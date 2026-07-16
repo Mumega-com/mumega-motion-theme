@@ -1,0 +1,16 @@
+{
+  "name": "mumega-motion-theme",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mumega WordPress theme with React/Motion-powered interactive components. Shares WordPress core's own React instance instead of bundling a duplicate.",
+  "scripts": {
+    "build": "wp-scripts build",
+    "start": "wp-scripts start"
+  },
+  "dependencies": {
+    "motion": "^12.42.2"
+  },
+  "devDependencies": {
+    "@wordpress/scripts": "^30.0.0"
+  }
+}
