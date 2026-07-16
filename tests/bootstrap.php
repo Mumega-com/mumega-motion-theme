@@ -402,9 +402,13 @@ function rest_sanitize_boolean( $value ) {
  * Wraps response data in a REST response.
  *
  * @param mixed $response Response data.
- * @return WP_REST_Response
+ * @return WP_REST_Response|WP_Error
  */
 function rest_ensure_response( $response ) {
+	if ( is_wp_error( $response ) ) {
+		return $response;
+	}
+
 	return $response instanceof WP_REST_Response ? $response : new WP_REST_Response( $response );
 }
 
@@ -473,12 +477,14 @@ function wp_safe_remote_get( $url, $args = array() ) {
  * Retrieves an HTTP response code.
  *
  * @param array|WP_Error $response HTTP response.
- * @return int
+ * @return int|string Response code, or an empty string for an invalid response.
  */
 function wp_remote_retrieve_response_code( $response ) {
-	return is_array( $response ) && isset( $response['response']['code'] )
-		? (int) $response['response']['code']
-		: 0;
+	if ( is_wp_error( $response ) || ! isset( $response['response'] ) || ! is_array( $response['response'] ) ) {
+		return '';
+	}
+
+	return $response['response']['code'];
 }
 
 /**
