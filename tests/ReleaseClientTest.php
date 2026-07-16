@@ -51,6 +51,43 @@ final class ReleaseClientTest extends TestCase {
 	}
 
 	/**
+	 * Selects prereleases using SemVer precedence rather than PHP's version rules.
+	 *
+	 * @dataProvider semver_prerelease_precedence_provider
+	 *
+	 * @param string $first    First release version.
+	 * @param string $second   Second release version.
+	 * @param string $expected Expected selected version.
+	 */
+	public function test_selects_prereleases_using_semver_precedence( string $first, string $second, string $expected ): void {
+		$this->queue_json_response(
+			array(
+				$this->release( 'edge-v' . $first ),
+				$this->release( 'edge-v' . $second ),
+			)
+		);
+		$this->queue_json_response( $this->manifest( $expected ) );
+
+		$result = ( new Mumega_Motion_Release_Client() )->latest();
+
+		$this->assertSame( $this->normalized_manifest( $expected ), $result );
+	}
+
+	/**
+	 * SemVer prerelease precedence cases PHP's version_compare() gets wrong.
+	 *
+	 * @return array<string,array{0:string,1:string,2:string}>
+	 */
+	public function semver_prerelease_precedence_provider(): array {
+		return array(
+			'arbitrary identifiers compare lexically' => array( '1.0.0-alpha', '1.0.0-zeta', '1.0.0-zeta' ),
+			'numeric identifier is lower than text'   => array( '1.0.0-alpha', '1.0.0-1', '1.0.0-alpha' ),
+			'dot identifiers compare independently'   => array( '1.0.0-alpha.1', '1.0.0-alpha.beta', '1.0.0-alpha.beta' ),
+			'build metadata does not set precedence'  => array( '1.0.0+build.1', '1.0.0+build.2', '1.0.0+build.1' ),
+		);
+	}
+
+	/**
 	 * Rejects a manifest asset outside the fixed public release path.
 	 */
 	public function test_rejects_manifest_asset_url_outside_fixed_repository(): void {

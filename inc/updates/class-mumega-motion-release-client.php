@@ -143,7 +143,7 @@ final class Mumega_Motion_Release_Client {
 				continue;
 			}
 
-			if ( null === $selected_version || version_compare( $version, $selected_version, '>' ) ) {
+			if ( null === $selected_version || 0 < $this->compare_semver( $version, $selected_version ) ) {
 				$selected         = $release;
 				$selected_version = $version;
 			}
@@ -157,6 +157,88 @@ final class Mumega_Motion_Release_Client {
 		}
 
 		return $selected;
+	}
+
+	/**
+	 * Compares two already-validated semantic versions by SemVer precedence.
+	 *
+	 * @param string $left  Left semantic version.
+	 * @param string $right Right semantic version.
+	 * @return int Negative, zero, or positive when left is lower, equal, or higher.
+	 */
+	private function compare_semver( $left, $right ) {
+		$left_parts  = explode( '-', explode( '+', $left, 2 )[0], 2 );
+		$right_parts = explode( '-', explode( '+', $right, 2 )[0], 2 );
+		$left_core   = explode( '.', $left_parts[0] );
+		$right_core  = explode( '.', $right_parts[0] );
+
+		for ( $index = 0; $index < 3; $index++ ) {
+			$comparison = $this->compare_numeric_identifier( $left_core[ $index ], $right_core[ $index ] );
+
+			if ( 0 !== $comparison ) {
+				return $comparison;
+			}
+		}
+
+		$left_has_prerelease  = isset( $left_parts[1] );
+		$right_has_prerelease = isset( $right_parts[1] );
+
+		if ( ! $left_has_prerelease || ! $right_has_prerelease ) {
+			return (int) $right_has_prerelease - (int) $left_has_prerelease;
+		}
+
+		$left_prerelease  = explode( '.', $left_parts[1] );
+		$right_prerelease = explode( '.', $right_parts[1] );
+		$identifier_count = max( count( $left_prerelease ), count( $right_prerelease ) );
+
+		for ( $index = 0; $index < $identifier_count; $index++ ) {
+			if ( ! isset( $left_prerelease[ $index ] ) ) {
+				return -1;
+			}
+
+			if ( ! isset( $right_prerelease[ $index ] ) ) {
+				return 1;
+			}
+
+			$left_identifier  = $left_prerelease[ $index ];
+			$right_identifier = $right_prerelease[ $index ];
+
+			if ( $left_identifier === $right_identifier ) {
+				continue;
+			}
+
+			$left_is_numeric  = 1 === preg_match( '/^[0-9]+$/', $left_identifier );
+			$right_is_numeric = 1 === preg_match( '/^[0-9]+$/', $right_identifier );
+
+			if ( $left_is_numeric && $right_is_numeric ) {
+				return $this->compare_numeric_identifier( $left_identifier, $right_identifier );
+			}
+
+			if ( $left_is_numeric ) {
+				return -1;
+			}
+
+			if ( $right_is_numeric ) {
+				return 1;
+			}
+
+			return strcmp( $left_identifier, $right_identifier );
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Compares numeric SemVer identifiers without integer-size limits.
+	 *
+	 * @param string $left  Left numeric identifier.
+	 * @param string $right Right numeric identifier.
+	 * @return int Negative, zero, or positive when left is lower, equal, or higher.
+	 */
+	private function compare_numeric_identifier( $left, $right ) {
+		$length_comparison = strlen( $left ) - strlen( $right );
+
+		return 0 !== $length_comparison ? $length_comparison : strcmp( $left, $right );
 	}
 
 	/**
