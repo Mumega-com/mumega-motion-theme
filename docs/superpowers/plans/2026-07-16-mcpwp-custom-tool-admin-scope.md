@@ -4,7 +4,7 @@
 
 **Goal:** Let extensions raise a registered MCP tool's inferred authorization scope to `admin` without allowing any extension to weaken existing MCPWP scope requirements.
 
-**Architecture:** Add one raise-only WordPress filter at MCPWP's existing tool-scope choke point. Keep the current core-tool inference unchanged—`wp_delete_draft` is admin, registered GET tools are read, and every other tool is write—expose the filter in the third-party tool contract, and prove elevation and downgrade protection in `ApiAuthTest`.
+**Architecture:** Add one raise-only WordPress filter at MCPWP's existing tool-scope choke point. Keep the current hard-coded admin list and name-based write/read inference unchanged, expose the filter in the third-party tool contract, and prove elevation and downgrade protection in `ApiAuthTest`.
 
 **Tech Stack:** PHP 7.4+, WordPress filters, MCPWP API-key authorization trait, PHPUnit 9.6, PHP_CodeSniffer.
 
@@ -78,7 +78,7 @@ public function test_extension_cannot_lower_builtin_admin_scope(): void {
 
 	$auth = new Mcpwp_Api_Auth_Test_Harness();
 
-	$this->assertSame( 'admin', $auth->required_scope_for_tool( 'wp_delete_draft' ) );
+	$this->assertSame( 'admin', $auth->required_scope_for_tool( 'wp_trigger_update' ) );
 }
 ```
 
@@ -107,9 +107,9 @@ public function test_invalid_filtered_scope_is_ignored(): void {
 public function test_scope_inference_is_unchanged_without_filter(): void {
 	$auth = new Mcpwp_Api_Auth_Test_Harness();
 
-	$this->assertSame( 'read', $auth->required_scope_for_tool( 'wp_list_posts' ) );
-	$this->assertSame( 'write', $auth->required_scope_for_tool( 'wp_update_post' ) );
-	$this->assertSame( 'admin', $auth->required_scope_for_tool( 'wp_delete_draft' ) );
+	$this->assertSame( 'read', $auth->required_scope_for_tool( 'vendor_list_records' ) );
+	$this->assertSame( 'write', $auth->required_scope_for_tool( 'wp_update_example' ) );
+	$this->assertSame( 'admin', $auth->required_scope_for_tool( 'wp_trigger_update' ) );
 }
 ```
 
@@ -139,7 +139,7 @@ git commit -m "test: define custom tool scope elevation contract"
 - Modify: `mcpwp/mcpwp.php`
 - Test: `mcpwp/tests/ApiAuthTest.php`
 
-- [ ] Refactor `get_required_scope_for_tool_name()` so its current `wp_delete_draft` special case and free-tool GET lookup assign to `$required_scope` instead of returning early. Preserve the existing fallback of `write` for every other tool.
+- [ ] Refactor `get_required_scope_for_tool_name()` so its current hard-coded admin list and write-name regex assign to `$required_scope` instead of returning early. Do not change either list or regex.
 
 - [ ] After default inference, apply the extension filter with the inferred scope and tool name.
 
