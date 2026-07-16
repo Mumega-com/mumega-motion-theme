@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
-import { LazyMotion, domAnimation } from 'motion/react';
+import { LazyMotion, domAnimation, m, LayoutGroup } from 'motion/react';
 import FadeIn from '../components/FadeIn';
+import StreamingText from '../components/StreamingText';
 
 /**
  * Progressive-enhancement auto-mount: any element already rendered by
@@ -41,6 +42,39 @@ function AutoMount( { html, delay, y, duration } ) {
 	);
 }
 
+/**
+ * Motion's layout animation only animates elements that are THEMSELVES
+ * motion components with the `layout` prop — a plain sibling <footer>
+ * elsewhere on the page does not automatically get pulled into the
+ * animation just because something above it changed size. To get a genuinely
+ * smooth push-down, the "sibling" has to be part of the same Motion-aware
+ * tree. This mounts both the streaming text AND a card below it together,
+ * so the card's position is actually under Motion's control and animates
+ * as the streaming content grows — confirmed by high-frequency sampling,
+ * not assumed.
+ */
+function StreamMount( { streamUrl, siblingText } ) {
+	return (
+		<LazyMotion features={ domAnimation }>
+			<LayoutGroup>
+				<m.div layout transition={ { duration: 0.8, ease: 'easeInOut' } }>
+					<StreamingText streamUrl={ streamUrl } />
+					{ siblingText && (
+						<m.div
+							id="stream-demo-sibling"
+							layout
+							transition={ { duration: 0.8, ease: 'easeInOut' } }
+							style={ { marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #ddd' } }
+						>
+							{ siblingText }
+						</m.div>
+					) }
+				</m.div>
+			</LayoutGroup>
+		</LazyMotion>
+	);
+}
+
 document.addEventListener( 'DOMContentLoaded', () => {
 	document.querySelectorAll( '[data-motion="fade-in"]' ).forEach( ( el ) => {
 		const html = el.innerHTML;
@@ -51,5 +85,11 @@ document.addEventListener( 'DOMContentLoaded', () => {
 		createRoot( el ).render(
 			<AutoMount html={ html } delay={ delay } y={ y } duration={ duration } />
 		);
+	} );
+
+	document.querySelectorAll( '[data-motion-stream]' ).forEach( ( el ) => {
+		const streamUrl = el.dataset.motionStream;
+		const siblingText = el.dataset.motionStreamSibling || '';
+		createRoot( el ).render( <StreamMount streamUrl={ streamUrl } siblingText={ siblingText } /> );
 	} );
 } );

@@ -36,6 +36,13 @@
 		<?php else : ?>
 			<p><?php esc_html_e( 'Nothing found.', 'mumega-motion' ); ?></p>
 		<?php endif; ?>
+
+		<section id="ai-stream-demo" style="max-width:260px;">
+			<div
+				data-motion-stream="<?php echo esc_url( get_template_directory_uri() . '/stream-demo.php' ); ?>"
+				data-motion-stream-sibling="<?php esc_attr_e( 'This card sits below the streaming text — its position is under Motion\'s control too, so it animates as the streaming content above it grows.', 'mumega-motion' ); ?>"
+			></div>
+		</section>
 	</main>
 
 	<?php wp_footer(); ?>

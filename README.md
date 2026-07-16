@@ -73,3 +73,30 @@ Built and tested live against a real WordPress instance (not just claimed):
 - WordPress's own core React script (`/wp-includes/js/dist/vendor/react*`) is what actually loads — no
   duplicate React bundle.
 - Zero console errors.
+
+## StreamingText — real HTTP-streamed content, with a known gap
+
+`src/components/StreamingText.jsx` renders text arriving from a genuine streaming HTTP response (`fetch`
++ `ReadableStream`, not a client-side typewriter simulation) — `data-motion-stream="<url>"` on a mount
+point. This is the actual "AI-first, impossible in Elementor" case: content that grows as tokens
+genuinely arrive over the wire, the same mechanism a real LLM response stream uses.
+
+**Confirmed working**, verified against `stream-demo.php` (a real chunked/flushed PHP endpoint, ~3s
+total, words arriving every ~90ms — proven via `curl -w '%{time_total}'`, not assumed):
+- Text renders progressively as real bytes arrive (sampled string length growing across the stream, not
+  jumping straight to the final value).
+- Final rendered text exactly matches the source.
+- Zero console errors.
+
+**Not confirmed — a real, currently-unresolved gap**, not glossed over: the intent was for a sibling
+element below the streaming text to smoothly glide down as the text grows (Motion's FLIP-based `layout`
+animation), rather than snap instantly like plain CSS reflow — the actual "Elementor literally cannot do
+this" claim. Extensive live testing (sub-25ms position and `transform` sampling across a growth event,
+both with and without an explicit `LayoutGroup` wrapper and an explicit slow `transition`) shows the
+sibling's position changes in a single frame with `transform` staying `none` throughout — i.e. the FLIP
+animation is not actually activating for this cross-component case in the current implementation, despite
+following Motion's documented `layout` + `LayoutGroup` pattern. Leading suspects, not yet root-caused:
+the sibling never re-renders itself (only `StreamingText`'s own internal state updates), and whatever
+ResizeObserver-based propagation Motion normally uses to catch "my neighbor grew" isn't registering
+across that boundary here. Worth a closer look with Motion's own devtools/source before relying on this
+specific effect in production.
