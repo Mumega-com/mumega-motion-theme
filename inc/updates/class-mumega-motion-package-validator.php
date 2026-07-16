@@ -62,7 +62,7 @@ final class Mumega_Motion_Package_Validator {
 			return self::error( 'mumega_motion_package_empty_archive', 'The downloaded theme package is empty.' );
 		}
 
-		$raw_name_result = self::inspect_raw_filenames( $zip_path, $entry_count );
+		$raw_name_result = self::inspect_zip_metadata( $zip_path, $entry_count );
 
 		if ( is_wp_error( $raw_name_result ) ) {
 			$archive->close();
@@ -72,6 +72,7 @@ final class Mumega_Motion_Package_Validator {
 
 		$roots   = array();
 		$entries = array();
+		$slug    = isset( $manifest['slug'] ) && is_string( $manifest['slug'] ) ? $manifest['slug'] : '';
 
 		for ( $index = 0; $index < $entry_count; $index++ ) {
 			$name = $archive->getNameIndex( $index );
@@ -82,8 +83,16 @@ final class Mumega_Motion_Package_Validator {
 				return self::error( 'mumega_motion_package_unsafe_path', 'The downloaded theme package contains an unsafe path.' );
 			}
 
-			$root           = explode( '/', rtrim( $name, '/' ), 2 )[0];
+			$is_directory   = '/' === substr( $name, -1 );
+			$entry_path     = $is_directory ? substr( $name, 0, -1 ) : $name;
+			$root           = explode( '/', $entry_path, 2 )[0];
 			$roots[ $root ] = true;
+
+			if ( $slug === $entry_path && ! $is_directory ) {
+				$archive->close();
+
+				return self::error( 'mumega_motion_package_invalid_root', 'The downloaded theme package contains a file colliding with its root directory.' );
+			}
 
 			if ( self::entry_is_symlink( $archive, $index ) ) {
 				$archive->close();
@@ -99,11 +108,24 @@ final class Mumega_Motion_Package_Validator {
 				return self::error( 'mumega_motion_package_invalid_archive', 'The downloaded theme package contains an invalid entry.' );
 			}
 
-			$entries[ $name ] = isset( $stat['size'] ) ? (int) $stat['size'] : 0;
+			$entry_size = isset( $stat['size'] ) ? $stat['size'] : 0;
+
+			if ( ! is_int( $entry_size ) || 0 > $entry_size ) {
+				$archive->close();
+
+				return self::error( 'mumega_motion_package_invalid_archive', 'The downloaded theme package contains an invalid entry size.' );
+			}
+
+			if ( self::MAX_PACKAGE_BYTES < $entry_size ) {
+				$archive->close();
+
+				return self::error( 'mumega_motion_package_too_large', 'The downloaded theme package declares an oversized entry.' );
+			}
+
+			$entries[ $name ] = $entry_size;
 		}
 
 		$archive->close();
-		$slug = isset( $manifest['slug'] ) && is_string( $manifest['slug'] ) ? $manifest['slug'] : '';
 
 		if ( 1 !== count( $roots ) || array( $slug ) !== array_keys( $roots ) ) {
 			return self::error( 'mumega_motion_package_invalid_root', 'The downloaded theme package has an invalid root directory.' );
@@ -135,7 +157,7 @@ final class Mumega_Motion_Package_Validator {
 			return true;
 		}
 
-		$trimmed_name = rtrim( $name, '/' );
+		$trimmed_name = '/' === substr( $name, -1 ) ? substr( $name, 0, -1 ) : $name;
 
 		if ( '' === $trimmed_name ) {
 			return true;
@@ -160,7 +182,7 @@ final class Mumega_Motion_Package_Validator {
 	 * @param int    $entry_count Entry count reported by ZipArchive.
 	 * @return true|WP_Error
 	 */
-	private static function inspect_raw_filenames( $zip_path, $entry_count ) {
+	private static function inspect_zip_metadata( $zip_path, $entry_count ) {
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local bounded ZIP metadata read.
 		$contents = file_get_contents( $zip_path );
 
@@ -168,11 +190,57 @@ final class Mumega_Motion_Package_Validator {
 			return self::error( 'mumega_motion_package_unreadable', 'The downloaded theme package could not be inspected.' );
 		}
 
-		$end_signature = "PK\x05\x06";
-		$end_offset    = strrpos( $contents, $end_signature );
+		$archive_length  = strlen( $contents );
+		$search_start    = max( 0, $archive_length - 65557 );
+		$search_tail     = substr( $contents, $search_start );
+		$candidates      = array();
+		$cursor          = 0;
+		$relative_offset = strpos( $search_tail, "PK\x05\x06", $cursor );
 
-		if ( false === $end_offset || strlen( $contents ) < $end_offset + 22 ) {
-			return self::error( 'mumega_motion_package_invalid_archive', 'The downloaded theme package has invalid ZIP metadata.' );
+		while ( false !== $relative_offset ) {
+			$candidates[]    = $search_start + $relative_offset;
+			$cursor          = $relative_offset + 1;
+			$relative_offset = strpos( $search_tail, "PK\x05\x06", $cursor );
+		}
+
+		$first_error = null;
+
+		foreach ( array_reverse( $candidates ) as $end_offset ) {
+			$end = self::parse_end_record( $contents, $end_offset, $entry_count );
+
+			if ( false === $end ) {
+				continue;
+			}
+
+			$result = self::inspect_central_directory( $contents, $end, $entry_count );
+
+			if ( true === $result ) {
+				return true;
+			}
+
+			if ( null === $first_error ) {
+				$first_error = $result;
+			}
+		}
+
+		return null !== $first_error
+			? $first_error
+			: self::error( 'mumega_motion_package_invalid_archive', 'The downloaded theme package has invalid ZIP metadata.' );
+	}
+
+	/**
+	 * Parses one bounded end-of-central-directory candidate.
+	 *
+	 * @param string $contents    Complete bounded archive bytes.
+	 * @param int    $end_offset  Candidate EOCD offset.
+	 * @param int    $entry_count Entry count reported by ZipArchive.
+	 * @return array|false
+	 */
+	private static function parse_end_record( $contents, $end_offset, $entry_count ) {
+		$archive_length = strlen( $contents );
+
+		if ( ! self::range_fits( $end_offset, 22, $archive_length ) ) {
+			return false;
 		}
 
 		$end = unpack(
@@ -182,50 +250,212 @@ final class Mumega_Motion_Package_Validator {
 
 		if (
 			false === $end ||
+			0xffff === $end['entries_on_disk'] ||
+			0xffff === $end['entries'] ||
+			0xffffffff === $end['central_size'] ||
+			0xffffffff === $end['central_offset'] ||
 			0 !== $end['disk'] ||
 			0 !== $end['central_disk'] ||
 			$end['entries_on_disk'] !== $end['entries'] ||
 			$entry_count !== $end['entries'] ||
-			strlen( $contents ) !== $end_offset + 22 + $end['comment_length'] ||
-			$end['central_offset'] + $end['central_size'] > $end_offset
+			! self::bounded_unsigned( $end['comment_length'], $archive_length - $end_offset - 22 ) ||
+			$end['comment_length'] !== $archive_length - $end_offset - 22 ||
+			! self::bounded_unsigned( $end['central_offset'], $end_offset ) ||
+			! self::bounded_unsigned( $end['central_size'], $end_offset ) ||
+			! self::range_fits( $end['central_offset'], $end['central_size'], $end_offset )
 		) {
-			return self::error( 'mumega_motion_package_invalid_archive', 'The downloaded theme package has inconsistent ZIP metadata.' );
+			return false;
 		}
 
+		$end['end_offset'] = $end_offset;
+
+		return $end;
+	}
+
+	/**
+	 * Validates central and matching local entry metadata without decompression.
+	 *
+	 * @param string $contents    Complete bounded archive bytes.
+	 * @param array  $end         Parsed EOCD fields.
+	 * @param int    $entry_count Expected entry count.
+	 * @return true|WP_Error
+	 */
+	private static function inspect_central_directory( $contents, array $end, $entry_count ) {
 		$offset      = $end['central_offset'];
 		$central_end = $offset + $end['central_size'];
 
 		for ( $index = 0; $index < $entry_count; $index++ ) {
-			if ( $offset + 46 > $central_end || "PK\x01\x02" !== substr( $contents, $offset, 4 ) ) {
+			if ( ! self::range_fits( $offset, 46, $central_end ) || "PK\x01\x02" !== substr( $contents, $offset, 4 ) ) {
 				return self::error( 'mumega_motion_package_invalid_archive', 'The downloaded theme package has an invalid central directory.' );
 			}
 
-			$lengths = unpack( 'vname/vextra/vcomment', substr( $contents, $offset + 28, 6 ) );
+			$entry = unpack(
+				'Vcompressed/Vuncompressed/vname/vextra/vcomment/vdisk/vinternal/x4/Vlocal_offset',
+				substr( $contents, $offset + 20, 26 )
+			);
 
-			if ( false === $lengths ) {
-				return self::error( 'mumega_motion_package_invalid_archive', 'The downloaded theme package has invalid entry metadata.' );
+			if ( false === $entry || ! self::central_entry_fields_are_valid( $entry, $end['central_offset'] ) ) {
+				return self::error( 'mumega_motion_package_invalid_archive', 'The downloaded theme package contains unsupported ZIP64 or invalid entry metadata.' );
 			}
 
-			$entry_size = 46 + $lengths['name'] + $lengths['extra'] + $lengths['comment'];
+			if ( self::MAX_PACKAGE_BYTES < $entry['uncompressed'] ) {
+				return self::error( 'mumega_motion_package_too_large', 'The downloaded theme package declares an oversized entry.' );
+			}
 
-			if ( $offset + $entry_size > $central_end ) {
+			$variable_length = $entry['name'] + $entry['extra'] + $entry['comment'];
+
+			if ( ! self::range_fits( $offset + 46, $variable_length, $central_end ) ) {
 				return self::error( 'mumega_motion_package_invalid_archive', 'The downloaded theme package has a truncated central directory.' );
 			}
 
-			$raw_name = substr( $contents, $offset + 46, $lengths['name'] );
+			$name_offset  = $offset + 46;
+			$extra_offset = $name_offset + $entry['name'];
+			$raw_name     = substr( $contents, $name_offset, $entry['name'] );
+			$raw_extra    = substr( $contents, $extra_offset, $entry['extra'] );
 
 			if ( false !== strpos( $raw_name, "\0" ) ) {
 				return self::error( 'mumega_motion_package_unsafe_path', 'The downloaded theme package contains a null byte in an entry path.' );
 			}
 
-			$offset += $entry_size;
+			if ( ! self::extra_fields_are_supported( $raw_extra ) ) {
+				return self::error( 'mumega_motion_package_invalid_archive', 'The downloaded theme package contains unsupported ZIP64 or malformed extra metadata.' );
+			}
+
+			$local_result = self::inspect_local_entry( $contents, $entry['local_offset'], $end['central_offset'], $raw_name );
+
+			if ( true !== $local_result ) {
+				return $local_result;
+			}
+
+			$offset += 46 + $variable_length;
 		}
 
-		if ( $offset !== $central_end ) {
+		if ( $offset !== $central_end || $central_end !== $end['end_offset'] ) {
 			return self::error( 'mumega_motion_package_invalid_archive', 'The downloaded theme package has unexpected central-directory data.' );
 		}
 
 		return true;
+	}
+
+	/**
+	 * Checks fixed-width central-directory fields before arithmetic.
+	 *
+	 * @param array $entry          Parsed central entry fields.
+	 * @param int   $central_offset Start of the central directory.
+	 * @return bool
+	 */
+	private static function central_entry_fields_are_valid( array $entry, $central_offset ) {
+		return 0xffffffff !== $entry['compressed'] &&
+			0xffffffff !== $entry['uncompressed'] &&
+			0xffffffff !== $entry['local_offset'] &&
+			0xffff !== $entry['disk'] &&
+			0 === $entry['disk'] &&
+			self::bounded_unsigned( $entry['compressed'], self::MAX_PACKAGE_BYTES ) &&
+			self::bounded_unsigned( $entry['uncompressed'], 0xffffffff ) &&
+			self::bounded_unsigned( $entry['local_offset'], $central_offset ) &&
+			self::bounded_unsigned( $entry['name'], 0xffff ) &&
+			self::bounded_unsigned( $entry['extra'], 0xffff ) &&
+			self::bounded_unsigned( $entry['comment'], 0xffff );
+	}
+
+	/**
+	 * Validates one local header and its raw extra metadata.
+	 *
+	 * @param string $contents       Complete bounded archive bytes.
+	 * @param int    $local_offset   Local header offset.
+	 * @param int    $central_offset Central-directory boundary.
+	 * @param string $central_name   Raw central filename.
+	 * @return true|WP_Error
+	 */
+	private static function inspect_local_entry( $contents, $local_offset, $central_offset, $central_name ) {
+		if ( ! self::range_fits( $local_offset, 30, $central_offset ) || "PK\x03\x04" !== substr( $contents, $local_offset, 4 ) ) {
+			return self::error( 'mumega_motion_package_invalid_archive', 'The downloaded theme package has an invalid local entry header.' );
+		}
+
+		$local = unpack( 'Vcompressed/Vuncompressed/vname/vextra', substr( $contents, $local_offset + 18, 12 ) );
+
+		if (
+			false === $local ||
+			0xffffffff === $local['compressed'] ||
+			0xffffffff === $local['uncompressed'] ||
+			! self::bounded_unsigned( $local['compressed'], self::MAX_PACKAGE_BYTES ) ||
+			! self::bounded_unsigned( $local['uncompressed'], 0xffffffff ) ||
+			! self::bounded_unsigned( $local['name'], 0xffff ) ||
+			! self::bounded_unsigned( $local['extra'], 0xffff )
+		) {
+			return self::error( 'mumega_motion_package_invalid_archive', 'The downloaded theme package contains unsupported ZIP64 or invalid local metadata.' );
+		}
+
+		if ( self::MAX_PACKAGE_BYTES < $local['uncompressed'] ) {
+			return self::error( 'mumega_motion_package_too_large', 'The downloaded theme package declares an oversized entry.' );
+		}
+
+		$variable_length = $local['name'] + $local['extra'];
+
+		if ( ! self::range_fits( $local_offset + 30, $variable_length, $central_offset ) ) {
+			return self::error( 'mumega_motion_package_invalid_archive', 'The downloaded theme package has truncated local metadata.' );
+		}
+
+		$local_name  = substr( $contents, $local_offset + 30, $local['name'] );
+		$local_extra = substr( $contents, $local_offset + 30 + $local['name'], $local['extra'] );
+
+		if ( $central_name !== $local_name || ! self::extra_fields_are_supported( $local_extra ) ) {
+			return self::error( 'mumega_motion_package_invalid_archive', 'The downloaded theme package has inconsistent or unsupported local metadata.' );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Rejects malformed and ZIP64 (0x0001) extra fields.
+	 *
+	 * @param string $extra Raw extra-field bytes.
+	 * @return bool
+	 */
+	private static function extra_fields_are_supported( $extra ) {
+		$offset = 0;
+		$length = strlen( $extra );
+
+		while ( $offset < $length ) {
+			if ( ! self::range_fits( $offset, 4, $length ) ) {
+				return false;
+			}
+
+			$field = unpack( 'vid/vsize', substr( $extra, $offset, 4 ) );
+
+			if ( false === $field || 0x0001 === $field['id'] || ! self::range_fits( $offset + 4, $field['size'], $length ) ) {
+				return false;
+			}
+
+			$offset += 4 + $field['size'];
+		}
+
+		return true;
+	}
+
+	/**
+	 * Checks an unpacked unsigned field against a runtime-safe bound.
+	 *
+	 * @param mixed $value Parsed value.
+	 * @param int   $limit Inclusive maximum.
+	 * @return bool
+	 */
+	private static function bounded_unsigned( $value, $limit ) {
+		return is_int( $value ) && is_int( $limit ) && 0 <= $value && 0 <= $limit && $value <= $limit;
+	}
+
+	/**
+	 * Checks a byte range using subtraction before addition.
+	 *
+	 * @param mixed $offset Range start.
+	 * @param mixed $length Range length.
+	 * @param mixed $limit  Exclusive upper bound.
+	 * @return bool
+	 */
+	private static function range_fits( $offset, $length, $limit ) {
+		return self::bounded_unsigned( $offset, $limit ) &&
+			self::bounded_unsigned( $length, $limit ) &&
+			$length <= $limit - $offset;
 	}
 
 	/**

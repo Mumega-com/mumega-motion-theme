@@ -68,6 +68,25 @@ final class PackageValidatorTest extends TestCase {
 	}
 
 	/**
+	 * Accepts descendants when the optional explicit root entry is absent.
+	 */
+	public function test_accepts_package_without_explicit_root_directory(): void {
+		$zip_path = $this->create_package( null, false );
+
+		$this->assertTrue( Mumega_Motion_Package_Validator::validate( $zip_path, $this->manifest_for( $zip_path ) ) );
+	}
+
+	/**
+	 * Accepts a valid archive when its comment contains a false EOCD signature.
+	 */
+	public function test_accepts_archive_comment_containing_eocd_signature(): void {
+		$zip_path = $this->create_package();
+		$this->append_archive_comment( $zip_path, 'comment' . "PK\x05\x06" . str_repeat( "\0", 18 ) );
+
+		$this->assertTrue( Mumega_Motion_Package_Validator::validate( $zip_path, $this->manifest_for( $zip_path ) ) );
+	}
+
+	/**
 	 * Rejects package integrity and size violations before installation.
 	 *
 	 * @dataProvider integrity_failure_provider
@@ -125,6 +144,9 @@ final class PackageValidatorTest extends TestCase {
 			case 'empty_required':
 				$entries[ self::SLUG . '/functions.php' ] = '';
 				break;
+			case 'slug_file_collision':
+				$entries[ self::SLUG ] = 'not a directory';
+				break;
 		}
 
 		$zip_path = $this->create_package( $entries );
@@ -146,6 +168,7 @@ final class PackageValidatorTest extends TestCase {
 			'wrong root slug'       => array( 'wrong_slug', 'mumega_motion_package_invalid_root' ),
 			'missing required file' => array( 'missing_required', 'mumega_motion_package_required_file_missing' ),
 			'empty required file'   => array( 'empty_required', 'mumega_motion_package_required_file_empty' ),
+			'slug file collision'   => array( 'slug_file_collision', 'mumega_motion_package_invalid_root' ),
 		);
 	}
 
@@ -180,6 +203,84 @@ final class PackageValidatorTest extends TestCase {
 			'parent traversal' => array( self::SLUG . '/../outside.php' ),
 			'absolute path'    => array( '/tmp/outside.php' ),
 			'Windows path'     => array( self::SLUG . '\\outside.php' ),
+			'repeated slash'   => array( self::SLUG . '/foo//' ),
+		);
+	}
+
+	/**
+	 * Rejects a ZIP64 extra field even when the archive remains under 20 MiB.
+	 */
+	public function test_rejects_zip64_extra_field(): void {
+		$zip_path = $this->create_package();
+		$this->add_central_extra_field(
+			$zip_path,
+			self::SLUG . '/build/index.asset.php',
+			pack( 'vvV2', 0x0001, 8, 32 * 1024 * 1024, 0 )
+		);
+
+		$this->assertLessThan( 20 * 1024 * 1024, filesize( $zip_path ) );
+		$this->assert_error_code(
+			'mumega_motion_package_invalid_archive',
+			Mumega_Motion_Package_Validator::validate( $zip_path, $this->manifest_for( $zip_path ) )
+		);
+	}
+
+	/**
+	 * Rejects a compressed package entry whose declared size exceeds the cap.
+	 */
+	public function test_rejects_oversized_declared_entry(): void {
+		$entries                                      = $this->required_entries();
+		$entries[ self::SLUG . '/build/index.js' ] = str_repeat( 'A', ( 20 * 1024 * 1024 ) + 1 );
+		$zip_path                                     = $this->create_package( $entries );
+
+		$this->assertLessThan( 20 * 1024 * 1024, filesize( $zip_path ) );
+		$this->assert_error_code(
+			'mumega_motion_package_too_large',
+			Mumega_Motion_Package_Validator::validate( $zip_path, $this->manifest_for( $zip_path ) )
+		);
+	}
+
+	/**
+	 * Rejects ZIP64 sentinels and out-of-bounds unsigned EOCD fields.
+	 *
+	 * @dataProvider invalid_eocd_field_provider
+	 *
+	 * @param string $case EOCD mutation case.
+	 */
+	public function test_rejects_invalid_eocd_fields( string $case ): void {
+		$zip_path = $this->create_package();
+
+		if ( 'entry_sentinels' === $case ) {
+			$this->replace_eocd_field( $zip_path, 8, pack( 'v', 0xffff ) );
+			$this->replace_eocd_field( $zip_path, 10, pack( 'v', 0xffff ) );
+		} elseif ( 'size_sentinel' === $case ) {
+			$this->replace_eocd_field( $zip_path, 12, pack( 'V', 0xffffffff ) );
+		} elseif ( 'offset_sentinel' === $case ) {
+			$this->replace_eocd_field( $zip_path, 16, pack( 'V', 0xffffffff ) );
+		} elseif ( 'size_out_of_bounds' === $case ) {
+			$this->replace_eocd_field( $zip_path, 12, pack( 'V', 0x80000000 ) );
+		} else {
+			$this->replace_eocd_field( $zip_path, 16, pack( 'V', 0x80000000 ) );
+		}
+
+		$this->assert_error_code(
+			'mumega_motion_package_invalid_archive',
+			Mumega_Motion_Package_Validator::validate( $zip_path, $this->manifest_for( $zip_path ) )
+		);
+	}
+
+	/**
+	 * Invalid unsigned EOCD field cases.
+	 *
+	 * @return array<string,array{0:string}>
+	 */
+	public function invalid_eocd_field_provider(): array {
+		return array(
+			'entry-count sentinels' => array( 'entry_sentinels' ),
+			'size sentinel'         => array( 'size_sentinel' ),
+			'offset sentinel'       => array( 'offset_sentinel' ),
+			'size out of bounds'    => array( 'size_out_of_bounds' ),
+			'offset out of bounds'  => array( 'offset_out_of_bounds' ),
 		);
 	}
 
@@ -267,10 +368,11 @@ final class PackageValidatorTest extends TestCase {
 	/**
 	 * Creates a package containing the supplied entries.
 	 *
-	 * @param array<string,string>|null $entries Entry contents keyed by path.
+	 * @param array<string,string>|null $entries      Entry contents keyed by path.
+	 * @param bool                      $include_root Whether to add an explicit root directory entry.
 	 * @return string Archive path.
 	 */
-	private function create_package( ?array $entries = null ): string {
+	private function create_package( ?array $entries = null, bool $include_root = true ): string {
 		$zip_path = $this->temporary_directory . '/package-' . bin2hex( random_bytes( 4 ) ) . '.zip';
 		$archive  = new ZipArchive();
 
@@ -278,10 +380,14 @@ final class PackageValidatorTest extends TestCase {
 		$root    = strtok( (string) array_key_first( $entries ), '/' );
 
 		$this->assertTrue( $archive->open( $zip_path, ZipArchive::CREATE | ZipArchive::OVERWRITE ) );
-		$this->assertTrue( $archive->addEmptyDir( $root ) );
+
+		if ( $include_root ) {
+			$this->assertTrue( $archive->addEmptyDir( $root ) );
+		}
 
 		foreach ( $entries as $name => $contents ) {
 			$this->assertTrue( $archive->addFromString( $name, $contents ) );
+			$this->assertTrue( $archive->setCompressionName( $name, ZipArchive::CM_DEFLATE ) );
 		}
 
 		$this->assertTrue( $archive->close() );
@@ -348,6 +454,58 @@ final class PackageValidatorTest extends TestCase {
 		$this->assertSame( 2, substr_count( $contents, $safe_name ) );
 		$contents = str_replace( $safe_name, $unsafe_name, $contents );
 		$this->assertSame( 2, substr_count( $contents, $unsafe_name ) );
+		file_put_contents( $zip_path, $contents );
+	}
+
+	/**
+	 * Adds an extra field to one central-directory entry and repairs EOCD size.
+	 *
+	 * @param string $zip_path   Archive path.
+	 * @param string $entry_name Target entry name.
+	 * @param string $extra      Complete extra-field record.
+	 */
+	private function add_central_extra_field( string $zip_path, string $entry_name, string $extra ): void {
+		$contents    = file_get_contents( $zip_path );
+		$end_offset  = strrpos( $contents, "PK\x05\x06" );
+		$end         = unpack( 'Vcentral_size/Vcentral_offset', substr( $contents, $end_offset + 12, 8 ) );
+		$name_offset = strpos( $contents, $entry_name, $end['central_offset'] );
+		$header      = $name_offset - 46;
+
+		$this->assertSame( "PK\x01\x02", substr( $contents, $header, 4 ) );
+		$lengths       = unpack( 'vname/vextra', substr( $contents, $header + 28, 4 ) );
+		$insert_offset = $header + 46 + $lengths['name'] + $lengths['extra'];
+		$contents      = substr_replace( $contents, pack( 'v', $lengths['extra'] + strlen( $extra ) ), $header + 30, 2 );
+		$contents      = substr_replace( $contents, $extra, $insert_offset, 0 );
+		$end_offset   += strlen( $extra );
+		$contents      = substr_replace( $contents, pack( 'V', $end['central_size'] + strlen( $extra ) ), $end_offset + 12, 4 );
+		file_put_contents( $zip_path, $contents );
+	}
+
+	/**
+	 * Replaces bytes in the actual EOCD record.
+	 *
+	 * @param string $zip_path Archive path.
+	 * @param int    $offset   Field offset from the EOCD signature.
+	 * @param string $bytes    Replacement bytes.
+	 */
+	private function replace_eocd_field( string $zip_path, int $offset, string $bytes ): void {
+		$contents   = file_get_contents( $zip_path );
+		$end_offset = strrpos( $contents, "PK\x05\x06" );
+		$contents   = substr_replace( $contents, $bytes, $end_offset + $offset, strlen( $bytes ) );
+		file_put_contents( $zip_path, $contents );
+	}
+
+	/**
+	 * Appends raw comment bytes to a comment-free archive.
+	 *
+	 * @param string $zip_path Archive path.
+	 * @param string $comment  Raw comment bytes.
+	 */
+	private function append_archive_comment( string $zip_path, string $comment ): void {
+		$contents   = file_get_contents( $zip_path );
+		$end_offset = strrpos( $contents, "PK\x05\x06" );
+		$this->assertSame( strlen( $contents ) - 22, $end_offset );
+		$contents = substr_replace( $contents, pack( 'v', strlen( $comment ) ), $end_offset + 20, 2 ) . $comment;
 		file_put_contents( $zip_path, $contents );
 	}
 
