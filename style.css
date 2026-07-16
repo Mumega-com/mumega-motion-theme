@@ -7,3 +7,29 @@ Requires at least: 6.5
 Requires PHP: 7.4
 Text Domain: mumega-motion
 */
+
+/*
+ * Demo consumption of Figma-synced design tokens (see inc/figma-tokens.php).
+ * Every var() has a hardcoded fallback so the page renders identically to
+ * before this feature existed when `mcpwp_figma_design_tokens` is missing,
+ * empty, or MCPWP isn't installed — the fallback values below ARE that
+ * pre-existing look, not placeholders.
+ */
+header {
+	background-color: var(--figma-color-brand-primary, #1a1a2e);
+	color: #ffffff;
+	padding: 2rem;
+}
+
+header h1 {
+	font-family: var(--figma-typography-heading-h1-font-family, inherit);
+	font-weight: var(--figma-typography-heading-h1-font-weight, 700);
+	font-size: var(--figma-typography-heading-h1-font-size, 2rem);
+	line-height: var(--figma-typography-heading-h1-line-height, 1.2);
+	margin: 0 0 0.25rem;
+}
+
+header p {
+	color: var(--figma-color-brand-secondary, #cccccc);
+	margin: 0;
+}

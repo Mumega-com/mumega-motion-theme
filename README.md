@@ -100,3 +100,75 @@ the sibling never re-renders itself (only `StreamingText`'s own internal state u
 ResizeObserver-based propagation Motion normally uses to catch "my neighbor grew" isn't registering
 across that boundary here. Worth a closer look with Motion's own devtools/source before relying on this
 specific effect in production.
+
+## Figma-synced design tokens (colors + typography)
+
+`inc/figma-tokens.php` reads a WP option — `mcpwp_figma_design_tokens` — and, if it holds any valid
+tokens, prints an inline `<style id="mumega-figma-tokens">` block of CSS custom properties in `wp_head`.
+This lets a *separate* plugin, [MCPWP](https://mcpwp.net) (a WordPress MCP plugin, installed independently
+on the same site), keep this theme's colors/typography in sync with a Figma file — re-syncing from Figma
+on the MCPWP side updates the rendered site immediately, with no theme rebuild and no theme code changes.
+
+**This theme has zero hard dependency on MCPWP.** It only ever calls `get_option(
+'mcpwp_figma_design_tokens', array() )`. If MCPWP isn't installed, hasn't synced yet, or the option is
+malformed, every code path here degrades to "no valid tokens" and the `<style>` block simply isn't
+printed — the theme's own hardcoded fallback values render exactly as if this feature didn't exist.
+
+### Option schema (owned by MCPWP; this theme is a read-only consumer)
+
+```php
+array(
+    'synced_at' => 1234567890, // unix timestamp
+    'file_key'  => 'abc123',
+    'colors'    => array(
+        'brand-primary'   => '#2F7CFF', // hex, or rgba(r, g, b, a) string if alpha < 1
+        'brand-secondary' => '#27C46A',
+    ),
+    'typography' => array(
+        'heading-h1' => array(
+            'fontFamily'   => 'Inter',
+            'fontWeight'   => 700,
+            'fontSize'     => 48,     // px, integer
+            'lineHeightPx' => 56,     // px, integer
+        ),
+    ),
+)
+```
+
+`colors` and `typography` keys are already CSS-custom-property-safe slugs (lowercase, hyphenated — Figma
+style names like "Brand/Primary" become `brand-primary` on the MCPWP side). Both maps may be empty (never
+synced, or a Figma file with no shared styles) — this theme treats that as the normal, unsynced state, not
+an error.
+
+### CSS custom property naming convention
+
+| Token | CSS custom property |
+|---|---|
+| `colors.{slug}` | `--figma-color-{slug}` |
+| `typography.{slug}.fontFamily` | `--figma-typography-{slug}-font-family` |
+| `typography.{slug}.fontWeight` | `--figma-typography-{slug}-font-weight` |
+| `typography.{slug}.fontSize` | `--figma-typography-{slug}-font-size` (px baked into the value, e.g. `48px`) |
+| `typography.{slug}.lineHeightPx` | `--figma-typography-{slug}-line-height` (px baked into the value, e.g. `56px`) |
+
+Every value is validated against a strict whitelist before being placed in the raw `<style>` block (colors
+must match a hex or `rgb()`/`rgba()` pattern; font families are stripped to letters/digits/spaces/hyphens/
+commas; numeric fields must be numeric and in a sane range) — the option is treated as untrusted input at
+this boundary even though it ultimately traces back to the site owner's own Figma account, since it passes
+through an external API and a separate plugin first. Values that don't pass validation are dropped, not
+partially escaped and kept.
+
+`style.css` consumes these with fallbacks, e.g.:
+
+```css
+header {
+	background-color: var(--figma-color-brand-primary, #1a1a2e);
+}
+header h1 {
+	font-family: var(--figma-typography-heading-h1-font-family, inherit);
+	font-size: var(--figma-typography-heading-h1-font-size, 2rem);
+}
+```
+
+So the header/hero re-colors and re-fonts itself the moment MCPWP's Figma sync populates the option —
+no theme rebuild, no theme code touched — and falls back to the hardcoded defaults above whenever the
+option is empty or MCPWP isn't present.
