@@ -22,6 +22,9 @@ $GLOBALS['mumega_motion_test_site_transients']  = array();
 $GLOBALS['mumega_motion_test_remote_requests']  = array();
 $GLOBALS['mumega_motion_test_remote_responses'] = array();
 $GLOBALS['mumega_motion_test_capabilities']     = array();
+$GLOBALS['mumega_motion_test_upload_basedir']   = sys_get_temp_dir();
+$GLOBALS['mumega_motion_test_copy_fail_after']  = null;
+$GLOBALS['mumega_motion_test_copy_count']       = 0;
 
 /**
  * Minimal WP_Error implementation for unit tests.
@@ -531,6 +534,142 @@ function wp_parse_url( $url, $component = -1 ) {
 function wp_json_encode( $value, $flags = 0, $depth = 512 ) {
 	// phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
 	return json_encode( $value, $flags, $depth );
+}
+
+/**
+ * Returns the uploads location configured by the current test.
+ *
+ * @return array
+ */
+function wp_upload_dir() {
+	return array(
+		'basedir' => $GLOBALS['mumega_motion_test_upload_basedir'],
+		'error'   => false,
+	);
+}
+
+/**
+ * Creates a directory recursively.
+ *
+ * @param string $target Directory to create.
+ * @return bool
+ */
+function wp_mkdir_p( $target ) {
+	return is_dir( $target ) || mkdir( $target, 0755, true );
+}
+
+/**
+ * Copies a directory recursively, with deterministic failure injection.
+ *
+ * @param string $from Source directory.
+ * @param string $to   Destination directory.
+ * @return true|WP_Error
+ */
+function copy_dir( $from, $to ) {
+	if ( ! is_dir( $from ) || is_link( $from ) || ! wp_mkdir_p( $to ) ) {
+		return new WP_Error( 'copy_failed', 'The directory could not be copied.' );
+	}
+
+	$entries = scandir( $from );
+
+	if ( false === $entries ) {
+		return new WP_Error( 'copy_failed', 'The source directory could not be read.' );
+	}
+
+	foreach ( $entries as $entry ) {
+		if ( '.' === $entry || '..' === $entry ) {
+			continue;
+		}
+
+		$source      = $from . '/' . $entry;
+		$destination = $to . '/' . $entry;
+
+		if ( is_link( $source ) ) {
+			return new WP_Error( 'copy_failed', 'Symbolic links are not copied.' );
+		}
+
+		if ( is_dir( $source ) ) {
+			$result = copy_dir( $source, $destination );
+
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+
+			continue;
+		}
+
+		$GLOBALS['mumega_motion_test_copy_count']++;
+
+		if (
+			null !== $GLOBALS['mumega_motion_test_copy_fail_after'] &&
+			$GLOBALS['mumega_motion_test_copy_count'] > $GLOBALS['mumega_motion_test_copy_fail_after']
+		) {
+			return new WP_Error( 'copy_failed', 'The injected copy failure occurred.' );
+		}
+
+		if ( ! copy( $source, $destination ) ) {
+			return new WP_Error( 'copy_failed', 'A file could not be copied.' );
+		}
+	}
+
+	return true;
+}
+
+/**
+ * Lightweight direct filesystem implementation used for recursive cleanup.
+ */
+class Mumega_Motion_Test_Filesystem {
+	/**
+	 * Deletes a file or directory.
+	 *
+	 * @param string $path      Path to delete.
+	 * @param bool   $recursive Whether to recurse.
+	 * @return bool
+	 */
+	public function delete( $path, $recursive = false ) {
+		if ( is_link( $path ) || is_file( $path ) ) {
+			return unlink( $path );
+		}
+
+		if ( ! file_exists( $path ) ) {
+			return true;
+		}
+
+		if ( ! is_dir( $path ) ) {
+			return false;
+		}
+
+		if ( $recursive ) {
+			$entries = scandir( $path );
+
+			if ( false === $entries ) {
+				return false;
+			}
+
+			foreach ( $entries as $entry ) {
+				if ( '.' !== $entry && '..' !== $entry && ! $this->delete( $path . '/' . $entry, true ) ) {
+					return false;
+				}
+			}
+		}
+
+		return rmdir( $path );
+	}
+}
+
+/**
+ * Initializes the test filesystem global.
+ *
+ * @return bool
+ */
+function WP_Filesystem() { // phpcs:ignore WordPress.NamingConventions.ValidFunctionName.FunctionNameInvalid
+	global $wp_filesystem;
+
+	if ( ! is_object( $wp_filesystem ) ) {
+		$wp_filesystem = new Mumega_Motion_Test_Filesystem();
+	}
+
+	return true;
 }
 
 // Load update classes in dependency order, after their WordPress dependencies.
