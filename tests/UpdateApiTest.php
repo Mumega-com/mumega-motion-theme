@@ -196,6 +196,115 @@ final class UpdateApiTest extends TestCase {
 	}
 
 	/**
+	 * Rejects a tampered Mumega Motion package from Theme_Upgrader's bulk
+	 * update shape, which omits the single-update type metadata.
+	 */
+	public function test_dashboard_bulk_theme_download_rejects_a_checksum_mismatch(): void {
+		$release = new Mumega_Motion_Update_Api_Test_Release_Client();
+		$api     = new Mumega_Motion_Update_Api( new Mumega_Motion_Update_Api_Test_Updater(), $release, false );
+		$package = tempnam( sys_get_temp_dir(), 'mumega-motion-dashboard-' );
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Test fixture bytes must deliberately fail checksum validation.
+		file_put_contents( $package, 'tampered bulk dashboard package' );
+		$GLOBALS['mumega_motion_test_download_results'][] = $package;
+		$api->register();
+
+		$result = apply_filters(
+			'upgrader_pre_download',
+			false,
+			$release->manifest['package_url'],
+			new stdClass(),
+			array(
+				'theme'       => 'mumega-motion-theme',
+				'temp_backup' => array(
+					'slug' => 'mumega-motion-theme',
+					'src'  => '/var/www/wp-content/themes',
+					'dir'  => 'themes',
+				),
+			)
+		);
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 'mumega_motion_package_checksum_mismatch', $result->get_error_code() );
+		$this->assertSame( array( true ), $release->latest_calls );
+		$this->assertSame( $release->manifest['package_url'], $GLOBALS['mumega_motion_test_download_requests'][0]['url'] );
+		$this->assertFileDoesNotExist( $package );
+	}
+
+	/**
+	 * Leaves non-Mumega bulk theme updates untouched.
+	 */
+	public function test_dashboard_bulk_theme_download_leaves_other_themes_untouched(): void {
+		$release = new Mumega_Motion_Update_Api_Test_Release_Client();
+		$api     = new Mumega_Motion_Update_Api( new Mumega_Motion_Update_Api_Test_Updater(), $release, false );
+		$reply   = new WP_Error( 'existing_reply', 'Existing downloader reply.' );
+		$api->register();
+
+		$result = apply_filters(
+			'upgrader_pre_download',
+			$reply,
+			$release->manifest['package_url'],
+			new stdClass(),
+			array(
+				'theme'       => 'other-theme',
+				'temp_backup' => array(
+					'slug' => 'other-theme',
+					'src'  => '/var/www/wp-content/themes',
+					'dir'  => 'themes',
+				),
+			)
+		);
+
+		$this->assertSame( $reply, $result );
+		$this->assertSame( array(), $release->latest_calls );
+		$this->assertSame( array(), $GLOBALS['mumega_motion_test_download_requests'] );
+	}
+
+	/**
+	 * Leaves malformed Mumega Motion bulk-update metadata untouched.
+	 */
+	public function test_dashboard_bulk_theme_download_leaves_invalid_metadata_untouched(): void {
+		$release = new Mumega_Motion_Update_Api_Test_Release_Client();
+		$api     = new Mumega_Motion_Update_Api( new Mumega_Motion_Update_Api_Test_Updater(), $release, false );
+		$api->register();
+
+		foreach (
+			array(
+				array(
+					'theme' => 'mumega-motion-theme',
+					'type'  => 'plugin',
+				),
+				array(
+					'theme' => 'mumega-motion-theme',
+				),
+				array(
+					'theme'       => 'mumega-motion-theme',
+					'temp_backup' => array(
+						'slug' => 'mumega-motion-theme',
+						'src'  => '/var/www/wp-content/themes',
+						'dir'  => 'plugins',
+					),
+				),
+			) as $hook_extra
+		) {
+			$reply = new WP_Error( 'existing_reply', 'Existing downloader reply.' );
+
+			$result = apply_filters(
+				'upgrader_pre_download',
+				$reply,
+				$release->manifest['package_url'],
+				new stdClass(),
+				$hook_extra
+			);
+
+			$this->assertSame( $reply, $result );
+		}
+
+		$this->assertSame( array(), $release->latest_calls );
+		$this->assertSame( array(), $GLOBALS['mumega_motion_test_download_requests'] );
+	}
+
+	/**
 	 * Gives Core a locally downloaded ZIP only after it is verified against the
 	 * freshly revalidated fixed manifest. Core then owns normal temp cleanup.
 	 */

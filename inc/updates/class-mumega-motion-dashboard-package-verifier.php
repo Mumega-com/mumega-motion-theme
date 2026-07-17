@@ -101,16 +101,26 @@ final class Mumega_Motion_Dashboard_Package_Verifier {
 	}
 
 	/**
-	 * Limits the hook to Core's Mumega Motion theme update operation.
+	 * Limits the hook to Core's Mumega Motion theme update operations.
 	 *
 	 * @param mixed $hook_extra Core upgrade metadata.
 	 * @return bool
 	 */
 	private function is_mumega_motion_theme_update( $hook_extra ) {
-		return is_array( $hook_extra ) &&
-			isset( $hook_extra['type'], $hook_extra['theme'] ) &&
-			'theme' === $hook_extra['type'] &&
-			self::THEME_SLUG === $hook_extra['theme'];
+		if ( ! is_array( $hook_extra ) || ! isset( $hook_extra['theme'] ) || self::THEME_SLUG !== $hook_extra['theme'] ) {
+			return false;
+		}
+
+		if ( array_key_exists( 'type', $hook_extra ) ) {
+			return 'theme' === $hook_extra['type'];
+		}
+
+		return isset( $hook_extra['temp_backup'] ) &&
+			is_array( $hook_extra['temp_backup'] ) &&
+			isset( $hook_extra['temp_backup']['slug'], $hook_extra['temp_backup']['src'], $hook_extra['temp_backup']['dir'] ) &&
+			self::THEME_SLUG === $hook_extra['temp_backup']['slug'] &&
+			is_string( $hook_extra['temp_backup']['src'] ) &&
+			'themes' === $hook_extra['temp_backup']['dir'];
 	}
 
 	/**
