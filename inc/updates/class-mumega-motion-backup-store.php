@@ -11,7 +11,11 @@
 class Mumega_Motion_Backup_Store {
 	private const STORE_DIRECTORY = 'mumega-motion-backups';
 	private const METADATA_FILE   = 'metadata.json';
+	private const SEQUENCE_FILE   = '.sequence.json';
+	private const SEQUENCE_LOCK   = '.sequence.lock';
 	private const THEME_DIRECTORY = 'theme';
+	private const HTACCESS        = "Order allow,deny\nDeny from all\n";
+	private const WEB_CONFIG      = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration><system.webServer><security><authorization><remove users=\"*\" roles=\"\" verbs=\"\" /><add accessType=\"Deny\" users=\"*\" /></authorization></security></system.webServer></configuration>\n";
 	private const REQUIRED_FILES  = array(
 		'style.css',
 		'functions.php',
@@ -19,6 +23,22 @@ class Mumega_Motion_Backup_Store {
 		'build/index.js',
 		'build/index.asset.php',
 	);
+
+	/**
+	 * Secret used only to authenticate local metadata.
+	 *
+	 * @var string
+	 */
+	private $secret;
+
+	/**
+	 * Creates a store with an injected or WordPress-derived secret.
+	 *
+	 * @param string|null $secret Optional injected secret.
+	 */
+	public function __construct( $secret = null ) {
+		$this->secret = is_string( $secret ) ? $secret : $this->default_secret();
+	}
 
 	/**
 	 * Creates a protected backup of an installed theme.
@@ -47,26 +67,58 @@ class Mumega_Motion_Backup_Store {
 		$backup_directory = $root . '/' . $backup_id;
 		$theme_backup     = $backup_directory . '/' . self::THEME_DIRECTORY;
 
-		if ( ! wp_mkdir_p( $backup_directory ) || is_link( $backup_directory ) ) {
+		if (
+			! wp_mkdir_p( $backup_directory ) ||
+			is_link( $backup_directory ) ||
+			! $this->protect_directory( $backup_directory, true )
+		) {
+			$this->delete_recursively( $backup_directory, $root );
 			return $this->error( 'mumega_motion_backup_store_unavailable', 'The backup store is unavailable.' );
 		}
 
 		$copy_result = copy_dir( $theme_directory, $theme_backup );
 
 		if ( is_wp_error( $copy_result ) || true !== $copy_result || ! $this->valid_theme_directory( $theme_backup ) ) {
-			$this->delete_recursively( $backup_directory );
+			if ( ! $this->cleanup_or_quarantine( $backup_directory, $root, $root ) ) {
+				return $this->cleanup_error( 'create_copy', 'mumega_motion_backup_copy_failed' );
+			}
 
 			return $this->error( 'mumega_motion_backup_copy_failed', 'The installed theme could not be backed up.' );
 		}
 
-		$metadata = array(
+		$manifest = $this->build_manifest( $theme_backup );
+
+		if ( is_wp_error( $manifest ) ) {
+			if ( ! $this->cleanup_or_quarantine( $backup_directory, $root, $root ) ) {
+				return $this->cleanup_error( 'create_manifest', 'mumega_motion_backup_copy_failed' );
+			}
+
+			return $manifest;
+		}
+
+		$sequence = $this->next_sequence( $root );
+
+		if ( is_wp_error( $sequence ) ) {
+			if ( ! $this->cleanup_or_quarantine( $backup_directory, $root, $root ) ) {
+				return $this->cleanup_error( 'create_sequence', $sequence->get_error_code() );
+			}
+
+			return $sequence;
+		}
+
+		$metadata              = array(
 			'id'         => $backup_id,
 			'version'    => $version,
-			'created_at' => microtime( true ),
+			'created_at' => $this->current_time(),
+			'sequence'   => $sequence,
+			'manifest'   => $manifest,
 		);
+		$metadata['signature'] = $this->sign_metadata( $metadata );
 
 		if ( ! $this->write_metadata( $backup_directory, $metadata ) ) {
-			$this->delete_recursively( $backup_directory );
+			if ( ! $this->cleanup_or_quarantine( $backup_directory, $root, $root ) ) {
+				return $this->cleanup_error( 'create_metadata', 'mumega_motion_backup_metadata_failed' );
+			}
 
 			return $this->error( 'mumega_motion_backup_metadata_failed', 'The backup metadata could not be stored safely.' );
 		}
@@ -74,7 +126,9 @@ class Mumega_Motion_Backup_Store {
 		$stored_metadata = $this->read_metadata( $backup_directory, $backup_id );
 
 		if ( is_wp_error( $stored_metadata ) || $metadata !== $stored_metadata ) {
-			$this->delete_recursively( $backup_directory );
+			if ( ! $this->cleanup_or_quarantine( $backup_directory, $root, $root ) ) {
+				return $this->cleanup_error( 'create_metadata_verify', 'mumega_motion_backup_metadata_failed' );
+			}
 
 			return $this->error( 'mumega_motion_backup_metadata_failed', 'The backup metadata could not be verified.' );
 		}
@@ -106,16 +160,16 @@ class Mumega_Motion_Backup_Store {
 			return $this->error( 'mumega_motion_backup_not_found', 'The requested backup was not found.' );
 		}
 
-		$metadata = $this->read_metadata( $backup_directory, $backup_id );
-
-		if ( is_wp_error( $metadata ) ) {
-			return $metadata;
-		}
-
 		$backup_theme = $backup_directory . '/' . self::THEME_DIRECTORY;
 
 		if ( ! $this->safe_child_directory( $backup_theme, $backup_directory ) || ! $this->valid_theme_directory( $backup_theme ) ) {
 			return $this->error( 'mumega_motion_backup_invalid_contents', 'The requested backup is incomplete or unsafe.' );
+		}
+
+		$metadata = $this->read_metadata( $backup_directory, $backup_id );
+
+		if ( is_wp_error( $metadata ) ) {
+			return $metadata;
 		}
 
 		if ( ! $this->valid_theme_directory( $theme_directory ) ) {
@@ -140,30 +194,38 @@ class Mumega_Motion_Backup_Store {
 		$copy_result = copy_dir( $backup_theme, $staging );
 
 		if ( is_wp_error( $copy_result ) || true !== $copy_result || ! $this->valid_theme_directory( $staging ) ) {
-			$this->delete_recursively( $staging );
+			if ( ! $this->cleanup_or_quarantine( $staging, $parent, $root ) ) {
+				return $this->cleanup_error( 'restore_stage', 'mumega_motion_backup_restore_copy_failed' );
+			}
 
 			return $this->error( 'mumega_motion_backup_restore_copy_failed', 'The backup could not be staged for restoration.' );
 		}
 
 		if ( ! $this->rename_path( $theme_real, $displaced ) ) {
-			$this->delete_recursively( $staging );
+			if ( ! $this->cleanup_or_quarantine( $staging, $parent, $root ) ) {
+				return $this->cleanup_error( 'restore_displace', 'mumega_motion_backup_restore_swap_failed' );
+			}
 
 			return $this->error( 'mumega_motion_backup_restore_swap_failed', 'The installed theme could not be displaced for restoration.' );
 		}
 
 		if ( ! $this->rename_path( $staging, $theme_real ) ) {
 			$recovered = $this->recover_displaced_theme( $displaced, $theme_real );
-			$this->delete_recursively( $staging );
+			$cleaned   = $this->cleanup_or_quarantine( $staging, $parent, $root );
 
 			if ( ! $recovered ) {
 				return $this->error( 'mumega_motion_backup_restore_rollback_failed', 'The restore failed and the installed theme could not be recovered automatically.' );
 			}
 
+			if ( ! $cleaned ) {
+				return $this->cleanup_error( 'restore_swap', 'mumega_motion_backup_restore_swap_failed' );
+			}
+
 			return $this->error( 'mumega_motion_backup_restore_swap_failed', 'The backup could not replace the installed theme; the installed theme was recovered.' );
 		}
 
-		if ( ! $this->delete_recursively( $displaced ) ) {
-			return $this->error( 'mumega_motion_backup_cleanup_failed', 'The backup was restored, but displaced files could not be removed.' );
+		if ( ! $this->cleanup_or_quarantine( $displaced, $parent, $root ) ) {
+			return $this->cleanup_error( 'restore_displaced', 'mumega_motion_backup_cleanup_failed' );
 		}
 
 		return $metadata;
@@ -206,8 +268,10 @@ class Mumega_Motion_Backup_Store {
 		}
 
 		foreach ( array_slice( $backups, $keep ) as $backup ) {
-			if ( ! $this->delete_recursively( $backup['directory'] ) ) {
-				return $this->error( 'mumega_motion_backup_prune_failed', 'An old theme backup could not be removed.' );
+			$root = dirname( $backup['directory'] );
+
+			if ( ! $this->cleanup_or_quarantine( $backup['directory'], $root, $root ) ) {
+				return $this->cleanup_error( 'prune', 'mumega_motion_backup_prune_failed' );
 			}
 		}
 
@@ -246,7 +310,7 @@ class Mumega_Motion_Backup_Store {
 	 * @return string|WP_Error
 	 */
 	private function prepare_store() {
-		if ( ! $this->ensure_filesystem_helpers() ) {
+		if ( '' === $this->secret || ! $this->ensure_filesystem_helpers() ) {
 			return $this->error( 'mumega_motion_backup_store_unavailable', 'The backup store is unavailable.' );
 		}
 
@@ -280,14 +344,30 @@ class Mumega_Motion_Backup_Store {
 			return $this->error( 'mumega_motion_backup_store_unavailable', 'The backup store is unavailable.' );
 		}
 
-		if (
-			! $this->write_protection_file( $root_real . '/index.php', '' ) ||
-			! $this->write_protection_file( $root_real . '/.htaccess', "Order allow,deny\nDeny from all\n" )
-		) {
+		if ( ! $this->protect_directory( $root_real, true ) ) {
 			return $this->error( 'mumega_motion_backup_store_unavailable', 'The backup store could not be protected.' );
 		}
 
 		return $root_real;
+	}
+
+	/**
+	 * Installs server and directory-index protection in a local directory.
+	 *
+	 * @param string $directory Directory to protect.
+	 * @param bool   $empty_index Whether index.php must be an empty blocker.
+	 * @return bool
+	 */
+	private function protect_directory( $directory, $empty_index ) {
+		if (
+			( $empty_index && ! $this->write_protection_file( $directory . '/index.php', '' ) ) ||
+			! $this->write_protection_file( $directory . '/.htaccess', self::HTACCESS ) ||
+			! $this->write_protection_file( $directory . '/web.config', self::WEB_CONFIG )
+		) {
+			return false;
+		}
+
+		return true;
 	}
 
 	/**
@@ -316,12 +396,12 @@ class Mumega_Motion_Backup_Store {
 		$written = file_put_contents( $temporary, $contents, LOCK_EX );
 
 		if ( strlen( $contents ) !== $written ) {
-			$this->delete_recursively( $temporary );
+			$this->delete_recursively( $temporary, dirname( $temporary ) );
 			return false;
 		}
 
 		if ( ! $this->rename_path( $temporary, $path ) ) {
-			$this->delete_recursively( $temporary );
+			$this->delete_recursively( $temporary, dirname( $temporary ) );
 			return false;
 		}
 
@@ -355,7 +435,7 @@ class Mumega_Motion_Backup_Store {
 	 */
 	private function write_metadata( $backup_directory, array $metadata ) {
 		$temporary = $backup_directory . '/.metadata-' . bin2hex( random_bytes( 16 ) );
-		$encoded   = wp_json_encode( $metadata );
+		$encoded   = wp_json_encode( $metadata, JSON_PRESERVE_ZERO_FRACTION );
 
 		if ( false === $encoded ) {
 			return false;
@@ -365,12 +445,12 @@ class Mumega_Motion_Backup_Store {
 		$written = file_put_contents( $temporary, $encoded . "\n", LOCK_EX );
 
 		if ( strlen( $encoded ) + 1 !== $written ) {
-			$this->delete_recursively( $temporary );
+			$this->delete_recursively( $temporary, $backup_directory );
 			return false;
 		}
 
 		if ( ! $this->rename_path( $temporary, $backup_directory . '/' . self::METADATA_FILE ) ) {
-			$this->delete_recursively( $temporary );
+			$this->delete_recursively( $temporary, $backup_directory );
 			return false;
 		}
 
@@ -393,7 +473,7 @@ class Mumega_Motion_Backup_Store {
 
 		$size = filesize( $path );
 
-		if ( false === $size || 0 === $size || 4096 < $size ) {
+		if ( false === $size || 0 === $size || ( 4 * 1024 * 1024 ) < $size ) {
 			return $this->error( 'mumega_motion_backup_invalid_metadata', 'Backup metadata is missing or invalid.' );
 		}
 
@@ -409,15 +489,33 @@ class Mumega_Motion_Backup_Store {
 		sort( $keys );
 
 		if (
-			array( 'created_at', 'id', 'version' ) !== $keys ||
+			array( 'created_at', 'id', 'manifest', 'sequence', 'signature', 'version' ) !== $keys ||
 			$backup_id !== $metadata['id'] ||
 			! $this->valid_backup_id( $metadata['id'] ) ||
 			! $this->valid_version( $metadata['version'] ) ||
 			! is_float( $metadata['created_at'] ) ||
 			! is_finite( $metadata['created_at'] ) ||
-			0 >= $metadata['created_at']
+			0 >= $metadata['created_at'] ||
+			! is_int( $metadata['sequence'] ) ||
+			1 > $metadata['sequence'] ||
+			! is_array( $metadata['manifest'] ) ||
+			! is_string( $metadata['signature'] ) ||
+			1 !== preg_match( '/\A[a-f0-9]{64}\z/', $metadata['signature'] )
 		) {
 			return $this->error( 'mumega_motion_backup_invalid_metadata', 'Backup metadata is missing or invalid.' );
+		}
+
+		$unsigned = $metadata;
+		unset( $unsigned['signature'] );
+
+		if ( ! hash_equals( $metadata['signature'], $this->sign_metadata( $unsigned ) ) ) {
+			return $this->error( 'mumega_motion_backup_integrity_failed', 'Backup integrity verification failed.' );
+		}
+
+		$actual_manifest = $this->build_manifest( $backup_directory . '/' . self::THEME_DIRECTORY );
+
+		if ( is_wp_error( $actual_manifest ) || $metadata['manifest'] !== $actual_manifest ) {
+			return $this->error( 'mumega_motion_backup_integrity_failed', 'Backup integrity verification failed.' );
 		}
 
 		return $metadata;
@@ -459,6 +557,11 @@ class Mumega_Motion_Backup_Store {
 				return $this->error( 'mumega_motion_backup_invalid_metadata', 'Backup metadata is missing or invalid.' );
 			}
 
+			if ( false === $this->safe_lstat( $directory . '/' . self::METADATA_FILE ) ) {
+				$this->quarantine_path( $directory, $root );
+				continue;
+			}
+
 			$metadata = $this->read_metadata( $directory, $entry );
 
 			if ( is_wp_error( $metadata ) ) {
@@ -474,11 +577,7 @@ class Mumega_Motion_Backup_Store {
 		usort(
 			$backups,
 			static function ( $left, $right ) {
-				if ( $left['metadata']['created_at'] === $right['metadata']['created_at'] ) {
-					return strcmp( $right['metadata']['id'], $left['metadata']['id'] );
-				}
-
-				return $left['metadata']['created_at'] < $right['metadata']['created_at'] ? 1 : -1;
+				return $right['metadata']['sequence'] <=> $left['metadata']['sequence'];
 			}
 		);
 
@@ -504,11 +603,228 @@ class Mumega_Motion_Backup_Store {
 		$copy_result = copy_dir( $displaced, $theme );
 
 		if ( is_wp_error( $copy_result ) || true !== $copy_result || ! $this->valid_theme_directory( $theme ) ) {
-			$this->delete_recursively( $theme );
+			$this->delete_recursively( $theme, dirname( $theme ) );
 			return false;
 		}
 
-		return $this->delete_recursively( $displaced );
+		return $this->delete_recursively( $displaced, dirname( $displaced ) );
+	}
+
+	/**
+	 * Builds a deterministic relative-path to SHA-256 manifest.
+	 *
+	 * @param string $directory Theme directory.
+	 * @return array|WP_Error
+	 */
+	private function build_manifest( $directory ) {
+		$root = realpath( $directory );
+
+		if ( false === $root || is_link( $directory ) || ! is_dir( $root ) ) {
+			return $this->error( 'mumega_motion_backup_integrity_failed', 'Backup integrity verification failed.' );
+		}
+
+		$manifest = array();
+
+		if ( ! $this->collect_manifest( $root, $root, $manifest ) ) {
+			return $this->error( 'mumega_motion_backup_integrity_failed', 'Backup integrity verification failed.' );
+		}
+
+		ksort( $manifest, SORT_STRING );
+
+		return $manifest;
+	}
+
+	/**
+	 * Recursively hashes regular files without following symbolic links.
+	 *
+	 * @param string $directory Current directory.
+	 * @param string $root      Manifest root.
+	 * @param array  $manifest  Collected manifest.
+	 * @return bool
+	 */
+	private function collect_manifest( $directory, $root, array &$manifest ) {
+		$directory_stat = $this->safe_lstat( $directory );
+		$directory_real = realpath( $directory );
+
+		if (
+			false === $directory_stat ||
+			false === $directory_real ||
+			! $this->path_is_within_or_same( $directory_real, $root ) ||
+			! $this->stat_is_directory( $directory_stat )
+		) {
+			return false;
+		}
+
+		$entries = scandir( $directory );
+
+		if ( false === $entries || ! $this->same_lstat( $directory, $directory_stat ) ) {
+			return false;
+		}
+
+		foreach ( $entries as $entry ) {
+			if ( '.' === $entry || '..' === $entry ) {
+				continue;
+			}
+
+			if ( ! $this->same_lstat( $directory, $directory_stat ) || realpath( $directory ) !== $directory_real ) {
+				return false;
+			}
+
+			$path = $directory . '/' . $entry;
+			$stat = $this->safe_lstat( $path );
+
+			if ( false === $stat || $this->stat_is_link( $stat ) ) {
+				return false;
+			}
+
+			if ( $this->stat_is_directory( $stat ) ) {
+				if ( ! $this->collect_manifest( $path, $root, $manifest ) ) {
+					return false;
+				}
+			} elseif ( $this->stat_is_regular_file( $stat ) ) {
+				$hash = hash_file( 'sha256', $path );
+
+				if ( false === $hash || ! $this->same_lstat( $path, $stat ) ) {
+					return false;
+				}
+
+				$manifest[ substr( $path, strlen( $root ) + 1 ) ] = $hash;
+			} else {
+				return false;
+			}
+		}
+
+		return $this->same_lstat( $directory, $directory_stat );
+	}
+
+	/**
+	 * Signs canonical path-free metadata.
+	 *
+	 * @param array $metadata Metadata without signature.
+	 * @return string
+	 */
+	private function sign_metadata( array $metadata ) {
+		return hash_hmac( 'sha256', (string) wp_json_encode( $metadata, JSON_PRESERVE_ZERO_FRACTION ), $this->secret );
+	}
+
+	/**
+	 * Returns the wall-clock evidence recorded alongside monotonic ordering.
+	 *
+	 * @return float
+	 */
+	protected function current_time() {
+		return microtime( true );
+	}
+
+	/**
+	 * Allocates a signed monotonic sequence under a store-level exclusive lock.
+	 *
+	 * @param string $root Protected store root.
+	 * @return int|WP_Error
+	 */
+	private function next_sequence( $root ) {
+		$lock_path = $root . '/' . self::SEQUENCE_LOCK;
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- Local flock is required for cross-request ordering.
+		$lock = fopen( $lock_path, 'c' );
+
+		if ( false === $lock ) {
+			return $this->error( 'mumega_motion_backup_sequence_failed', 'The backup sequence could not be locked.' );
+		}
+
+		if ( ! flock( $lock, LOCK_EX ) ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- Closes the local flock handle above.
+			fclose( $lock );
+
+			return $this->error( 'mumega_motion_backup_sequence_failed', 'The backup sequence could not be locked.' );
+		}
+
+		$state_path = $root . '/' . self::SEQUENCE_FILE;
+		$current    = 0;
+		$result     = null;
+
+		if ( false !== $this->safe_lstat( $state_path ) ) {
+			$size = filesize( $state_path );
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Small signed local sequence state.
+			$contents = false === $size || 1024 < $size ? false : file_get_contents( $state_path );
+			$state    = false === $contents ? null : json_decode( $contents, true );
+
+			if (
+				! is_array( $state ) ||
+				array( 'sequence', 'signature' ) !== array_keys( $state ) ||
+				! is_int( $state['sequence'] ) ||
+				0 > $state['sequence'] ||
+				! is_string( $state['signature'] ) ||
+				! hash_equals( $this->sign_sequence( $state['sequence'] ), $state['signature'] )
+			) {
+				$result = $this->error( 'mumega_motion_backup_sequence_integrity_failed', 'The backup sequence integrity check failed.' );
+			} else {
+				$current = $state['sequence'];
+			}
+		}
+
+		if ( null === $result ) {
+			if ( PHP_INT_MAX === $current ) {
+				$result = $this->error( 'mumega_motion_backup_sequence_failed', 'The backup sequence is exhausted.' );
+			} else {
+				$next    = $current + 1;
+				$state   = array(
+					'sequence'  => $next,
+					'signature' => $this->sign_sequence( $next ),
+				);
+				$encoded = wp_json_encode( $state );
+				$temp    = $root . '/.sequence-' . bin2hex( random_bytes( 16 ) );
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Same-directory atomic sequence publication.
+				$written = false === $encoded ? false : file_put_contents( $temp, $encoded . "\n", LOCK_EX );
+
+				if ( false === $encoded || strlen( $encoded ) + 1 !== $written || ! $this->rename_path( $temp, $state_path ) ) {
+					$this->delete_recursively( $temp, $root );
+					$result = $this->error( 'mumega_motion_backup_sequence_failed', 'The backup sequence could not be stored safely.' );
+				} else {
+					$result = $next;
+				}
+			}
+		}
+
+		flock( $lock, LOCK_UN );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- Closes the local flock handle above.
+		fclose( $lock );
+
+		return $result;
+	}
+
+	/**
+	 * Signs the store-level sequence state in a separate HMAC domain.
+	 *
+	 * @param int $sequence Monotonic sequence.
+	 * @return string
+	 */
+	private function sign_sequence( $sequence ) {
+		return hash_hmac( 'sha256', "mumega-motion-backup-sequence\0" . $sequence, $this->secret );
+	}
+
+	/**
+	 * Derives the default authentication key from WordPress secrets.
+	 *
+	 * @return string
+	 */
+	private function default_secret() {
+		if ( function_exists( 'wp_salt' ) ) {
+			$secret = wp_salt( 'auth' );
+
+			if ( is_string( $secret ) && '' !== $secret ) {
+				return $secret;
+			}
+		}
+
+		$secret = '';
+
+		foreach ( array( 'AUTH_KEY', 'SECURE_AUTH_KEY', 'LOGGED_IN_KEY', 'NONCE_KEY' ) as $constant ) {
+			if ( defined( $constant ) ) {
+				$secret .= constant( $constant );
+			}
+		}
+
+		return $secret;
 	}
 
 	/**
@@ -600,6 +916,17 @@ class Mumega_Motion_Backup_Store {
 	}
 
 	/**
+	 * Tests canonical equality or containment.
+	 *
+	 * @param string $path            Canonical candidate.
+	 * @param string $expected_parent Canonical parent.
+	 * @return bool
+	 */
+	private function path_is_within_or_same( $path, $expected_parent ) {
+		return $path === $expected_parent || $this->path_is_within( $path, $expected_parent );
+	}
+
+	/**
 	 * Validates a random backup identifier.
 	 *
 	 * @param mixed $backup_id Candidate identifier.
@@ -620,23 +947,215 @@ class Mumega_Motion_Backup_Store {
 	}
 
 	/**
-	 * Deletes a local path through the initialized WordPress filesystem API.
+	 * Deletes a contained tree without following symbolic links.
 	 *
-	 * @param string $path File or directory.
+	 * Each descent verifies the canonical parent plus lstat device/inode before
+	 * and after directory reads and immediately before unlink/rmdir. PHP does
+	 * not expose unlinkat(), so any detected replacement aborts safely.
+	 *
+	 * @param string      $path           File or directory to remove.
+	 * @param string|null $allowed_parent Canonical containment boundary.
 	 * @return bool
 	 */
-	private function delete_recursively( $path ) {
-		global $wp_filesystem;
+	protected function delete_recursively( $path, $allowed_parent = null ) {
+		$stat = $this->safe_lstat( $path );
 
-		if ( ! file_exists( $path ) && ! is_link( $path ) ) {
+		if ( false === $stat ) {
 			return true;
 		}
 
-		if ( ! $this->ensure_filesystem_helpers() ) {
+		$allowed_real = realpath( null === $allowed_parent ? dirname( $path ) : $allowed_parent );
+		$parent       = dirname( $path );
+		$parent_real  = realpath( $parent );
+		$parent_stat  = $this->safe_lstat( $parent );
+
+		if (
+			false === $allowed_real ||
+			false === $parent_real ||
+			false === $parent_stat ||
+			! $this->path_is_within_or_same( $parent_real, $allowed_real ) ||
+			! $this->stat_is_directory( $parent_stat )
+		) {
 			return false;
 		}
 
-		return is_object( $wp_filesystem ) && method_exists( $wp_filesystem, 'delete' ) && $wp_filesystem->delete( $path, true );
+		if ( $this->stat_is_link( $stat ) || $this->stat_is_regular_file( $stat ) ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- Deletes only after containment and inode checks.
+			return $this->same_lstat( $parent, $parent_stat ) && $this->same_lstat( $path, $stat ) && unlink( $path );
+		}
+
+		if ( ! $this->stat_is_directory( $stat ) ) {
+			return false;
+		}
+
+		$path_real = realpath( $path );
+
+		if ( false === $path_real || ! $this->path_is_within( $path_real, $allowed_real ) ) {
+			return false;
+		}
+
+		$entries = scandir( $path );
+
+		if ( false === $entries || ! $this->same_lstat( $path, $stat ) || realpath( $path ) !== $path_real ) {
+			return false;
+		}
+
+		foreach ( $entries as $entry ) {
+			if ( '.' === $entry || '..' === $entry ) {
+				continue;
+			}
+
+			if (
+				! $this->same_lstat( $parent, $parent_stat ) ||
+				! $this->same_lstat( $path, $stat ) ||
+				realpath( $path ) !== $path_real ||
+				! $this->delete_recursively( $path . '/' . $entry, $allowed_real )
+			) {
+				return false;
+			}
+		}
+
+		if (
+			! $this->same_lstat( $parent, $parent_stat ) ||
+			! $this->same_lstat( $path, $stat ) ||
+			realpath( $path ) !== $path_real
+		) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- Deletes only after containment and inode checks.
+		return rmdir( $path );
+	}
+
+	/**
+	 * Deletes an operation artifact or moves it under the protected store.
+	 *
+	 * @param string $path           Artifact path.
+	 * @param string $allowed_parent Deletion containment boundary.
+	 * @param string $store_root     Protected store root.
+	 * @return bool True only when deletion completed.
+	 */
+	private function cleanup_or_quarantine( $path, $allowed_parent, $store_root ) {
+		if ( $this->delete_recursively( $path, $allowed_parent ) ) {
+			return true;
+		}
+
+		$this->quarantine_path( $path, $store_root );
+
+		return false;
+	}
+
+	/**
+	 * Moves an undeletable artifact to an opaque non-backup name.
+	 *
+	 * @param string $path       Artifact path.
+	 * @param string $store_root Protected store root.
+	 * @return bool
+	 */
+	private function quarantine_path( $path, $store_root ) {
+		if ( false === $this->safe_lstat( $path ) || is_link( $path ) ) {
+			return false;
+		}
+
+		$root_real   = realpath( $store_root );
+		$parent_real = realpath( dirname( $path ) );
+
+		if ( false === $root_real || false === $parent_real ) {
+			return false;
+		}
+
+		$destination = $root_real . '/.incomplete-' . bin2hex( random_bytes( 16 ) );
+
+		if ( ! $this->rename_path( $path, $destination ) ) {
+			return false;
+		}
+
+		$this->protect_directory( $destination, false );
+
+		return true;
+	}
+
+	/**
+	 * Creates a cleanup error with only path-free operation context.
+	 *
+	 * @param string $operation     Stable operation name.
+	 * @param string $original_code Original failure code.
+	 * @return WP_Error
+	 */
+	private function cleanup_error( $operation, $original_code ) {
+		return new WP_Error(
+			'mumega_motion_backup_cleanup_failed',
+			'Backup cleanup did not complete; the artifact was isolated when possible.',
+			array(
+				'operation'     => $operation,
+				'original_code' => $original_code,
+			)
+		);
+	}
+
+	/**
+	 * Reads link metadata without emitting path-dependent warnings.
+	 *
+	 * @param string $path Path to inspect.
+	 * @return array|false
+	 */
+	private function safe_lstat( $path ) {
+		$handler = static function () {
+			return true;
+		};
+
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- A disappearing path is represented by false.
+		set_error_handler( $handler );
+		$stat = lstat( $path );
+		restore_error_handler();
+
+		return $stat;
+	}
+
+	/**
+	 * Compares an lstat snapshot by type, device, and inode.
+	 *
+	 * @param string $path     Path to inspect.
+	 * @param array  $expected Earlier lstat result.
+	 * @return bool
+	 */
+	private function same_lstat( $path, array $expected ) {
+		$actual = $this->safe_lstat( $path );
+
+		return false !== $actual &&
+			$actual['dev'] === $expected['dev'] &&
+			$actual['ino'] === $expected['ino'] &&
+			$actual['mode'] === $expected['mode'];
+	}
+
+	/**
+	 * Checks an lstat result for a symbolic link.
+	 *
+	 * @param array $stat lstat result.
+	 * @return bool
+	 */
+	private function stat_is_link( array $stat ) {
+		return 0120000 === ( $stat['mode'] & 0170000 );
+	}
+
+	/**
+	 * Checks an lstat result for a directory.
+	 *
+	 * @param array $stat lstat result.
+	 * @return bool
+	 */
+	private function stat_is_directory( array $stat ) {
+		return 0040000 === ( $stat['mode'] & 0170000 );
+	}
+
+	/**
+	 * Checks an lstat result for a regular file.
+	 *
+	 * @param array $stat lstat result.
+	 * @return bool
+	 */
+	private function stat_is_regular_file( array $stat ) {
+		return 0100000 === ( $stat['mode'] & 0170000 );
 	}
 
 	/**

@@ -78,8 +78,17 @@ final class BackupStoreTest extends TestCase {
 		$this->assertFileExists( $root . '/index.php' );
 		$this->assertSame( '', file_get_contents( $root . '/index.php' ) );
 		$this->assertStringContainsString( 'Deny from all', file_get_contents( $root . '/.htaccess' ) );
+		$this->assertFileExists( $root . '/web.config' );
+		$this->assertStringContainsString( 'accessType="Deny"', file_get_contents( $root . '/web.config' ) );
+		$this->assertFileExists( $backup_path . '/index.php' );
+		$this->assertSame( '', file_get_contents( $backup_path . '/index.php' ) );
+		$this->assertFileExists( $backup_path . '/.htaccess' );
+		$this->assertStringContainsString( 'Deny from all', file_get_contents( $backup_path . '/.htaccess' ) );
+		$this->assertFileExists( $backup_path . '/web.config' );
+		$this->assertStringContainsString( 'accessType="Deny"', file_get_contents( $backup_path . '/web.config' ) );
 		$this->assertSame( $first, json_decode( file_get_contents( $backup_path . '/metadata.json' ), true ) );
 		$this->assertStringNotContainsString( $theme, file_get_contents( $backup_path . '/metadata.json' ) );
+		$this->assertStringNotContainsString( 'mumega-motion-test-secret', file_get_contents( $backup_path . '/metadata.json' ) );
 		$this->assertSame( array(), glob( $backup_path . '/.metadata-*' ) );
 	}
 
@@ -106,7 +115,80 @@ final class BackupStoreTest extends TestCase {
 		$result = ( new Mumega_Motion_Backup_Store() )->create( $this->create_theme( 'current', 'safe' ), '0.1.100' );
 
 		$this->assert_error_code( 'mumega_motion_backup_copy_failed', $result );
-		$this->assertSame( array( '.htaccess', 'index.php' ), $this->backup_root_entries() );
+		$this->assertSame( array( '.htaccess', 'index.php', 'web.config' ), $this->backup_root_entries() );
+	}
+
+	/**
+	 * Reports cleanup failure with the original operation context and quarantines the partial backup.
+	 */
+	public function test_create_reports_cleanup_failure_and_quarantines_partial_backup(): void {
+		$GLOBALS['mumega_motion_test_copy_fail_after'] = 2;
+		$store = new class() extends Mumega_Motion_Backup_Store {
+			protected function delete_recursively( $path, $allowed_parent = null ) {
+				return false;
+			}
+		};
+
+		$result = $store->create( $this->create_theme( 'current', 'safe' ), '0.1.100' );
+
+		$this->assert_error_code( 'mumega_motion_backup_cleanup_failed', $result );
+		$this->assertSame( 'create_copy', $result->get_error_data()['operation'] );
+		$this->assertSame( 'mumega_motion_backup_copy_failed', $result->get_error_data()['original_code'] );
+		$this->assertCount( 1, glob( $this->backup_root() . '/.incomplete-*', GLOB_ONLYDIR ) );
+		$this->assertSame( array(), glob( $this->backup_root() . '/[a-f0-9]*', GLOB_ONLYDIR ) );
+	}
+
+	/**
+	 * Never follows a cleanup target replaced with a symlink outside the store.
+	 */
+	public function test_partial_cleanup_unlinks_replaced_symlink_without_escaping_store(): void {
+		$GLOBALS['mumega_motion_test_copy_fail_after'] = 2;
+		$outside = $this->temporary_directory . '/outside-cleanup';
+		mkdir( $outside );
+		file_put_contents( $outside . '/sentinel', 'safe' );
+		$store = new class( $outside ) extends Mumega_Motion_Backup_Store {
+			private $outside;
+			private $mutated = false;
+
+			public function __construct( $outside ) {
+				parent::__construct( 'cleanup-symlink-secret' );
+				$this->outside = $outside;
+			}
+
+			public function was_mutated() {
+				return $this->mutated;
+			}
+
+			protected function delete_recursively( $path, $allowed_parent = null ) {
+				if ( ! $this->mutated && 1 === preg_match( '/\A[a-f0-9]{32}\z/', basename( $path ) ) ) {
+					$this->remove_fixture_path( $path );
+				symlink( $this->outside, $path );
+				$this->mutated = true;
+				}
+
+				return parent::delete_recursively( $path, $allowed_parent );
+			}
+
+			private function remove_fixture_path( $path ) {
+				if ( is_file( $path ) || is_link( $path ) ) {
+					unlink( $path );
+					return;
+				}
+
+				foreach ( array_diff( scandir( $path ), array( '.', '..' ) ) as $entry ) {
+					$this->remove_fixture_path( $path . '/' . $entry );
+				}
+
+				rmdir( $path );
+			}
+		};
+
+		$result = $store->create( $this->create_theme( 'current', 'safe' ), '0.1.100' );
+
+		$this->assert_error_code( 'mumega_motion_backup_copy_failed', $result );
+		$this->assertTrue( $store->was_mutated() );
+		$this->assertSame( 'safe', file_get_contents( $outside . '/sentinel' ) );
+		$this->assertSame( array(), glob( $this->backup_root() . '/[a-f0-9]*' ) );
 	}
 
 	/**
@@ -129,7 +211,132 @@ final class BackupStoreTest extends TestCase {
 		$result = $store->create( $this->create_theme( 'current', 'safe' ), '0.1.100' );
 
 		$this->assert_error_code( 'mumega_motion_backup_metadata_failed', $result );
-		$this->assertSame( array( '.htaccess', 'index.php' ), $this->backup_root_entries() );
+		$this->assertSame(
+			array( '.htaccess', '.sequence.json', '.sequence.lock', 'index.php', 'web.config' ),
+			$this->backup_root_entries()
+		);
+	}
+
+	/**
+	 * Skips and quarantines an identifier directory left before metadata publication.
+	 */
+	public function test_latest_and_prune_skip_incomplete_identifier_directory(): void {
+		$store    = new Mumega_Motion_Backup_Store();
+		$metadata = $store->create( $this->create_theme( 'current', 'safe' ), '0.1.100' );
+		$partial  = $this->backup_root() . '/' . str_repeat( 'a', 32 );
+		mkdir( $partial );
+		file_put_contents( $partial . '/partial', 'incomplete' );
+
+		$this->assertSame( $metadata, $store->latest() );
+		$this->assertTrue( $store->prune() );
+		$this->assertDirectoryDoesNotExist( $partial );
+		$this->assertNotEmpty( glob( $this->backup_root() . '/.incomplete-*', GLOB_ONLYDIR ) );
+	}
+
+	/**
+	 * Detects schema-valid metadata field tampering through its keyed signature.
+	 *
+	 * @dataProvider signed_metadata_tampering_provider
+	 *
+	 * @param string $field Tampered field.
+	 * @param mixed  $value Replacement value.
+	 */
+	public function test_latest_rejects_signed_metadata_tampering( $field, $value ): void {
+		$store     = new Mumega_Motion_Backup_Store( 'injected-test-secret' );
+		$metadata  = $store->create( $this->create_theme( 'current', 'safe' ), '0.1.100' );
+		$directory = $this->backup_root() . '/' . $metadata['id'];
+		$stored    = json_decode( file_get_contents( $directory . '/metadata.json' ), true );
+		$stored[ $field ] = $value;
+		file_put_contents( $directory . '/metadata.json', wp_json_encode( $stored ) );
+
+		$this->assert_error_code( 'mumega_motion_backup_integrity_failed', $store->latest() );
+	}
+
+	/**
+	 * Signed metadata tampering cases.
+	 *
+	 * @return array
+	 */
+	public function signed_metadata_tampering_provider() {
+		return array(
+			'version'    => array( 'version', '9.9.9' ),
+			'created_at' => array( 'created_at', 1.25 ),
+			'sequence'   => array( 'sequence', 999 ),
+		);
+	}
+
+	/**
+	 * Rejects backup content changed after its deterministic manifest was signed.
+	 */
+	public function test_latest_and_restore_reject_tampered_backup_content(): void {
+		$store     = new Mumega_Motion_Backup_Store( 'injected-test-secret' );
+		$theme     = $this->create_theme( 'current', 'safe' );
+		$metadata  = $store->create( $theme, '0.1.100' );
+		$directory = $this->backup_root() . '/' . $metadata['id'];
+		file_put_contents( $directory . '/theme/functions.php', '<?php // Tampered.' );
+
+		$this->assert_error_code( 'mumega_motion_backup_integrity_failed', $store->latest() );
+		$this->assert_error_code( 'mumega_motion_backup_integrity_failed', $store->restore( $metadata['id'], $theme ) );
+	}
+
+	/**
+	 * Rejects valid signed metadata when verified under a different injected secret.
+	 */
+	public function test_injected_secret_binds_backup_metadata_without_being_stored(): void {
+		$writer   = new Mumega_Motion_Backup_Store( 'first-secret' );
+		$metadata = $writer->create( $this->create_theme( 'current', 'safe' ), '0.1.100' );
+		$contents = file_get_contents( $this->backup_root() . '/' . $metadata['id'] . '/metadata.json' );
+
+		$this->assertStringNotContainsString( 'first-secret', $contents );
+		$this->assert_error_code(
+			'mumega_motion_backup_integrity_failed',
+			( new Mumega_Motion_Backup_Store( 'second-secret' ) )->latest()
+		);
+	}
+
+	/**
+	 * Orders equal and decreasing wall-clock timestamps by a shared monotonic sequence.
+	 */
+	public function test_sequence_orders_timestamp_ties_across_instances_and_clock_rollback(): void {
+		$theme  = $this->create_theme( 'current', 'safe' );
+		$first  = $this->store_at_time( 1000.0 )->create( $theme, '0.1.100' );
+		$second = $this->store_at_time( 1000.0 )->create( $theme, '0.1.101' );
+		$third  = $this->store_at_time( 900.0 )->create( $theme, '0.1.102' );
+
+		$this->assertArrayHasKey( 'sequence', $first );
+		$this->assertSame( 1, $first['sequence'] );
+		$this->assertSame( 2, $second['sequence'] );
+		$this->assertSame( 3, $third['sequence'] );
+		$this->assertSame( 1000.0, $first['created_at'] );
+		$this->assertSame( 1000.0, $second['created_at'] );
+		$this->assertSame( 900.0, $third['created_at'] );
+
+		$reader = new Mumega_Motion_Backup_Store( 'sequence-test-secret' );
+		$this->assertSame( $third, $reader->latest() );
+		$this->assertTrue( $reader->prune( 2 ) );
+		$this->assertDirectoryDoesNotExist( $this->backup_root() . '/' . $first['id'] );
+		$this->assertDirectoryExists( $this->backup_root() . '/' . $second['id'] );
+		$this->assertDirectoryExists( $this->backup_root() . '/' . $third['id'] );
+	}
+
+	/**
+	 * Rejects rollback or tampering of the store-level sequence state.
+	 */
+	public function test_create_rejects_tampered_sequence_state(): void {
+		$theme = $this->create_theme( 'current', 'safe' );
+		$store = new Mumega_Motion_Backup_Store( 'sequence-test-secret' );
+		$store->create( $theme, '0.1.100' );
+		$sequence_path = $this->backup_root() . '/.sequence.json';
+
+		$this->assertFileExists( $sequence_path );
+		$state             = json_decode( file_get_contents( $sequence_path ), true );
+		$state['sequence'] = 0;
+		file_put_contents( $sequence_path, wp_json_encode( $state ) );
+
+		$this->assert_error_code(
+			'mumega_motion_backup_sequence_integrity_failed',
+			$store->create( $theme, '0.1.101' )
+		);
 	}
 
 	/**
@@ -288,6 +495,27 @@ final class BackupStoreTest extends TestCase {
 	}
 
 	/**
+	 * Builds a store with a controlled wall-clock reading.
+	 *
+	 * @param float $time Wall-clock value.
+	 * @return Mumega_Motion_Backup_Store
+	 */
+	private function store_at_time( $time ) {
+		return new class( $time ) extends Mumega_Motion_Backup_Store {
+			private $time;
+
+			public function __construct( $time ) {
+				parent::__construct( 'sequence-test-secret' );
+				$this->time = $time;
+			}
+
+			protected function current_time() {
+				return $this->time;
+			}
+		};
+	}
+
+	/**
 	 * Builds a store whose selected rename calls fail.
 	 *
 	 * @param array $failed_calls One-based calls that should fail.
@@ -299,6 +527,7 @@ final class BackupStoreTest extends TestCase {
 			private $failed_calls;
 
 			public function __construct( array $failed_calls ) {
+				parent::__construct();
 				$this->failed_calls = $failed_calls;
 			}
 

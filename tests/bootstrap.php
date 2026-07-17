@@ -25,6 +25,7 @@ $GLOBALS['mumega_motion_test_capabilities']     = array();
 $GLOBALS['mumega_motion_test_upload_basedir']   = sys_get_temp_dir();
 $GLOBALS['mumega_motion_test_copy_fail_after']  = null;
 $GLOBALS['mumega_motion_test_copy_count']       = 0;
+$GLOBALS['mumega_motion_test_salt']             = 'mumega-motion-test-secret';
 
 /**
  * Minimal WP_Error implementation for unit tests.
@@ -534,6 +535,16 @@ function wp_parse_url( $url, $component = -1 ) {
 function wp_json_encode( $value, $flags = 0, $depth = 512 ) {
 	// phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
 	return json_encode( $value, $flags, $depth );
+}
+
+/**
+ * Returns the deterministic secret configured by the current test.
+ *
+ * @param string $scheme Salt scheme.
+ * @return string
+ */
+function wp_salt( $scheme = 'auth' ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found
+	return $GLOBALS['mumega_motion_test_salt'];
 }
 
 /**
