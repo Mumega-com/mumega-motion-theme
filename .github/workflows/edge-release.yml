@@ -154,6 +154,7 @@ jobs:
           fi
 
       - name: Verify the new annotated tag resolves to the verified commit
+        shell: bash
         run: |
           local_sha="$(git rev-parse "refs/tags/${TAG}^{}")"
           remote_sha="$(
@@ -179,6 +180,7 @@ jobs:
             --notes "Edge package for ${GITHUB_SHA}; GitHub Immutable Releases is required."
 
       - name: Verify the published release is immutable and correctly bound
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

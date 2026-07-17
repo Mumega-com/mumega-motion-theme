@@ -115,6 +115,12 @@ assert_contains 'credential.helper=!f() {' "${WORKFLOW}"
 assert_contains 'GITHUB_TOKEN: ${{ github.token }}' "${WORKFLOW}"
 assert_contains 'awk -v peeled_ref="refs/tags/${TAG}^{}"' "${WORKFLOW}"
 assert_contains 'test -n "$remote_sha"' "${WORKFLOW}"
+
+# The peeled-ref pipelines must run under Bash so their pipefail contract is
+# explicit, both before publishing and after the release has been created.
+peeled_ref_bash_count="$(grep -c '^        shell: bash$' "${WORKFLOW}" || true)"
+test "${peeled_ref_bash_count}" -eq 2 || fail 'Both peeled-ref verification steps must explicitly use Bash.'
+
 assert_contains 'gh release create "$TAG"' "${WORKFLOW}"
 assert_contains '--verify-tag' "${WORKFLOW}"
 assert_not_contains '--target "${GITHUB_SHA}"' "${WORKFLOW}"

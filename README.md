@@ -74,8 +74,11 @@ reusing it.
 
 Immutable Releases protects release assets, but it is not a substitute for tag
 protection. Configure a repository ruleset for `refs/tags/edge-v*` that blocks
-tag deletion and force updates. The GitHub Actions bot needs permission only to
-create a new edge tag; this workflow never needs to move an existing one.
+tag deletion and force updates. The ruleset's separate GitHub Actions bot
+exception needs permission only to create a new edge tag; this workflow never
+needs to move an existing one. That tag-ruleset exception is distinct from the
+release job's `contents: write` workflow permission, which authorizes creating
+the prerelease and uploading its assets.
 
 To make the same package locally, run `npm run package -- 0.1.123`. The
 packager stages an explicit runtime allowlist, rejects development-only
