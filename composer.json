@@ -1,0 +1,20 @@
+{
+  "name": "mumega/mumega-motion-theme",
+  "description": "Mumega Motion WordPress theme",
+  "type": "wordpress-theme",
+  "require-dev": {
+    "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+    "phpunit/phpunit": "^9.6",
+    "squizlabs/php_codesniffer": "^3.10",
+    "wp-coding-standards/wpcs": "^3.0"
+  },
+  "scripts": {
+    "test": "phpunit -c phpunit.xml.dist",
+    "lint:php": "phpcs --standard=WordPress inc functions.php tests"
+  },
+  "config": {
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    }
+  }
+}

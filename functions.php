@@ -56,6 +56,12 @@ add_action( 'wp_enqueue_scripts', 'mumega_motion_enqueue_styles' );
 require get_template_directory() . '/inc/figma-tokens.php';
 
 /**
+ * Fixed-repository verified update system, with dashboard fallback independent
+ * of the optional MCPWP extension hook.
+ */
+require get_template_directory() . '/inc/updates/bootstrap.php';
+
+/**
  * Theme supports.
  */
 function mumega_motion_setup() {

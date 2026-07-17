@@ -1,0 +1,195 @@
+name: Edge theme release
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify (PHP ${{ matrix.php }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        php:
+          - '7.4'
+          - '8.3'
+    steps:
+      - name: Check out the exact triggering commit
+        # actions/checkout v4.2.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        # actions/setup-node v4.0.3
+        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up PHP with ZIP support
+        # shivammathur/setup-php v2.34.1
+        uses: shivammathur/setup-php@0f7f1d08e3e32076e51cae65eb0b0c871405b16e
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: zip
+          tools: composer:v2
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Build production JavaScript
+        run: npm run build
+
+      - name: Check built JavaScript syntax
+        run: find build -type f -name '*.js' -print0 | xargs -0 -r -n1 node --check
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Run PHPUnit and lint shipped PHP
+        run: |
+          vendor/bin/phpunit -c phpunit.xml.dist
+          find functions.php index.php stream-demo.php inc -type f -name '*.php' -print0 | xargs -0 -r -n1 php -l
+
+  release:
+    name: Package and publish edge release
+    needs: verify
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the exact verified commit
+        # actions/checkout v4.2.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        # actions/setup-node v4.0.3
+        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Derive immutable edge version
+        run: |
+          echo "VERSION=0.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          echo "TAG=edge-v0.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+
+      - name: Install and build JavaScript
+        run: |
+          npm ci
+          npm run build
+
+      - name: Check built JavaScript syntax
+        run: find build -type f -name '*.js' -print0 | xargs -0 -r -n1 node --check
+
+      - name: Package the verified runtime allowlist
+        run: ./scripts/package-theme.sh "$VERSION"
+
+      - name: Verify package layout and manifest
+        run: |
+          archive="dist/mumega-motion-theme-${VERSION}.zip"
+          test "$(unzip -Z1 "$archive" | cut -d/ -f1 | sort -u)" = "mumega-motion-theme"
+          for required in style.css functions.php index.php stream-demo.php build/index.js build/index.asset.php; do
+            unzip -Z1 "$archive" | grep -Fx "mumega-motion-theme/${required}" >/dev/null
+          done
+          if unzip -Z1 "$archive" | grep -Ei '/(src|tests|test|docs|scripts|node_modules|vendor|\.git|\.github)(/|$)|\.(map|md)$|/readme[^/]*$|/(composer\.json|composer\.lock|package\.json|package-lock\.json)$'; then
+            echo "Package contains a disallowed development file." >&2
+            exit 1
+          fi
+          actual_sha="$(sha256sum "$archive" | awk '{print $1}')"
+          expected_sha="$(awk 'NR == 1 { print $1 }' "${archive}.sha256")"
+          test "$actual_sha" = "$expected_sha"
+          # shellcheck disable=SC2016 # JavaScript template expressions are evaluated by Node.
+          ACTUAL_SHA="$actual_sha" node -e 'const fs=require("fs"); const version=process.env.VERSION; const archive=`mumega-motion-theme-${version}.zip`; const actual=process.env.ACTUAL_SHA; const manifest=JSON.parse(fs.readFileSync("dist/manifest.json", "utf8")); const expected={slug:"mumega-motion-theme",version,package_url:`https://github.com/Mumega-com/mumega-motion-theme/releases/download/edge-v${version}/${archive}`,sha256:actual,requires_wp:"6.5",requires_php:"7.4"}; if (JSON.stringify(manifest)!==JSON.stringify(expected)) { console.error("Manifest does not exactly bind the archive and runtime contract."); process.exit(1); }'
+          (
+            cd dist
+            sha256sum -c "mumega-motion-theme-${VERSION}.zip.sha256"
+          )
+
+      # This workflow does not make releases immutable. Before enabling it,
+      # repository administrators must enable GitHub's Immutable Releases
+      # repository setting; the post-publish check below enforces that it took
+      # effect for this release.
+      - name: Create a new annotated tag for the verified commit
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Refusing to replace existing immutable tag ${TAG}." >&2
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" "${GITHUB_SHA}" -m "Mumega Motion ${VERSION}"
+
+      # checkout deliberately persists no credentials. The helper below exists
+      # only for this command, supplies the Actions token only to GitHub's
+      # credential protocol, and is never written to repository configuration.
+      - name: Push the new annotated tag
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          push_output="$(
+            # shellcheck disable=SC2016 # The credential helper expands its inherited token when Git invokes it.
+            git -c credential.helper= \
+              -c 'credential.helper=!f() { if [ "$1" = get ]; then printf "%s\\n" "username=x-access-token" "password=${GITHUB_TOKEN}"; fi; }; f' \
+              push --porcelain origin "refs/tags/${TAG}:refs/tags/${TAG}"
+          )"
+          printf '%s\n' "$push_output"
+          if ! printf '%s\n' "$push_output" | grep -Eq '^\*.*\[new tag\]$'; then
+            echo "Refusing to use a tag that was created concurrently: ${TAG}." >&2
+            exit 1
+          fi
+
+      - name: Verify the new annotated tag resolves to the verified commit
+        shell: bash
+        run: |
+          local_sha="$(git rev-parse "refs/tags/${TAG}^{}")"
+          remote_sha="$(
+            git ls-remote --exit-code origin "refs/tags/${TAG}^{}" |
+              awk -v peeled_ref="refs/tags/${TAG}^{}" '$2 == peeled_ref { print $1; exit }'
+          )"
+          test "$local_sha" = "${GITHUB_SHA}"
+          test -n "$remote_sha"
+          test "$remote_sha" = "${GITHUB_SHA}"
+
+      - name: Create prerelease from the verified tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" \
+            "dist/mumega-motion-theme-${VERSION}.zip" \
+            "dist/mumega-motion-theme-${VERSION}.zip.sha256" \
+            "dist/manifest.json" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --verify-tag \
+            --prerelease \
+            --title "Mumega Motion ${VERSION}" \
+            --notes "Edge package for ${GITHUB_SHA}; GitHub Immutable Releases is required."
+
+      - name: Verify the published release is immutable and correctly bound
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}")"
+          # shellcheck disable=SC2016 # JavaScript expressions are evaluated by Node.
+          RELEASE_JSON="$release_json" node -e 'const release=JSON.parse(process.env.RELEASE_JSON); const version=process.env.VERSION; const expected=[`mumega-motion-theme-${version}.zip`,`mumega-motion-theme-${version}.zip.sha256`,`manifest.json`].sort(); const actual=release.assets.map(({name})=>name).sort(); if (release.tag_name!==process.env.TAG || !release.prerelease || release.immutable!==true || JSON.stringify(actual)!==JSON.stringify(expected)) { console.error("Published release is not immutable or does not match the verified tag/assets."); process.exit(1); }'
+          remote_sha="$(
+            git ls-remote --exit-code origin "refs/tags/${TAG}^{}" |
+              awk -v peeled_ref="refs/tags/${TAG}^{}" '$2 == peeled_ref { print $1; exit }'
+          )"
+          test -n "$remote_sha"
+          test "$remote_sha" = "${GITHUB_SHA}"

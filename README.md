@@ -52,7 +52,63 @@ For custom Gutenberg blocks or hand-authored components, import `FadeIn` or `Sta
 npm install
 npm run build     # production build -> build/index.js + build/index.asset.php
 npm run start     # dev build with watch mode
+npm run package -- 0.1.123 # build and create dist/mumega-motion-theme-0.1.123.zip
 ```
+
+## Edge update packages
+
+Every successful `master` build can produce a GitHub edge prerelease. Its edge
+version is `0.1.<GitHub run number>` and its tag is
+`edge-v0.1.<GitHub run number>`. The release contains only the WordPress theme
+runtime files, its SHA-256 checksum, and `manifest.json`; it never changes the
+checked-in `style.css` version.
+
+Release immutability is a GitHub repository setting, not something this
+workflow can establish by itself. Before enabling publishing, a repository
+administrator must enable GitHub **Immutable Releases** for this repository.
+The workflow creates a new annotated tag without force-pushing, verifies that
+the remote tag resolves to the triggering commit, and verifies after publishing
+that GitHub reports the release as immutable with exactly the expected assets.
+It deliberately fails on a pre-existing or concurrently-created tag instead of
+reusing it.
+
+Immutable Releases protects release assets, but it is not a substitute for tag
+protection. Configure a repository ruleset for `refs/tags/edge-v*` that blocks
+tag deletion and force updates. The ruleset's separate GitHub Actions bot
+exception needs permission only to create a new edge tag; this workflow never
+needs to move an existing one. That tag-ruleset exception is distinct from the
+release job's `contents: write` workflow permission, which authorizes creating
+the prerelease and uploading its assets.
+
+To make the same package locally, run `npm run package -- 0.1.123`. The
+packager stages an explicit runtime allowlist, rejects development-only
+directories and files (including source maps, docs, tests, and build tooling),
+sets the version only in the staged stylesheet, and normalizes archive metadata
+so a repeated build from the same source produces the same ZIP bytes.
+`dist/manifest.json` exactly binds the archive SHA-256, fixed GitHub download
+URL, WordPress requirement, and PHP requirement.
+
+Publishing an edge package does **not** install it on a WordPress site. The
+normal WordPress Themes/Updates dashboard remains the fallback when MCPWP is
+unavailable or an operator prefers a dashboard action.
+
+For the explicit MCP workflow, wait for the edge prerelease, then call
+`wp_update_mumega_motion` with an MCPWP key that has the required `admin`
+scope (optionally using `force_check: true`). Review the returned package and
+installation evidence, then separately verify the homepage status, desktop
+and mobile rendering, and the absence of fatal errors. Use
+`wp_rollback_mumega_motion` only as an explicit recovery operation; updates
+are never installed merely by pushing a commit.
+
+Before an install, the updater stores a local copy of the active theme and
+retains the three newest successful backups. It automatically attempts to
+restore the fresh backup when a post-backup update step fails.
+
+The MCP bridge has a one-time installation requirement: install a theme bridge
+ZIP manually through WordPress once (and ensure MCPWP includes the
+raise-only admin-scope bridge support) before relying on MCP-triggered updates.
+After that bootstrap, later verified edge packages can be discovered and
+installed through the dashboard or the explicit MCP workflow above.
 
 ## Known tradeoff — bundle size
 
