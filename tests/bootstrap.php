@@ -688,6 +688,54 @@ function WP_Filesystem() { // phpcs:ignore WordPress.NamingConventions.ValidFunc
 	return true;
 }
 
+/**
+ * Fixed-purpose updater double used by the update API tests.
+ */
+final class Mumega_Motion_Update_Api_Test_Updater {
+	/** @var array */
+	public $update_calls = array();
+
+	/** @var int */
+	public $rollback_calls = 0;
+
+	/** @return array */
+	public function update( $force_check = true ) {
+		$this->update_calls[] = $force_check;
+
+		return array( 'status' => 'updated' );
+	}
+
+	/** @return array */
+	public function rollback() {
+		++$this->rollback_calls;
+
+		return array( 'status' => 'rolled_back' );
+	}
+}
+
+/**
+ * Fixed verified manifest double used by the update API tests.
+ */
+final class Mumega_Motion_Update_Api_Test_Release_Client {
+	/** @var array */
+	public $manifest = array(
+		'slug'         => 'mumega-motion-theme',
+		'version'      => '0.1.101',
+		'package_url'  => 'https://github.com/Mumega-com/mumega-motion-theme/releases/download/edge-v0.1.101/mumega-motion-theme-0.1.101.zip',
+		'sha256'       => 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+		'requires_wp'  => '6.5',
+		'requires_php' => '7.4',
+		'published_at' => '2026-01-01T00:00:00Z',
+		'release_tag'  => 'edge-v0.1.101',
+		'manifest_url' => 'https://github.com/Mumega-com/mumega-motion-theme/releases/download/edge-v0.1.101/manifest.json',
+	);
+
+	/** @return array */
+	public function latest() {
+		return $this->manifest;
+	}
+}
+
 // Load update classes in dependency order, after their WordPress dependencies.
 $mumega_motion_update_classes = array(
 	'inc/updates/class-mumega-motion-release-client.php',
