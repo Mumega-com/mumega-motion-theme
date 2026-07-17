@@ -21,19 +21,23 @@ jobs:
           - '8.3'
     steps:
       - name: Check out the exact triggering commit
-        uses: actions/checkout@v4
+        # actions/checkout v4.2.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        # actions/setup-node v4.0.3
+        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b
         with:
           node-version: 20
           cache: npm
 
       - name: Set up PHP with ZIP support
-        uses: shivammathur/setup-php@v2
+        # shivammathur/setup-php v2.34.1
+        uses: shivammathur/setup-php@0f7f1d08e3e32076e51cae65eb0b0c871405b16e
         with:
           php-version: ${{ matrix.php }}
           extensions: zip
@@ -57,20 +61,23 @@ jobs:
           find functions.php index.php stream-demo.php inc -type f -name '*.php' -print0 | xargs -0 -r -n1 php -l
 
   release:
-    name: Package and publish immutable edge release
+    name: Package and publish edge release
     needs: verify
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - name: Check out the exact verified commit
-        uses: actions/checkout@v4
+        # actions/checkout v4.2.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        # actions/setup-node v4.0.3
+        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b
         with:
           node-version: 20
           cache: npm
@@ -98,21 +105,43 @@ jobs:
           for required in style.css functions.php index.php stream-demo.php build/index.js build/index.asset.php; do
             unzip -Z1 "$archive" | grep -Fx "mumega-motion-theme/${required}" >/dev/null
           done
-          if unzip -Z1 "$archive" | grep -E '/(src|tests|docs|node_modules|vendor|\.git|\.github)/|\.map$'; then
+          if unzip -Z1 "$archive" | grep -E '/(src|tests|test|docs|scripts|node_modules|vendor|\.git|\.github)(/|$)|\.(map|md)$|/([Rr][Ee][Aa][Dd][Mm][Ee][^/]*)$|/(composer\.json|composer\.lock|package\.json|package-lock\.json)$'; then
             echo "Package contains a disallowed development file." >&2
             exit 1
           fi
-          node -e 'const fs=require("fs"); const m=JSON.parse(fs.readFileSync("dist/manifest.json", "utf8")); const keys=["slug","version","package_url","sha256","requires_wp","requires_php"]; if (JSON.stringify(Object.keys(m))!==JSON.stringify(keys) || m.slug!=="mumega-motion-theme" || m.version!==process.env.VERSION || !/^[0-9a-f]{64}$/.test(m.sha256)) process.exit(1);'
-          sha256sum -c "dist/mumega-motion-theme-${VERSION}.zip.sha256"
+          actual_sha="$(sha256sum "$archive" | awk '{print $1}')"
+          expected_sha="$(awk 'NR == 1 { print $1 }' "${archive}.sha256")"
+          test "$actual_sha" = "$expected_sha"
+          ACTUAL_SHA="$actual_sha" node -e 'const fs=require("fs"); const version=process.env.VERSION; const archive=`mumega-motion-theme-${version}.zip`; const actual=process.env.ACTUAL_SHA; const manifest=JSON.parse(fs.readFileSync("dist/manifest.json", "utf8")); const expected={slug:"mumega-motion-theme",version,package_url:`https://github.com/Mumega-com/mumega-motion-theme/releases/download/edge-v${version}/${archive}`,sha256:actual,requires_wp:"6.5",requires_php:"7.4"}; if (JSON.stringify(manifest)!==JSON.stringify(expected)) { console.error("Manifest does not exactly bind the archive and runtime contract."); process.exit(1); }'
+          (
+            cd dist
+            sha256sum -c "mumega-motion-theme-${VERSION}.zip.sha256"
+          )
 
-      - name: Refuse to replace an existing tag
+      # This workflow does not make releases immutable. Before enabling it,
+      # repository administrators must enable GitHub's Immutable Releases
+      # repository setting; the post-publish check below enforces that it took
+      # effect for this release.
+      - name: Create and verify a new annotated tag for the verified commit
         run: |
           if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
             echo "Refusing to replace existing immutable tag ${TAG}." >&2
             exit 1
           fi
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          git tag -a "${TAG}" "${GITHUB_SHA}" -m "Mumega Motion ${VERSION}"
+          push_output="$(git push --porcelain origin "refs/tags/${TAG}:refs/tags/${TAG}")"
+          printf '%s\n' "$push_output"
+          if ! printf '%s\n' "$push_output" | grep -Eq '^\*.*\[new tag\]$'; then
+            echo "Refusing to use a tag that was created concurrently: ${TAG}." >&2
+            exit 1
+          fi
+          local_sha="$(git rev-parse "refs/tags/${TAG}^{}")"
+          remote_sha="$(git ls-remote --exit-code origin "refs/tags/${TAG}^{}" | awk 'NR == 1 { print $1 }')"
+          test "$local_sha" = "${GITHUB_SHA}"
+          test "$remote_sha" = "${GITHUB_SHA}"
 
-      - name: Create immutable prerelease for the verified commit
+      - name: Create prerelease from the verified tag
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -121,7 +150,14 @@ jobs:
             "dist/mumega-motion-theme-${VERSION}.zip.sha256" \
             "dist/manifest.json" \
             --repo "${GITHUB_REPOSITORY}" \
-            --target "${GITHUB_SHA}" \
+            --verify-tag \
             --prerelease \
             --title "Mumega Motion ${VERSION}" \
-            --notes "Immutable edge package for ${GITHUB_SHA}."
+            --notes "Edge package for ${GITHUB_SHA}; GitHub Immutable Releases is required."
+
+      - name: Verify the published release is immutable and correctly bound
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}")"
+          RELEASE_JSON="$release_json" node -e 'const release=JSON.parse(process.env.RELEASE_JSON); const version=process.env.VERSION; const expected=[`mumega-motion-theme-${version}.zip`,`mumega-motion-theme-${version}.zip.sha256`,`manifest.json`].sort(); const actual=release.assets.map(({name})=>name).sort(); if (release.tag_name!==process.env.TAG || !release.prerelease || release.immutable!==true || JSON.stringify(actual)!==JSON.stringify(expected)) { console.error("Published release is not immutable or does not match the verified tag/assets."); process.exit(1); }'

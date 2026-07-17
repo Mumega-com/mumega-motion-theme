@@ -49,6 +49,25 @@ done
 # Source maps are development-only even when a build tool leaves one in build/.
 find "${STAGED_THEME}" -type f -name '*.map' -delete
 
+# The allowlist above is the primary boundary. These checks make the policy
+# explicit and prevent a future runtime directory from silently carrying
+# development material into the installable ZIP.
+if find "${STAGED_THEME}" -type d \( \
+	-name src -o -name tests -o -name test -o -name docs -o -name scripts -o \
+	-name node_modules -o -name vendor -o -name .git -o -name .github \
+\) -print -quit | grep -q .; then
+	printf 'Runtime package contains a disallowed development directory.\n' >&2
+	exit 1
+fi
+
+if find "${STAGED_THEME}" -type f \( \
+	-name '*.map' -o -name '*.md' -o -iname 'readme*' -o -name composer.json -o \
+	-name composer.lock -o -name package.json -o -name package-lock.json \
+\) -print -quit | grep -q .; then
+	printf 'Runtime package contains a disallowed development file.\n' >&2
+	exit 1
+fi
+
 if [[ -n $(find "${STAGED_THEME}" -type l -print -quit) ]]; then
 	printf 'Runtime package must not contain symbolic links.\n' >&2
 	exit 1

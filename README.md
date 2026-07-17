@@ -57,17 +57,28 @@ npm run package -- 0.1.123 # build and create dist/mumega-motion-theme-0.1.123.z
 
 ## Edge update packages
 
-Every successful `master` build can produce an immutable GitHub prerelease. Its
-edge version is `0.1.<GitHub run number>` and its tag is
+Every successful `master` build can produce a GitHub edge prerelease. Its edge
+version is `0.1.<GitHub run number>` and its tag is
 `edge-v0.1.<GitHub run number>`. The release contains only the WordPress theme
 runtime files, its SHA-256 checksum, and `manifest.json`; it never changes the
 checked-in `style.css` version.
 
+Release immutability is a GitHub repository setting, not something this
+workflow can establish by itself. Before enabling publishing, a repository
+administrator must enable GitHub **Immutable Releases** for this repository.
+The workflow creates a new annotated tag without force-pushing, verifies that
+the remote tag resolves to the triggering commit, and verifies after publishing
+that GitHub reports the release as immutable with exactly the expected assets.
+It deliberately fails on a pre-existing or concurrently-created tag instead of
+reusing it.
+
 To make the same package locally, run `npm run package -- 0.1.123`. The
-packager stages an explicit runtime allowlist, sets the version only in the
-staged stylesheet, and normalizes archive metadata so a repeated build from
-the same source produces the same ZIP bytes. `dist/manifest.json` describes
-the fixed GitHub download URL and runtime requirements.
+packager stages an explicit runtime allowlist, rejects development-only
+directories and files (including source maps, docs, tests, and build tooling),
+sets the version only in the staged stylesheet, and normalizes archive metadata
+so a repeated build from the same source produces the same ZIP bytes.
+`dist/manifest.json` exactly binds the archive SHA-256, fixed GitHub download
+URL, WordPress requirement, and PHP requirement.
 
 Publishing an edge package does **not** install it on a WordPress site. The
 normal WordPress Themes/Updates dashboard remains the fallback when MCPWP is
