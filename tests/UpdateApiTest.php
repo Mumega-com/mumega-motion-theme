@@ -15,11 +15,13 @@ final class UpdateApiTest extends TestCase {
 	 * Resets the observable WordPress registrations.
 	 */
 	protected function setUp(): void {
-		$GLOBALS['mumega_motion_test_filters']      = array();
-		$GLOBALS['mumega_motion_test_actions']      = array();
-		$GLOBALS['mumega_motion_test_routes']       = array();
-		$GLOBALS['mumega_motion_test_tools']        = array();
-		$GLOBALS['mumega_motion_test_capabilities'] = array();
+		$GLOBALS['mumega_motion_test_filters']           = array();
+		$GLOBALS['mumega_motion_test_actions']           = array();
+		$GLOBALS['mumega_motion_test_routes']            = array();
+		$GLOBALS['mumega_motion_test_tools']             = array();
+		$GLOBALS['mumega_motion_test_capabilities']      = array();
+		$GLOBALS['mumega_motion_test_download_requests'] = array();
+		$GLOBALS['mumega_motion_test_download_results']  = array();
 	}
 
 	/**
@@ -113,8 +115,26 @@ final class UpdateApiTest extends TestCase {
 		$this->assertArrayHasKey( 'rest_api_init', $GLOBALS['mumega_motion_test_actions'] );
 		$this->assertArrayHasKey( 'pre_set_site_transient_update_themes', $GLOBALS['mumega_motion_test_filters'] );
 		$this->assertArrayHasKey( 'themes_api', $GLOBALS['mumega_motion_test_filters'] );
+		$this->assertArrayHasKey( 'upgrader_pre_download', $GLOBALS['mumega_motion_test_filters'] );
 		$this->assertArrayNotHasKey( 'mcpwp_register_tools', $GLOBALS['mumega_motion_test_filters'] );
 		$this->assertArrayNotHasKey( 'mcpwp_required_scope_for_tool', $GLOBALS['mumega_motion_test_filters'] );
+	}
+
+	/**
+	 * Verifies the bootstrap's feature detection enables only the optional
+	 * MCPWP integration when the installed feature flag explicitly opts in.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_bootstrap_detects_the_explicit_mcpwp_scope_feature_flag(): void {
+		define( 'MCPWP_SUPPORTS_CUSTOM_TOOL_SCOPE_FILTER', true );
+		require dirname( __DIR__ ) . '/inc/updates/bootstrap.php';
+
+		$this->assertArrayHasKey( 'pre_set_site_transient_update_themes', $GLOBALS['mumega_motion_test_filters'] );
+		$this->assertArrayHasKey( 'upgrader_pre_download', $GLOBALS['mumega_motion_test_filters'] );
+		$this->assertArrayHasKey( 'mcpwp_register_tools', $GLOBALS['mumega_motion_test_filters'] );
+		$this->assertArrayHasKey( 'mcpwp_required_scope_for_tool', $GLOBALS['mumega_motion_test_filters'] );
 	}
 
 	/**
@@ -141,5 +161,90 @@ final class UpdateApiTest extends TestCase {
 		$this->assertSame( '0.1.101', $info->version );
 		$this->assertSame( $release->manifest['package_url'], $info->download_link );
 		$this->assertSame( false, $api->theme_information( false, 'theme_information', (object) array( 'slug' => 'other-theme' ) ) );
+	}
+
+	/**
+	 * Rejects a dashboard download whose bytes do not match the freshly
+	 * revalidated fixed manifest, before WordPress can unpack or install it.
+	 */
+	public function test_dashboard_core_download_rejects_a_checksum_mismatch_and_removes_the_temporary_file(): void {
+		$release = new Mumega_Motion_Update_Api_Test_Release_Client();
+		$api     = new Mumega_Motion_Update_Api( new Mumega_Motion_Update_Api_Test_Updater(), $release, false );
+		$package = tempnam( sys_get_temp_dir(), 'mumega-motion-dashboard-' );
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Test fixture bytes must deliberately fail checksum validation.
+		file_put_contents( $package, 'tampered dashboard package' );
+		$GLOBALS['mumega_motion_test_download_results'][] = $package;
+		$api->register();
+
+		$result = apply_filters(
+			'upgrader_pre_download',
+			false,
+			$release->manifest['package_url'],
+			new stdClass(),
+			array(
+				'type'  => 'theme',
+				'theme' => 'mumega-motion-theme',
+			)
+		);
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 'mumega_motion_package_checksum_mismatch', $result->get_error_code() );
+		$this->assertSame( array( true ), $release->latest_calls );
+		$this->assertSame( $release->manifest['package_url'], $GLOBALS['mumega_motion_test_download_requests'][0]['url'] );
+		$this->assertFileDoesNotExist( $package );
+	}
+
+	/**
+	 * Gives Core a locally downloaded ZIP only after it is verified against the
+	 * freshly revalidated fixed manifest. Core then owns normal temp cleanup.
+	 */
+	public function test_dashboard_core_download_hands_a_verified_package_to_core_for_cleanup(): void {
+		if ( ! class_exists( 'ZipArchive' ) ) {
+			$this->markTestSkipped( 'ZipArchive is required for the verified package fixture.' );
+		}
+
+		$release                     = new Mumega_Motion_Update_Api_Test_Release_Client();
+		$api                         = new Mumega_Motion_Update_Api( new Mumega_Motion_Update_Api_Test_Updater(), $release, false );
+		$package                     = $this->create_valid_dashboard_package();
+		$release->manifest['sha256'] = hash_file( 'sha256', $package );
+		$GLOBALS['mumega_motion_test_download_results'][] = $package;
+		$api->register();
+
+		$result = apply_filters(
+			'upgrader_pre_download',
+			false,
+			$release->manifest['package_url'],
+			new stdClass(),
+			array(
+				'type'  => 'theme',
+				'theme' => 'mumega-motion-theme',
+			)
+		);
+
+		$this->assertSame( $package, $result );
+		$this->assertFileExists( $package );
+		$this->assertSame( array( true ), $release->latest_calls );
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- Simulates Core's ownership of successful package cleanup.
+		unlink( $package );
+	}
+
+	/**
+	 * Builds the smallest valid theme package for the dashboard handoff test.
+	 *
+	 * @return string
+	 */
+	private function create_valid_dashboard_package(): string {
+		$path    = tempnam( sys_get_temp_dir(), 'mumega-motion-dashboard-' );
+		$archive = new ZipArchive();
+
+		$this->assertTrue( $archive->open( $path, ZipArchive::CREATE | ZipArchive::OVERWRITE ) );
+		foreach ( array( 'style.css', 'functions.php', 'index.php', 'build/index.js', 'build/index.asset.php' ) as $file ) {
+			$this->assertTrue( $archive->addFromString( 'mumega-motion-theme/' . $file, 'fixture' ) );
+		}
+		$this->assertTrue( $archive->close() );
+
+		return $path;
 	}
 }

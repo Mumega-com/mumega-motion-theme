@@ -21,6 +21,8 @@ $GLOBALS['mumega_motion_test_tools']            = array();
 $GLOBALS['mumega_motion_test_site_transients']  = array();
 $GLOBALS['mumega_motion_test_remote_requests']  = array();
 $GLOBALS['mumega_motion_test_remote_responses'] = array();
+$GLOBALS['mumega_motion_test_download_requests'] = array();
+$GLOBALS['mumega_motion_test_download_results']  = array();
 $GLOBALS['mumega_motion_test_capabilities']     = array();
 $GLOBALS['mumega_motion_test_upload_basedir']   = sys_get_temp_dir();
 $GLOBALS['mumega_motion_test_copy_fail_after']  = null;
@@ -479,6 +481,26 @@ function wp_safe_remote_get( $url, $args = array() ) {
 }
 
 /**
+ * Returns a queued temporary download and records the requested URL.
+ *
+ * @param string $url     Download URL.
+ * @param int    $timeout Request timeout.
+ * @return string|WP_Error
+ */
+function download_url( $url, $timeout = 300 ) {
+	$GLOBALS['mumega_motion_test_download_requests'][] = array(
+		'url'     => $url,
+		'timeout' => (int) $timeout,
+	);
+
+	if ( empty( $GLOBALS['mumega_motion_test_download_results'] ) ) {
+		return new WP_Error( 'download_failed', 'No test download was queued.' );
+	}
+
+	return array_shift( $GLOBALS['mumega_motion_test_download_results'] );
+}
+
+/**
  * Retrieves an HTTP response code.
  *
  * @param array|WP_Error $response HTTP response.
@@ -718,6 +740,9 @@ final class Mumega_Motion_Update_Api_Test_Updater {
  */
 final class Mumega_Motion_Update_Api_Test_Release_Client {
 	/** @var array */
+	public $latest_calls = array();
+
+	/** @var array */
 	public $manifest = array(
 		'slug'         => 'mumega-motion-theme',
 		'version'      => '0.1.101',
@@ -731,7 +756,9 @@ final class Mumega_Motion_Update_Api_Test_Release_Client {
 	);
 
 	/** @return array */
-	public function latest() {
+	public function latest( $force = false ) {
+		$this->latest_calls[] = (bool) $force;
+
 		return $this->manifest;
 	}
 }
@@ -742,6 +769,7 @@ $mumega_motion_update_classes = array(
 	'inc/updates/class-mumega-motion-package-validator.php',
 	'inc/updates/class-mumega-motion-backup-store.php',
 	'inc/updates/class-mumega-motion-updater.php',
+	'inc/updates/class-mumega-motion-dashboard-package-verifier.php',
 	'inc/updates/class-mumega-motion-update-api.php',
 );
 

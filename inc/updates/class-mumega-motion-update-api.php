@@ -28,6 +28,13 @@ final class Mumega_Motion_Update_Api {
 	private $release_client;
 
 	/**
+	 * Native dashboard package verifier.
+	 *
+	 * @var Mumega_Motion_Dashboard_Package_Verifier
+	 */
+	private $dashboard_package_verifier;
+
+	/**
 	 * Whether the installed MCPWP version supports custom scope elevation.
 	 *
 	 * @var bool
@@ -39,12 +46,16 @@ final class Mumega_Motion_Update_Api {
 	 *
 	 * @param object $updater              Fixed update transaction.
 	 * @param object $release_client       Fixed release discovery client.
-	 * @param bool   $mcpwp_scope_support Whether MCPWP custom scope support is available.
+	 * @param bool   $mcpwp_scope_support          Whether MCPWP custom scope support is available.
+	 * @param object $dashboard_package_verifier   Optional native dashboard verifier.
 	 */
-	public function __construct( $updater, $release_client, $mcpwp_scope_support = false ) {
-		$this->updater             = $updater;
-		$this->release_client      = $release_client;
-		$this->mcpwp_scope_support = true === $mcpwp_scope_support;
+	public function __construct( $updater, $release_client, $mcpwp_scope_support = false, $dashboard_package_verifier = null ) {
+		$this->updater                    = $updater;
+		$this->release_client             = $release_client;
+		$this->mcpwp_scope_support        = true === $mcpwp_scope_support;
+		$this->dashboard_package_verifier = is_object( $dashboard_package_verifier )
+			? $dashboard_package_verifier
+			: new Mumega_Motion_Dashboard_Package_Verifier( $release_client );
 	}
 
 	/**
@@ -56,6 +67,7 @@ final class Mumega_Motion_Update_Api {
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 		add_filter( 'pre_set_site_transient_update_themes', array( $this, 'discover_theme_update' ) );
 		add_filter( 'themes_api', array( $this, 'theme_information' ), 10, 3 );
+		add_filter( 'upgrader_pre_download', array( $this->dashboard_package_verifier, 'verify_dashboard_package' ), 10, 4 );
 
 		if ( ! $this->mcpwp_scope_support ) {
 			return;

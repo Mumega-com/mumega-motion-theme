@@ -14,6 +14,7 @@ $mumega_motion_update_files = array(
 	'class-mumega-motion-package-validator.php',
 	'class-mumega-motion-backup-store.php',
 	'class-mumega-motion-updater.php',
+	'class-mumega-motion-dashboard-package-verifier.php',
 	'class-mumega-motion-update-api.php',
 );
 
