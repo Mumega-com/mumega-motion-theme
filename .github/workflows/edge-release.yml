@@ -155,10 +155,15 @@ jobs:
 
       - name: Verify the new annotated tag resolves to the verified commit
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           local_sha="$(git rev-parse "refs/tags/${TAG}^{}")"
           remote_sha="$(
-            git ls-remote --exit-code origin "refs/tags/${TAG}^{}" |
+            # shellcheck disable=SC2016 # The credential helper expands its inherited token when Git invokes it.
+            git -c credential.helper= \
+              -c 'credential.helper=!f() { if [ "$1" = get ]; then printf "%s\\n" "username=x-access-token" "password=${GITHUB_TOKEN}"; fi; }; f' \
+              ls-remote --exit-code origin "refs/tags/${TAG}^{}" |
               awk -v peeled_ref="refs/tags/${TAG}^{}" '$2 == peeled_ref { print $1; exit }'
           )"
           test "$local_sha" = "${GITHUB_SHA}"
@@ -183,12 +188,16 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           release_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}")"
           # shellcheck disable=SC2016 # JavaScript expressions are evaluated by Node.
           RELEASE_JSON="$release_json" node -e 'const release=JSON.parse(process.env.RELEASE_JSON); const version=process.env.VERSION; const expected=[`mumega-motion-theme-${version}.zip`,`mumega-motion-theme-${version}.zip.sha256`,`manifest.json`].sort(); const actual=release.assets.map(({name})=>name).sort(); if (release.tag_name!==process.env.TAG || !release.prerelease || release.immutable!==true || JSON.stringify(actual)!==JSON.stringify(expected)) { console.error("Published release is not immutable or does not match the verified tag/assets."); process.exit(1); }'
           remote_sha="$(
-            git ls-remote --exit-code origin "refs/tags/${TAG}^{}" |
+            # shellcheck disable=SC2016 # The credential helper expands its inherited token when Git invokes it.
+            git -c credential.helper= \
+              -c 'credential.helper=!f() { if [ "$1" = get ]; then printf "%s\\n" "username=x-access-token" "password=${GITHUB_TOKEN}"; fi; }; f' \
+              ls-remote --exit-code origin "refs/tags/${TAG}^{}" |
               awk -v peeled_ref="refs/tags/${TAG}^{}" '$2 == peeled_ref { print $1; exit }'
           )"
           test -n "$remote_sha"

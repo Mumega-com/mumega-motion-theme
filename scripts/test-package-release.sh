@@ -109,12 +109,44 @@ assert_contains 'git tag -a "${TAG}" "${GITHUB_SHA}"' "${WORKFLOW}"
 assert_contains 'git config --local user.name "github-actions[bot]"' "${WORKFLOW}"
 assert_contains 'git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"' "${WORKFLOW}"
 assert_contains 'push --porcelain origin "refs/tags/${TAG}:refs/tags/${TAG}"' "${WORKFLOW}"
-assert_contains 'git ls-remote --exit-code origin "refs/tags/${TAG}^{}"' "${WORKFLOW}"
+assert_contains 'echo "VERSION=0.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"' "${WORKFLOW}"
+assert_contains 'echo "TAG=edge-v0.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"' "${WORKFLOW}"
 assert_contains 'git rev-parse "refs/tags/${TAG}^{}"' "${WORKFLOW}"
 assert_contains 'credential.helper=!f() {' "${WORKFLOW}"
 assert_contains 'GITHUB_TOKEN: ${{ github.token }}' "${WORKFLOW}"
 assert_contains 'awk -v peeled_ref="refs/tags/${TAG}^{}"' "${WORKFLOW}"
 assert_contains 'test -n "$remote_sha"' "${WORKFLOW}"
+
+assert_step_contains() {
+	local step_name="$1"
+	local needle="$2"
+
+	awk -v step_name="${step_name}" -v needle="${needle}" '
+		$0 == "      - name: " step_name {
+			in_step = 1
+			next
+		}
+		in_step && /^      - name: / {
+			exit
+		}
+		in_step && index($0, needle) {
+			found = 1
+		}
+		END {
+			exit found ? 0 : 1
+		}
+	' "${WORKFLOW}" || fail "Workflow step ${step_name} is missing: ${needle}"
+}
+
+# Each authenticated remote peeled-tag check must use the same ephemeral
+# credential helper as the tag push; checkout never persists credentials.
+for verification_step in \
+	'Verify the new annotated tag resolves to the verified commit' \
+	'Verify the published release is immutable and correctly bound'; do
+	assert_step_contains "${verification_step}" 'GITHUB_TOKEN: ${{ github.token }}'
+	assert_step_contains "${verification_step}" 'credential.helper=!f() {'
+	assert_step_contains "${verification_step}" 'ls-remote --exit-code origin "refs/tags/${TAG}^{}"'
+done
 
 # The peeled-ref pipelines must run under Bash so their pipefail contract is
 # explicit, both before publishing and after the release has been created.
