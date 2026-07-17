@@ -88,17 +88,48 @@ final class UpdateApiTest extends TestCase {
 		$this->assertSame( 'admin', $tools[0]['category'] );
 		$this->assertTrue( $tools[0]['destructive'] );
 		$this->assertTrue( $tools[0]['open_world'] );
-		$this->assertSame( '/mumega-motion/v1/update', $tools[0]['rest_path'] );
+		$this->assertArrayNotHasKey( 'rest_path', $tools[0] );
+		$this->assertIsCallable( $tools[0]['callback'] );
+		$this->assertSame( 'POST', $tools[0]['method'] );
 		$this->assertSame( array( 'force_check' => array( 'type' => 'boolean' ) ), $tools[0]['input_props'] );
 		$this->assertSame( 'wp_rollback_mumega_motion', $tools[1]['name'] );
 		$this->assertSame( 'admin', $tools[1]['category'] );
 		$this->assertTrue( $tools[1]['destructive'] );
 		$this->assertFalse( $tools[1]['open_world'] );
+		$this->assertArrayNotHasKey( 'rest_path', $tools[1] );
+		$this->assertIsCallable( $tools[1]['callback'] );
+		$this->assertSame( 'POST', $tools[1]['method'] );
 		$this->assertSame( array(), $tools[1]['input_props'] );
 
 		$this->assertSame( 'admin', apply_filters( 'mcpwp_required_scope_for_tool', 'read', 'wp_update_mumega_motion' ) );
 		$this->assertSame( 'admin', apply_filters( 'mcpwp_required_scope_for_tool', 'write', 'wp_rollback_mumega_motion' ) );
 		$this->assertSame( 'write', apply_filters( 'mcpwp_required_scope_for_tool', 'write', 'wp_update_post' ) );
+	}
+
+	/**
+	 * Runs privileged MCP callbacks without weakening direct REST permissions.
+	 */
+	public function test_mcp_callbacks_delegate_only_to_fixed_updater_operations(): void {
+		$updater = new Mumega_Motion_Update_Api_Test_Updater();
+		$api     = new Mumega_Motion_Update_Api(
+			$updater,
+			new Mumega_Motion_Update_Api_Test_Release_Client(),
+			true
+		);
+		$api->register();
+		$tools = apply_filters( 'mcpwp_register_tools', array() );
+
+		$this->assertSame(
+			array( 'status' => 'updated' ),
+			call_user_func( $tools[0]['callback'], array(
+				'force_check' => 'false',
+				'package_url' => 'https://evil.example/theme.zip',
+				'slug'        => 'evil-theme',
+			) )
+		);
+		$this->assertSame( array( false ), $updater->update_calls );
+		$this->assertSame( array( 'status' => 'rolled_back' ), call_user_func( $tools[1]['callback'], array() ) );
+		$this->assertSame( 1, $updater->rollback_calls );
 	}
 
 	/**
@@ -121,20 +152,35 @@ final class UpdateApiTest extends TestCase {
 	}
 
 	/**
-	 * Verifies the bootstrap's feature detection enables only the optional
-	 * MCPWP integration when the installed feature flag explicitly opts in.
+	 * Verifies the bootstrap enables MCP only when both required MCPWP features
+	 * are explicitly available.
 	 *
 	 * @runInSeparateProcess
 	 * @preserveGlobalState disabled
 	 */
 	public function test_bootstrap_detects_the_explicit_mcpwp_scope_feature_flag(): void {
 		define( 'MCPWP_SUPPORTS_CUSTOM_TOOL_SCOPE_FILTER', true );
+		define( 'MCPWP_SUPPORTS_CUSTOM_TOOL_CALLBACKS', true );
 		require dirname( __DIR__ ) . '/inc/updates/bootstrap.php';
 
 		$this->assertArrayHasKey( 'pre_set_site_transient_update_themes', $GLOBALS['mumega_motion_test_filters'] );
 		$this->assertArrayHasKey( 'upgrader_pre_download', $GLOBALS['mumega_motion_test_filters'] );
 		$this->assertArrayHasKey( 'mcpwp_register_tools', $GLOBALS['mumega_motion_test_filters'] );
 		$this->assertArrayHasKey( 'mcpwp_required_scope_for_tool', $GLOBALS['mumega_motion_test_filters'] );
+	}
+
+	/**
+	 * Keeps custom update tools unavailable when an older MCPWP lacks callbacks.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_bootstrap_requires_the_custom_tool_callback_feature_flag(): void {
+		define( 'MCPWP_SUPPORTS_CUSTOM_TOOL_SCOPE_FILTER', true );
+		require dirname( __DIR__ ) . '/inc/updates/bootstrap.php';
+
+		$this->assertArrayNotHasKey( 'mcpwp_register_tools', $GLOBALS['mumega_motion_test_filters'] );
+		$this->assertArrayNotHasKey( 'mcpwp_required_scope_for_tool', $GLOBALS['mumega_motion_test_filters'] );
 	}
 
 	/**
