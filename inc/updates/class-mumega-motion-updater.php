@@ -62,7 +62,7 @@ final class Mumega_Motion_Updater {
 			return $this->error( 'mumega_motion_update_invalid_release', 'The release manifest is invalid.' );
 		}
 
-		if ( version_compare( $manifest['version'], $installed['version'], '<=' ) ) {
+		if ( 0 >= Mumega_Motion_Release_Client::compare_semver( $manifest['version'], $installed['version'] ) ) {
 			return array(
 				'status'           => 'up_to_date',
 				'previous_version' => $installed['version'],
@@ -183,7 +183,7 @@ final class Mumega_Motion_Updater {
 		$restored = call_user_func( $this->collaborators['backup_restore'], $prior['id'], $installed['directory'] );
 
 		if ( is_wp_error( $restored ) ) {
-			return $restored;
+			return $this->recover_rollback_failure( $restored, $safety, $installed );
 		}
 
 		call_user_func( $this->collaborators['flush'] );
@@ -201,28 +201,7 @@ final class Mumega_Motion_Updater {
 			);
 		}
 
-		$recovered = call_user_func( $this->collaborators['backup_restore'], $safety['id'], $installed['directory'] );
-
-		if ( is_wp_error( $recovered ) ) {
-			return new WP_Error(
-				'mumega_motion_rollback_and_recovery_failed',
-				__( 'Rollback verification failed and the safety backup could not be restored.', 'mumega-motion' ),
-				array(
-					'rollback_error' => $this->error_evidence( $verification ),
-					'recovery_error' => $this->error_evidence( $recovered ),
-					'safety_backup'  => $safety,
-				)
-			);
-		}
-
-		return new WP_Error(
-			'mumega_motion_rollback_failed_recovered',
-			__( 'Rollback verification failed; the current theme was restored from its safety backup.', 'mumega-motion' ),
-			array(
-				'rollback_error' => $this->error_evidence( $verification ),
-				'safety_backup'  => $safety,
-			)
-		);
+		return $this->recover_rollback_failure( $verification, $safety, $installed );
 	}
 
 	/**
@@ -248,13 +227,85 @@ final class Mumega_Motion_Updater {
 			);
 		}
 
+		call_user_func( $this->collaborators['flush'] );
+		$verification = $this->verify_recovered_theme( $this->inspect(), $installed['version'] );
+
+		if ( is_wp_error( $verification ) ) {
+			return new WP_Error(
+				'mumega_motion_update_and_restore_failed',
+				__( 'The theme update failed and its automatic restore could not be verified.', 'mumega-motion' ),
+				array(
+					'update_error'  => $this->error_evidence( $failure ),
+					'restore_error' => $this->error_evidence( $verification ),
+					'backup'        => $backup,
+					'restored'      => is_array( $restored ) ? $restored : array(),
+				)
+			);
+		}
+
 		return new WP_Error(
 			'mumega_motion_update_failed_restored',
 			__( 'The theme update failed and the previous version was restored automatically.', 'mumega-motion' ),
 			array(
-				'update_error' => $this->error_evidence( $failure ),
-				'backup'       => $backup,
-				'restored'     => is_array( $restored ) ? $restored : array(),
+				'update_error'      => $this->error_evidence( $failure ),
+				'backup'            => $backup,
+				'restored'          => is_array( $restored ) ? $restored : array(),
+				'recovery_verified' => true,
+			)
+		);
+	}
+
+	/**
+	 * Recovers a failed rollback from its safety backup and verifies the exact
+	 * pre-rollback active theme before reporting recovery success.
+	 *
+	 * @param WP_Error $failure   Failed restore or post-restore verification.
+	 * @param array    $safety    Safety backup metadata.
+	 * @param array    $installed Pre-rollback inspection.
+	 * @return WP_Error
+	 */
+	private function recover_rollback_failure( WP_Error $failure, array $safety, array $installed ) {
+		$recovered = call_user_func( $this->collaborators['backup_restore'], $safety['id'], $installed['directory'] );
+
+		if ( is_wp_error( $recovered ) ) {
+			return $this->rollback_recovery_error( $failure, $recovered, $safety );
+		}
+
+		call_user_func( $this->collaborators['flush'] );
+		$verification = $this->verify_recovered_theme( $this->inspect(), $installed['version'] );
+
+		if ( is_wp_error( $verification ) ) {
+			return $this->rollback_recovery_error( $failure, $verification, $safety );
+		}
+
+		return new WP_Error(
+			'mumega_motion_rollback_failed_recovered',
+			__( 'Rollback failed; the current theme was restored from its safety backup.', 'mumega-motion' ),
+			array(
+				'rollback_error'    => $this->error_evidence( $failure ),
+				'safety_backup'     => $safety,
+				'recovered'         => is_array( $recovered ) ? $recovered : array(),
+				'recovery_verified' => true,
+			)
+		);
+	}
+
+	/**
+	 * Creates stable rollback-and-safety-recovery failure evidence.
+	 *
+	 * @param WP_Error $rollback_failure Failed rollback operation.
+	 * @param WP_Error $recovery_failure Failed safety recovery operation.
+	 * @param array    $safety           Safety backup metadata.
+	 * @return WP_Error
+	 */
+	private function rollback_recovery_error( WP_Error $rollback_failure, WP_Error $recovery_failure, array $safety ) {
+		return new WP_Error(
+			'mumega_motion_rollback_and_recovery_failed',
+			__( 'Rollback failed and the safety backup could not be restored and verified.', 'mumega-motion' ),
+			array(
+				'rollback_error' => $this->error_evidence( $rollback_failure ),
+				'recovery_error' => $this->error_evidence( $recovery_failure ),
+				'safety_backup'  => $safety,
 			)
 		);
 	}
@@ -372,6 +423,33 @@ final class Mumega_Motion_Updater {
 	}
 
 	/**
+	 * Verifies that recovery returned the exact previously active theme.
+	 *
+	 * @param array|WP_Error $inspection Installed theme inspection.
+	 * @param string         $version    Expected pre-operation version.
+	 * @return true|WP_Error
+	 */
+	private function verify_recovered_theme( $inspection, $version ) {
+		if ( is_wp_error( $inspection ) ) {
+			return $inspection;
+		}
+
+		if ( self::THEME_SLUG !== $inspection['slug'] ) {
+			return $this->error( 'mumega_motion_recovery_inactive_theme', 'The recovered Mumega Motion theme is not active.' );
+		}
+
+		if ( $version !== $inspection['version'] ) {
+			return $this->error( 'mumega_motion_recovery_version_mismatch', 'The recovered theme version does not match the original version.' );
+		}
+
+		if ( ! $inspection['required_files'] ) {
+			return $this->error( 'mumega_motion_recovery_required_files_missing', 'The recovered theme is missing required files.' );
+		}
+
+		return true;
+	}
+
+	/**
 	 * Ensures release data is sufficient for the updater transaction.
 	 *
 	 * @param mixed $manifest Candidate manifest.
@@ -379,12 +457,7 @@ final class Mumega_Motion_Updater {
 	 */
 	private function valid_manifest( $manifest ) {
 		return is_array( $manifest ) &&
-			isset( $manifest['slug'], $manifest['version'], $manifest['package_url'], $manifest['sha256'], $manifest['release_tag'] ) &&
-			self::THEME_SLUG === $manifest['slug'] &&
-			is_string( $manifest['version'] ) &&
-			is_string( $manifest['package_url'] ) &&
-			is_string( $manifest['release_tag'] ) &&
-			1 === preg_match( '/^[a-f0-9]{64}$/', $manifest['sha256'] );
+			Mumega_Motion_Release_Client::valid_manifest_binding( $manifest );
 	}
 
 	/**
@@ -465,7 +538,7 @@ final class Mumega_Motion_Updater {
 		unset( $manifest );
 
 		if ( ! class_exists( 'Theme_Upgrader' ) ) {
-			require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+			require_once ABSPATH . 'wp-admin/includes/class-theme-upgrader.php';
 		}
 
 		$upgrader = new Theme_Upgrader( new Automatic_Upgrader_Skin() );

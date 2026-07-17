@@ -170,6 +170,23 @@ final class ReleaseClientTest extends TestCase {
 	}
 
 	/**
+	 * Rejects a cached manifest whose immutable release asset binding changed.
+	 */
+	public function test_rejects_cached_manifest_with_an_invalid_asset_binding(): void {
+		$cached                = $this->normalized_manifest( '0.1.123' );
+		$cached['package_url'] = 'https://evil.example/mumega-motion-theme-0.1.123.zip';
+		$GLOBALS['mumega_motion_test_site_transients']['mumega_motion_latest_edge_release'] = array(
+			'value'      => $cached,
+			'expiration' => 900,
+		);
+
+		$result = ( new Mumega_Motion_Release_Client() )->latest();
+
+		$this->assert_error_code( 'mumega_motion_release_manifest_invalid', $result );
+		$this->assertCount( 0, $GLOBALS['mumega_motion_test_remote_requests'] );
+	}
+
+	/**
 	 * A forced check discards cached discovery and performs fresh requests.
 	 */
 	public function test_force_deletes_cache_and_makes_fresh_requests(): void {

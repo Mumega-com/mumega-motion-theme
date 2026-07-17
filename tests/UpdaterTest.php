@@ -145,6 +145,7 @@ final class UpdaterTest extends TestCase {
 		} elseif ( 'prune' === $failure ) {
 			$this->state['inspections'][] = $this->inspection( '0.1.101' );
 		}
+		$this->state['inspections'][] = $this->inspection( '0.1.100' );
 		$updater = $this->updater( $options );
 
 		$result = $updater->update();
@@ -189,6 +190,39 @@ final class UpdaterTest extends TestCase {
 	}
 
 	/**
+	 * Treats a restore as successful only after the original active theme has
+	 * been flushed and inspected again.
+	 */
+	public function test_update_verifies_the_recovered_theme_after_restore(): void {
+		$this->state['inspections'][] = $this->inspection( '0.1.100' );
+		$updater                      = $this->updater( array( 'failure' => 'install' ) );
+
+		$result = $updater->update();
+
+		$this->assert_error_code( 'mumega_motion_update_failed_restored', $result );
+		$this->assertSame(
+			array( 'inspect', 'release', 'download', 'validate', 'backup', 'install', 'restore', 'flush', 'inspect', 'cleanup' ),
+			$this->state['calls']
+		);
+		$this->assertTrue( $result->get_error_data()['recovery_verified'] );
+	}
+
+	/**
+	 * Reports recovery evidence when a successful restore does not put the
+	 * original theme back in service.
+	 */
+	public function test_update_reports_when_restoration_verification_fails(): void {
+		$this->state['inspections'][] = $this->inspection( '0.1.102' );
+		$updater                      = $this->updater( array( 'failure' => 'install' ) );
+
+		$result = $updater->update();
+
+		$this->assert_error_code( 'mumega_motion_update_and_restore_failed', $result );
+		$this->assertSame( 'mumega_motion_test_install_failed', $result->get_error_data()['update_error']['code'] );
+		$this->assertSame( 'mumega_motion_recovery_version_mismatch', $result->get_error_data()['restore_error']['code'] );
+	}
+
+	/**
 	 * Uses only the latest backup and automatically restores the safety backup on failed rollback verification.
 	 */
 	public function test_rollback_uses_latest_backup_and_recovers_with_safety_backup(): void {
@@ -201,10 +235,128 @@ final class UpdaterTest extends TestCase {
 
 		$this->assert_error_code( 'mumega_motion_rollback_failed_recovered', $result );
 		$this->assertSame(
-			array( 'inspect', 'latest', 'backup', 'restore', 'flush', 'inspect', 'restore' ),
+			array( 'inspect', 'latest', 'backup', 'restore', 'flush', 'inspect', 'restore', 'flush', 'inspect' ),
 			$this->state['calls']
 		);
 		$this->assertSame( $this->state['backup_id'], $result->get_error_data()['safety_backup']['id'] );
+		$this->assertTrue( $result->get_error_data()['recovery_verified'] );
+	}
+
+	/**
+	 * Recovers through the safety backup even when the attempted prior restore
+	 * reports a WordPress error before post-restore inspection.
+	 */
+	public function test_rollback_recovers_after_the_initial_restore_returns_an_error(): void {
+		$this->state['latest']        = array( 'id' => 'abcdefabcdefabcdefabcdefabcdefab', 'version' => '0.1.99' );
+		$this->state['inspections'][] = $this->inspection( '0.1.100' );
+		$updater                      = $this->updater( array( 'prior_restore_failure' => true ) );
+
+		$result = $updater->rollback();
+
+		$this->assert_error_code( 'mumega_motion_rollback_failed_recovered', $result );
+		$this->assertSame( 'mumega_motion_test_restore_failed', $result->get_error_data()['rollback_error']['code'] );
+		$this->assertTrue( $result->get_error_data()['recovery_verified'] );
+		$this->assertSame(
+			array( 'inspect', 'latest', 'backup', 'restore', 'restore', 'flush', 'inspect' ),
+			$this->state['calls']
+		);
+	}
+
+	/**
+	 * Preserves separate safety recovery evidence when recovery cannot restore
+	 * the original active theme.
+	 */
+	public function test_rollback_reports_distinct_evidence_when_safety_recovery_fails(): void {
+		$this->state['latest'] = array( 'id' => 'abcdefabcdefabcdefabcdefabcdefab', 'version' => '0.1.99' );
+		$updater                = $this->updater( array( 'prior_restore_failure' => true, 'safety_restore_failure' => true ) );
+
+		$result = $updater->rollback();
+
+		$this->assert_error_code( 'mumega_motion_rollback_and_recovery_failed', $result );
+		$this->assertSame( 'mumega_motion_test_restore_failed', $result->get_error_data()['rollback_error']['code'] );
+		$this->assertSame( 'mumega_motion_test_safety_restore_failed', $result->get_error_data()['recovery_error']['code'] );
+	}
+
+	/**
+	 * Uses SemVer precedence, not PHP version ordering, to decide freshness.
+	 *
+	 * @dataProvider semver_freshness_provider
+	 *
+	 * @param string $installed Installed version.
+	 * @param string $release   Candidate release version.
+	 * @param bool   $fresh     Whether the candidate is a newer release.
+	 */
+	public function test_update_uses_semver_precedence_for_freshness( string $installed, string $release, bool $fresh ): void {
+		$this->state['inspections'][0] = $this->inspection( $installed );
+		if ( $fresh ) {
+			$this->state['inspections'][] = $this->inspection( $release );
+		}
+		$updater = $this->updater( array( 'version' => $release ) );
+
+		$result = $updater->update();
+
+		$this->assertSame( $fresh ? 'updated' : 'up_to_date', $result['status'] );
+	}
+
+	/**
+	 * SemVer cases that differ from PHP's version_compare() behavior.
+	 *
+	 * @return array<string,array{0:string,1:string,2:bool}>
+	 */
+	public function semver_freshness_provider(): array {
+		return array(
+			'numeric prerelease is lower than alpha' => array( '1.0.0-alpha', '1.0.0-1', false ),
+			'release follows prerelease'              => array( '1.0.0-alpha', '1.0.0', true ),
+			'build metadata has no precedence'        => array( '1.0.0+build.2', '1.0.0+build.3', false ),
+		);
+	}
+
+	/**
+	 * Rejects a malformed cached manifest before it can be downloaded.
+	 */
+	public function test_update_revalidates_cached_release_asset_binding_before_download(): void {
+		$updater = $this->updater(
+			array(
+				'manifest_overrides' => array(
+					'package_url' => 'https://evil.example/mumega-motion-theme-0.1.101.zip',
+				),
+			)
+		);
+
+		$result = $updater->update( false );
+
+		$this->assert_error_code( 'mumega_motion_update_invalid_release', $result );
+		$this->assertSame( array( 'inspect', 'release' ), $this->state['calls'] );
+	}
+
+	/**
+	 * Loads the WordPress theme upgrader definition when it has not already
+	 * been loaded by the current request.
+	 */
+	public function test_default_installer_loads_the_theme_upgrader_definition(): void {
+		if ( class_exists( 'Theme_Upgrader', false ) ) {
+			$this->markTestSkipped( 'Theme_Upgrader is already loaded by this PHP process.' );
+		}
+
+		$includes_directory = ABSPATH . 'wp-admin/includes';
+		$loader_path        = $includes_directory . '/class-theme-upgrader.php';
+		$this->assertTrue( mkdir( $includes_directory, 0700, true ) );
+		file_put_contents(
+			$loader_path,
+			'<?php class Theme_Upgrader { public function __construct( $skin ) {} public function install( $package, $args ) { return true; } } class Automatic_Upgrader_Skin {}'
+		);
+
+		try {
+			$method = new ReflectionMethod( Mumega_Motion_Updater::class, 'install_package' );
+			$method->setAccessible( true );
+
+			$this->assertTrue( $method->invoke( new Mumega_Motion_Updater(), $this->package_path, array() ) );
+			$this->assertTrue( class_exists( 'Theme_Upgrader', false ) );
+		} finally {
+			unlink( $loader_path );
+			rmdir( $includes_directory );
+			rmdir( dirname( $includes_directory ) );
+		}
 	}
 
 	/**
@@ -216,13 +368,18 @@ final class UpdaterTest extends TestCase {
 	private function updater( array $options = array() ): Mumega_Motion_Updater {
 		$state =& $this->state;
 		$package_path = $this->package_path;
+		$version = isset( $options['version'] ) ? $options['version'] : '0.1.101';
 		$manifest = array(
 			'slug'        => 'mumega-motion-theme',
-			'version'     => isset( $options['version'] ) ? $options['version'] : '0.1.101',
-			'release_tag' => isset( $options['version'] ) ? 'edge-v' . $options['version'] : 'edge-v0.1.101',
-			'package_url' => 'https://github.com/Mumega-com/mumega-motion-theme/releases/download/edge-v0.1.101/mumega-motion-theme-0.1.101.zip',
+			'version'     => $version,
+			'release_tag' => 'edge-v' . $version,
+			'package_url' => 'https://github.com/Mumega-com/mumega-motion-theme/releases/download/edge-v' . $version . '/mumega-motion-theme-' . $version . '.zip',
 			'sha256'      => str_repeat( 'a', 64 ),
+			'manifest_url'=> 'https://github.com/Mumega-com/mumega-motion-theme/releases/download/edge-v' . $version . '/manifest.json',
 		);
+		if ( isset( $options['manifest_overrides'] ) && is_array( $options['manifest_overrides'] ) ) {
+			$manifest = array_merge( $manifest, $options['manifest_overrides'] );
+		}
 		$failure = isset( $options['failure'] ) ? $options['failure'] : '';
 
 		return new Mumega_Motion_Updater(
@@ -245,6 +402,12 @@ final class UpdaterTest extends TestCase {
 				},
 				'backup_restore' => static function ( $id, $directory ) use ( &$state, $options ) {
 					$state['calls'][] = 'restore';
+					if ( ! empty( $options['prior_restore_failure'] ) && isset( $state['latest']['id'] ) && $state['latest']['id'] === $id ) {
+						return new WP_Error( 'mumega_motion_test_restore_failed', 'Restore failed.' );
+					}
+					if ( ! empty( $options['safety_restore_failure'] ) && $state['backup_id'] === $id ) {
+						return new WP_Error( 'mumega_motion_test_safety_restore_failed', 'Safety restore failed.' );
+					}
 					return ! empty( $options['restore_failure'] ) ? new WP_Error( 'mumega_motion_test_restore_failed', 'Restore failed.' ) : array( 'id' => $id, 'version' => '0.1.100' );
 				},
 				'backup_latest' => static function () use ( &$state ) {

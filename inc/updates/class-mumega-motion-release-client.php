@@ -32,7 +32,7 @@ final class Mumega_Motion_Release_Client {
 			$cached = get_site_transient( self::TRANSIENT_KEY );
 
 			if ( is_array( $cached ) ) {
-				return $cached;
+				return self::valid_manifest_binding( $cached ) ? $cached : $this->invalid_manifest_error();
 			}
 		}
 
@@ -166,14 +166,14 @@ final class Mumega_Motion_Release_Client {
 	 * @param string $right Right semantic version.
 	 * @return int Negative, zero, or positive when left is lower, equal, or higher.
 	 */
-	private function compare_semver( $left, $right ) {
+	public static function compare_semver( $left, $right ) {
 		$left_parts  = explode( '-', explode( '+', $left, 2 )[0], 2 );
 		$right_parts = explode( '-', explode( '+', $right, 2 )[0], 2 );
 		$left_core   = explode( '.', $left_parts[0] );
 		$right_core  = explode( '.', $right_parts[0] );
 
 		for ( $index = 0; $index < 3; $index++ ) {
-			$comparison = $this->compare_numeric_identifier( $left_core[ $index ], $right_core[ $index ] );
+			$comparison = self::compare_numeric_identifier( $left_core[ $index ], $right_core[ $index ] );
 
 			if ( 0 !== $comparison ) {
 				return $comparison;
@@ -211,7 +211,7 @@ final class Mumega_Motion_Release_Client {
 			$right_is_numeric = 1 === preg_match( '/^[0-9]+$/', $right_identifier );
 
 			if ( $left_is_numeric && $right_is_numeric ) {
-				return $this->compare_numeric_identifier( $left_identifier, $right_identifier );
+				return self::compare_numeric_identifier( $left_identifier, $right_identifier );
 			}
 
 			if ( $left_is_numeric ) {
@@ -235,7 +235,7 @@ final class Mumega_Motion_Release_Client {
 	 * @param string $right Right numeric identifier.
 	 * @return int Negative, zero, or positive when left is lower, equal, or higher.
 	 */
-	private function compare_numeric_identifier( $left, $right ) {
+	private static function compare_numeric_identifier( $left, $right ) {
 		$length_comparison = strlen( $left ) - strlen( $right );
 
 		return 0 !== $length_comparison ? $length_comparison : strcmp( $left, $right );
@@ -303,7 +303,7 @@ final class Mumega_Motion_Release_Client {
 
 		if (
 			self::THEME_SLUG !== $manifest['slug'] ||
-			! $this->is_semver( $manifest['version'] ) ||
+			! self::is_semver( $manifest['version'] ) ||
 			$version !== $manifest['version'] ||
 			1 !== preg_match( '/^[a-f0-9]{64}$/', $manifest['sha256'] )
 		) {
@@ -352,13 +352,48 @@ final class Mumega_Motion_Release_Client {
 	}
 
 	/**
+	 * Validates the immutable source, tag, version, and asset bindings kept in
+	 * a normalized manifest. This is also used by the updater before download
+	 * so a tampered transient cannot redirect an installation.
+	 *
+	 * @param mixed $manifest Candidate normalized manifest.
+	 * @return bool
+	 */
+	public static function valid_manifest_binding( $manifest ) {
+		if (
+			! is_array( $manifest ) ||
+			! isset( $manifest['slug'], $manifest['version'], $manifest['release_tag'], $manifest['package_url'], $manifest['sha256'], $manifest['manifest_url'] ) ||
+			! is_string( $manifest['slug'] ) ||
+			! is_string( $manifest['version'] ) ||
+			! is_string( $manifest['release_tag'] ) ||
+			! is_string( $manifest['package_url'] ) ||
+			! is_string( $manifest['sha256'] ) ||
+			! is_string( $manifest['manifest_url'] ) ||
+			self::THEME_SLUG !== $manifest['slug'] ||
+			! self::is_semver( $manifest['version'] ) ||
+			self::TAG_PREFIX . $manifest['version'] !== $manifest['release_tag'] ||
+			1 !== preg_match( '/^[a-f0-9]{64}$/', $manifest['sha256'] )
+		) {
+			return false;
+		}
+
+		return self::release_download_url(
+			$manifest['manifest_url'],
+			$manifest['release_tag'] . '/manifest.json'
+		) && self::release_download_url(
+			$manifest['package_url'],
+			$manifest['release_tag'] . '/' . self::THEME_SLUG . '-' . $manifest['version'] . '.zip'
+		);
+	}
+
+	/**
 	 * Checks an exact immutable path on the fixed GitHub repository.
 	 *
 	 * @param string $url          Candidate URL.
 	 * @param string $release_path Expected path beneath releases/download.
 	 * @return bool
 	 */
-	private function release_download_url( $url, $release_path ) {
+	private static function release_download_url( $url, $release_path ) {
 		$parts = wp_parse_url( $url );
 
 		if ( ! is_array( $parts ) ) {
@@ -384,7 +419,7 @@ final class Mumega_Motion_Release_Client {
 	 * @param string $version Version string.
 	 * @return bool
 	 */
-	private function is_semver( $version ) {
+	private static function is_semver( $version ) {
 		return is_string( $version ) && 1 === preg_match( self::SEMVER_REGEX, $version );
 	}
 
