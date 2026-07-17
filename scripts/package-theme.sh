@@ -47,7 +47,7 @@ for runtime_path in style.css functions.php index.php stream-demo.php build inc;
 done
 
 # Source maps are development-only even when a build tool leaves one in build/.
-find "${STAGED_THEME}" -type f -name '*.map' -delete
+find "${STAGED_THEME}" -type f -iname '*.map' -delete
 
 # The allowlist above is the primary boundary. These checks make the policy
 # explicit and prevent a future runtime directory from silently carrying
@@ -61,8 +61,8 @@ if find "${STAGED_THEME}" -type d \( \
 fi
 
 if find "${STAGED_THEME}" -type f \( \
-	-name '*.map' -o -name '*.md' -o -iname 'readme*' -o -name composer.json -o \
-	-name composer.lock -o -name package.json -o -name package-lock.json \
+	-iname '*.map' -o -iname '*.md' -o -iname 'readme*' -o -iname composer.json -o \
+	-iname composer.lock -o -iname package.json -o -iname package-lock.json \
 \) -print -quit | grep -q .; then
 	printf 'Runtime package contains a disallowed development file.\n' >&2
 	exit 1

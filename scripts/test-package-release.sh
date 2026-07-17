@@ -34,6 +34,7 @@ assert_not_contains() {
 
 cleanup() {
 	rm -f "${ROOT_DIR}/inc/README.package-release-test"
+	rm -f "${ROOT_DIR}/inc/DEVELOPMENT.MD"
 	rm -rf "${DIST_DIR}"
 }
 trap cleanup EXIT
@@ -73,7 +74,7 @@ unzip -Z1 "${DIST_DIR}/${ARCHIVE}" > "${DIST_DIR}/contents.txt"
 for required in style.css functions.php index.php stream-demo.php build/index.js build/index.asset.php; do
 	grep -Fxq "mumega-motion-theme/${required}" "${DIST_DIR}/contents.txt" || fail "Missing runtime file: ${required}"
 done
-if grep -E '/(src|tests|docs|scripts|node_modules|vendor|\.git|\.github)(/|$)|\.(map|md)$' "${DIST_DIR}/contents.txt"; then
+if grep -Ei '/(src|tests|docs|scripts|node_modules|vendor|\.git|\.github)(/|$)|\.(map|md)$' "${DIST_DIR}/contents.txt"; then
 	fail 'Package contains development-only content.'
 fi
 
@@ -89,6 +90,13 @@ if ./scripts/package-theme.sh "${VERSION}"; then
 fi
 rm -f "${ROOT_DIR}/inc/README.package-release-test"
 
+# Case variants of development extensions must be rejected too.
+printf 'package test fixture\n' > "${ROOT_DIR}/inc/DEVELOPMENT.MD"
+if ./scripts/package-theme.sh "${VERSION}"; then
+	fail 'Packager accepted an uppercase development file extension beneath an allowed runtime path.'
+fi
+rm -f "${ROOT_DIR}/inc/DEVELOPMENT.MD"
+
 # Release workflow invariants: immutable, verified tag and release bindings.
 while IFS= read -r action; do
 	[[ "${action}" =~ @[0-9a-f]{40}(\ #.*)?$ ]] || fail "Action is not pinned to a full commit SHA: ${action}"
@@ -98,9 +106,15 @@ checkout_count="$(grep -c 'uses: actions/checkout@' "${WORKFLOW}")"
 credentials_disabled_count="$(grep -c 'persist-credentials: false' "${WORKFLOW}")"
 test "${checkout_count}" -eq "${credentials_disabled_count}" || fail 'Each checkout must disable persisted credentials.'
 assert_contains 'git tag -a "${TAG}" "${GITHUB_SHA}"' "${WORKFLOW}"
-assert_contains 'git push --porcelain origin "refs/tags/${TAG}:refs/tags/${TAG}"' "${WORKFLOW}"
+assert_contains 'git config --local user.name "github-actions[bot]"' "${WORKFLOW}"
+assert_contains 'git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"' "${WORKFLOW}"
+assert_contains 'push --porcelain origin "refs/tags/${TAG}:refs/tags/${TAG}"' "${WORKFLOW}"
 assert_contains 'git ls-remote --exit-code origin "refs/tags/${TAG}^{}"' "${WORKFLOW}"
 assert_contains 'git rev-parse "refs/tags/${TAG}^{}"' "${WORKFLOW}"
+assert_contains 'credential.helper=!f() {' "${WORKFLOW}"
+assert_contains 'GITHUB_TOKEN: ${{ github.token }}' "${WORKFLOW}"
+assert_contains 'awk -v peeled_ref="refs/tags/${TAG}^{}"' "${WORKFLOW}"
+assert_contains 'test -n "$remote_sha"' "${WORKFLOW}"
 assert_contains 'gh release create "$TAG"' "${WORKFLOW}"
 assert_contains '--verify-tag' "${WORKFLOW}"
 assert_not_contains '--target "${GITHUB_SHA}"' "${WORKFLOW}"
@@ -109,5 +123,19 @@ assert_contains 'sha256sum -c "mumega-motion-theme-${VERSION}.zip.sha256"' "${WO
 assert_contains "repository administrators must enable GitHub's Immutable Releases" "${WORKFLOW}"
 assert_contains 'release.immutable!==true' "${WORKFLOW}"
 assert_contains 'release.assets.map' "${WORKFLOW}"
+assert_contains 'grep -Ei' "${WORKFLOW}"
+assert_contains "-iname '*.map'" "${ROOT_DIR}/scripts/package-theme.sh"
+assert_contains "-iname '*.md'" "${ROOT_DIR}/scripts/package-theme.sh"
+
+# Exercise the exact peeled-ref selection used by the workflow: a matching
+# tag object SHA must not be mistaken for the dereferenced commit SHA.
+test_tag='edge-v0.1.987'
+expected_sha='0123456789abcdef0123456789abcdef01234567'
+remote_sha="$({
+	printf '%s %s\n' 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' "refs/tags/${test_tag}"
+	printf '%s %s\n' "${expected_sha}" "refs/tags/${test_tag}^{}"
+} | awk -v peeled_ref="refs/tags/${test_tag}^{}" '$2 == peeled_ref { print $1; exit }')"
+test -n "${remote_sha}" || fail 'Peeled remote tag SHA must be nonempty.'
+test "${remote_sha}" = "${expected_sha}" || fail 'Peeled remote tag SHA did not select the triggering commit.'
 
 printf 'Package and release workflow checks passed.\n'

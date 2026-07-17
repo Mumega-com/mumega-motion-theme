@@ -72,6 +72,11 @@ that GitHub reports the release as immutable with exactly the expected assets.
 It deliberately fails on a pre-existing or concurrently-created tag instead of
 reusing it.
 
+Immutable Releases protects release assets, but it is not a substitute for tag
+protection. Configure a repository ruleset for `refs/tags/edge-v*` that blocks
+tag deletion and force updates. The GitHub Actions bot needs permission only to
+create a new edge tag; this workflow never needs to move an existing one.
+
 To make the same package locally, run `npm run package -- 0.1.123`. The
 packager stages an explicit runtime allowlist, rejects development-only
 directories and files (including source maps, docs, tests, and build tooling),
