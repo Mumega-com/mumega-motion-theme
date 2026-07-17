@@ -25,6 +25,7 @@ $GLOBALS['mumega_motion_test_capabilities']     = array();
 $GLOBALS['mumega_motion_test_upload_basedir']   = sys_get_temp_dir();
 $GLOBALS['mumega_motion_test_copy_fail_after']  = null;
 $GLOBALS['mumega_motion_test_copy_count']       = 0;
+$GLOBALS['mumega_motion_test_copy_after_file']  = null;
 $GLOBALS['mumega_motion_test_salt']             = 'mumega-motion-test-secret';
 
 /**
@@ -620,6 +621,10 @@ function copy_dir( $from, $to ) {
 
 		if ( ! copy( $source, $destination ) ) {
 			return new WP_Error( 'copy_failed', 'A file could not be copied.' );
+		}
+
+		if ( is_callable( $GLOBALS['mumega_motion_test_copy_after_file'] ) ) {
+			call_user_func( $GLOBALS['mumega_motion_test_copy_after_file'], $source, $destination );
 		}
 	}
 

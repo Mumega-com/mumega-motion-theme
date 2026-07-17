@@ -39,6 +39,7 @@ final class BackupStoreTest extends TestCase {
 		$GLOBALS['mumega_motion_test_upload_basedir']  = $this->uploads_directory;
 		$GLOBALS['mumega_motion_test_copy_fail_after'] = null;
 		$GLOBALS['mumega_motion_test_copy_count']      = 0;
+		$GLOBALS['mumega_motion_test_copy_after_file'] = null;
 		$wp_filesystem                                 = new Mumega_Motion_Test_Filesystem();
 	}
 
@@ -90,6 +91,55 @@ final class BackupStoreTest extends TestCase {
 		$this->assertStringNotContainsString( $theme, file_get_contents( $backup_path . '/metadata.json' ) );
 		$this->assertStringNotContainsString( 'mumega-motion-test-secret', file_get_contents( $backup_path . '/metadata.json' ) );
 		$this->assertSame( array(), glob( $backup_path . '/.metadata-*' ) );
+	}
+
+	/**
+	 * Restricts the store and each backup directory to the current filesystem owner.
+	 */
+	public function test_create_restricts_store_and_backup_directories_to_the_owner(): void {
+		$metadata = ( new Mumega_Motion_Backup_Store() )->create( $this->create_theme( 'current', 'safe' ), '0.1.100' );
+
+		$this->assertIsArray( $metadata );
+		$this->assertSame( 0, fileperms( $this->backup_root() ) & 0077 );
+		$this->assertSame( 0, fileperms( $this->backup_root() . '/' . $metadata['id'] ) & 0077 );
+	}
+
+	/**
+	 * Rejects a temporary metadata path replaced by a symbolic link before publication.
+	 */
+	public function test_create_rejects_substituted_temporary_metadata_path(): void {
+		$outside = $this->temporary_directory . '/outside-temporary';
+		file_put_contents( $outside, 'safe' );
+		$store = new class( $outside ) extends Mumega_Motion_Backup_Store {
+			private $outside;
+			private $substituted = false;
+
+			public function __construct( $outside ) {
+				parent::__construct();
+				$this->outside = $outside;
+			}
+
+			public function was_substituted() {
+				return $this->substituted;
+			}
+
+			protected function before_atomic_publish( $temporary ) {
+				if ( 0 === strpos( basename( $temporary ), '.metadata-' ) ) {
+					unlink( $temporary );
+					symlink( $this->outside, $temporary );
+					$this->substituted = true;
+				}
+
+				return true;
+			}
+		};
+
+		$result = $store->create( $this->create_theme( 'current', 'safe' ), '0.1.100' );
+
+		$this->assert_error_code( 'mumega_motion_backup_metadata_failed', $result );
+		$this->assertTrue( $store->was_substituted() );
+		$this->assertSame( 'safe', file_get_contents( $outside ) );
+		$this->assertSame( array(), glob( $this->backup_root() . '/*/.metadata-*' ) );
 	}
 
 	/**
@@ -393,6 +443,29 @@ final class BackupStoreTest extends TestCase {
 		$this->assertSame( 'old', file_get_contents( $theme . '/marker.txt' ) );
 		$this->assertFileDoesNotExist( $theme . '/new-only.txt' );
 		$this->assertFileExists( $this->backup_root() . '/' . $metadata['id'] . '/theme/marker.txt' );
+		$this->assertSame( array(), glob( dirname( $theme ) . '/.mumega-motion-*' ) );
+	}
+
+	/**
+	 * Does not swap the live theme when a backup changes while being staged.
+	 */
+	public function test_restore_rechecks_staged_manifest_before_swapping_live_theme(): void {
+		$store    = new Mumega_Motion_Backup_Store();
+		$theme    = $this->create_theme( 'current', 'old' );
+		$metadata = $store->create( $theme, '0.1.100' );
+		$backup   = $this->backup_root() . '/' . $metadata['id'] . '/theme';
+		file_put_contents( $theme . '/marker.txt', 'current' );
+
+		$GLOBALS['mumega_motion_test_copy_after_file'] = static function ( $source ) use ( $backup ) {
+			if ( 'functions.php' === basename( $source ) ) {
+				file_put_contents( $backup . '/marker.txt', 'changed-during-copy' );
+			}
+		};
+
+		$result = $store->restore( $metadata['id'], $theme );
+
+		$this->assert_error_code( 'mumega_motion_backup_integrity_failed', $result );
+		$this->assertSame( 'current', file_get_contents( $theme . '/marker.txt' ) );
 		$this->assertSame( array(), glob( dirname( $theme ) . '/.mumega-motion-*' ) );
 	}
 

@@ -70,6 +70,7 @@ class Mumega_Motion_Backup_Store {
 		if (
 			! wp_mkdir_p( $backup_directory ) ||
 			is_link( $backup_directory ) ||
+			! $this->restrict_directory_to_owner( $backup_directory ) ||
 			! $this->protect_directory( $backup_directory, true )
 		) {
 			$this->delete_recursively( $backup_directory, $root );
@@ -199,6 +200,16 @@ class Mumega_Motion_Backup_Store {
 			}
 
 			return $this->error( 'mumega_motion_backup_restore_copy_failed', 'The backup could not be staged for restoration.' );
+		}
+
+		$staged_manifest = $this->build_manifest( $staging );
+
+		if ( is_wp_error( $staged_manifest ) || $metadata['manifest'] !== $staged_manifest ) {
+			if ( ! $this->cleanup_or_quarantine( $staging, $parent, $root ) ) {
+				return $this->cleanup_error( 'restore_integrity', 'mumega_motion_backup_integrity_failed' );
+			}
+
+			return $this->error( 'mumega_motion_backup_integrity_failed', 'Backup integrity verification failed.' );
 		}
 
 		if ( ! $this->rename_path( $theme_real, $displaced ) ) {
@@ -344,7 +355,7 @@ class Mumega_Motion_Backup_Store {
 			return $this->error( 'mumega_motion_backup_store_unavailable', 'The backup store is unavailable.' );
 		}
 
-		if ( ! $this->protect_directory( $root_real, true ) ) {
+		if ( ! $this->restrict_directory_to_owner( $root_real ) || ! $this->protect_directory( $root_real, true ) ) {
 			return $this->error( 'mumega_motion_backup_store_unavailable', 'The backup store could not be protected.' );
 		}
 
@@ -391,19 +402,149 @@ class Mumega_Motion_Backup_Store {
 			}
 		}
 
-		$temporary = dirname( $path ) . '/.protection-' . bin2hex( random_bytes( 16 ) );
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Atomic local protection file publication.
-		$written = file_put_contents( $temporary, $contents, LOCK_EX );
+		return $this->write_atomic_file( dirname( $path ), '.protection-', $path, $contents );
+	}
 
-		if ( strlen( $contents ) !== $written ) {
-			$this->delete_recursively( $temporary, dirname( $temporary ) );
+	/**
+	 * Restricts a store-controlled directory to its filesystem owner.
+	 *
+	 * The uploads base can have broader permissions, but all mutable backup
+	 * state lives beneath this directory. Checking its inode both before and
+	 * after chmod prevents a replacement from being accepted as protected.
+	 *
+	 * @param string $directory Store-controlled directory.
+	 * @return bool
+	 */
+	private function restrict_directory_to_owner( $directory ) {
+		$before = $this->safe_lstat( $directory );
+
+		if ( false === $before || ! $this->stat_is_directory( $before ) || $this->stat_is_link( $before ) ) {
 			return false;
 		}
 
-		if ( ! $this->rename_path( $temporary, $path ) ) {
-			$this->delete_recursively( $temporary, dirname( $temporary ) );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod -- Backup state must not be writable by other local users.
+		if ( ! chmod( $directory, 0700 ) ) {
 			return false;
 		}
+
+		$after = $this->safe_lstat( $directory );
+
+		return false !== $after &&
+			$this->same_inode( $after, $before ) &&
+			$this->stat_is_directory( $after ) &&
+			0 === ( $after['mode'] & 0077 );
+	}
+
+	/**
+	 * Publishes a local file from an exclusively-created same-directory temporary.
+	 *
+	 * Exclusive fopen('x') rejects a pre-existing temporary name, including a symlink.
+	 * Direct lstat-safe cleanup is deliberate here: WP_Filesystem helpers do not
+	 * expose no-follow or inode checks needed to clean an attacker-substituted
+	 * temporary path safely.
+	 *
+	 * @param string $directory   Containing protected directory.
+	 * @param string $temporary_prefix Opaque temporary filename prefix.
+	 * @param string $destination Final file path.
+	 * @param string $contents    Exact file contents.
+	 * @return bool
+	 */
+	private function write_atomic_file( $directory, $temporary_prefix, $destination, $contents ) {
+		$directory_stat = $this->safe_lstat( $directory );
+
+		if (
+			false === $directory_stat ||
+			! $this->stat_is_directory( $directory_stat ) ||
+			! $this->restrict_directory_to_owner( $directory )
+		) {
+			return false;
+		}
+
+		$directory_stat = $this->safe_lstat( $directory );
+
+		if ( false === $directory_stat || ! $this->stat_is_directory( $directory_stat ) ) {
+			return false;
+		}
+
+		$temporary = $directory . '/' . $temporary_prefix . bin2hex( random_bytes( 16 ) );
+		$handler   = static function () {
+			return true;
+		};
+
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- Exclusive temporary creation failure is handled locally.
+		set_error_handler( $handler );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- fopen('x') provides exclusive, non-traversing temporary creation.
+		$handle = fopen( $temporary, 'x' );
+		restore_error_handler();
+
+		if ( false === $handle ) {
+			return false;
+		}
+
+		$temporary_stat = $this->safe_lstat( $temporary );
+
+		if ( false === $temporary_stat || ! $this->stat_is_regular_file( $temporary_stat ) ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- Closes the exclusively-created temporary file.
+			fclose( $handle );
+			$this->delete_recursively( $temporary, $directory );
+			return false;
+		}
+
+		$length  = strlen( $contents );
+		$written = 0;
+
+		while ( $written < $length ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- Writes through the exclusively-created temporary descriptor.
+			$chunk = fwrite( $handle, substr( $contents, $written ) );
+
+			if ( false === $chunk || 0 === $chunk ) {
+				break;
+			}
+
+			$written += $chunk;
+		}
+
+		$flushed = fflush( $handle );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- Closes the exclusively-created temporary file.
+		fclose( $handle );
+
+		$destination_stat = $this->safe_lstat( $destination );
+
+		if ( ! $this->before_atomic_publish( $temporary ) ) {
+			$this->delete_recursively( $temporary, $directory );
+			return false;
+		}
+
+		if (
+			$length !== $written ||
+			! $flushed ||
+			! $this->same_lstat( $directory, $directory_stat ) ||
+			! $this->same_lstat( $temporary, $temporary_stat ) ||
+			( false !== $destination_stat && ! $this->stat_is_regular_file( $destination_stat ) )
+		) {
+			$this->delete_recursively( $temporary, $directory );
+			return false;
+		}
+
+		if ( ! $this->rename_path( $temporary, $destination ) ) {
+			$this->delete_recursively( $temporary, $directory );
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Provides a deterministic test seam before the final no-follow checks.
+	 *
+	 * Production does not alter the temporary path here. Keeping the seam
+	 * protected permits regression coverage for a path substitution race.
+	 *
+	 * @param string $temporary Exclusively-created temporary path.
+	 * @return bool
+	 */
+	protected function before_atomic_publish( $temporary ) {
+		unset( $temporary );
 
 		return true;
 	}
@@ -434,27 +575,18 @@ class Mumega_Motion_Backup_Store {
 	 * @return bool
 	 */
 	private function write_metadata( $backup_directory, array $metadata ) {
-		$temporary = $backup_directory . '/.metadata-' . bin2hex( random_bytes( 16 ) );
-		$encoded   = wp_json_encode( $metadata, JSON_PRESERVE_ZERO_FRACTION );
+		$encoded = wp_json_encode( $metadata, JSON_PRESERVE_ZERO_FRACTION );
 
 		if ( false === $encoded ) {
 			return false;
 		}
 
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Atomic local metadata publication.
-		$written = file_put_contents( $temporary, $encoded . "\n", LOCK_EX );
-
-		if ( strlen( $encoded ) + 1 !== $written ) {
-			$this->delete_recursively( $temporary, $backup_directory );
-			return false;
-		}
-
-		if ( ! $this->rename_path( $temporary, $backup_directory . '/' . self::METADATA_FILE ) ) {
-			$this->delete_recursively( $temporary, $backup_directory );
-			return false;
-		}
-
-		return true;
+		return $this->write_atomic_file(
+			$backup_directory,
+			'.metadata-',
+			$backup_directory . '/' . self::METADATA_FILE,
+			$encoded . "\n"
+		);
 	}
 
 	/**
@@ -772,12 +904,11 @@ class Mumega_Motion_Backup_Store {
 					'signature' => $this->sign_sequence( $next ),
 				);
 				$encoded = wp_json_encode( $state );
-				$temp    = $root . '/.sequence-' . bin2hex( random_bytes( 16 ) );
-				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Same-directory atomic sequence publication.
-				$written = false === $encoded ? false : file_put_contents( $temp, $encoded . "\n", LOCK_EX );
 
-				if ( false === $encoded || strlen( $encoded ) + 1 !== $written || ! $this->rename_path( $temp, $state_path ) ) {
-					$this->delete_recursively( $temp, $root );
+				if (
+					false === $encoded ||
+					! $this->write_atomic_file( $root, '.sequence-', $state_path, $encoded . "\n" )
+				) {
 					$result = $this->error( 'mumega_motion_backup_sequence_failed', 'The backup sequence could not be stored safely.' );
 				} else {
 					$result = $next;
@@ -1104,6 +1235,7 @@ class Mumega_Motion_Backup_Store {
 			return true;
 		};
 
+		clearstatcache( true, $path );
 		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- A disappearing path is represented by false.
 		set_error_handler( $handler );
 		$stat = lstat( $path );
@@ -1123,9 +1255,19 @@ class Mumega_Motion_Backup_Store {
 		$actual = $this->safe_lstat( $path );
 
 		return false !== $actual &&
-			$actual['dev'] === $expected['dev'] &&
-			$actual['ino'] === $expected['ino'] &&
+			$this->same_inode( $actual, $expected ) &&
 			$actual['mode'] === $expected['mode'];
+	}
+
+	/**
+	 * Compares the device and inode of two lstat snapshots.
+	 *
+	 * @param array $left  First lstat snapshot.
+	 * @param array $right Second lstat snapshot.
+	 * @return bool
+	 */
+	private function same_inode( array $left, array $right ) {
+		return $left['dev'] === $right['dev'] && $left['ino'] === $right['ino'];
 	}
 
 	/**
