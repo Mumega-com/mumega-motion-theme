@@ -1,0 +1,127 @@
+name: Edge theme release
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify (PHP ${{ matrix.php }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        php:
+          - '7.4'
+          - '8.3'
+    steps:
+      - name: Check out the exact triggering commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up PHP with ZIP support
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: zip
+          tools: composer:v2
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Build production JavaScript
+        run: npm run build
+
+      - name: Check built JavaScript syntax
+        run: find build -type f -name '*.js' -print0 | xargs -0 -r -n1 node --check
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Run PHPUnit and lint shipped PHP
+        run: |
+          vendor/bin/phpunit -c phpunit.xml.dist
+          find functions.php index.php stream-demo.php inc -type f -name '*.php' -print0 | xargs -0 -r -n1 php -l
+
+  release:
+    name: Package and publish immutable edge release
+    needs: verify
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the exact verified commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Derive immutable edge version
+        run: |
+          echo "VERSION=0.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          echo "TAG=edge-v0.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+
+      - name: Install and build JavaScript
+        run: |
+          npm ci
+          npm run build
+
+      - name: Check built JavaScript syntax
+        run: find build -type f -name '*.js' -print0 | xargs -0 -r -n1 node --check
+
+      - name: Package the verified runtime allowlist
+        run: ./scripts/package-theme.sh "$VERSION"
+
+      - name: Verify package layout and manifest
+        run: |
+          archive="dist/mumega-motion-theme-${VERSION}.zip"
+          test "$(unzip -Z1 "$archive" | cut -d/ -f1 | sort -u)" = "mumega-motion-theme"
+          for required in style.css functions.php index.php stream-demo.php build/index.js build/index.asset.php; do
+            unzip -Z1 "$archive" | grep -Fx "mumega-motion-theme/${required}" >/dev/null
+          done
+          if unzip -Z1 "$archive" | grep -E '/(src|tests|docs|node_modules|vendor|\.git|\.github)/|\.map$'; then
+            echo "Package contains a disallowed development file." >&2
+            exit 1
+          fi
+          node -e 'const fs=require("fs"); const m=JSON.parse(fs.readFileSync("dist/manifest.json", "utf8")); const keys=["slug","version","package_url","sha256","requires_wp","requires_php"]; if (JSON.stringify(Object.keys(m))!==JSON.stringify(keys) || m.slug!=="mumega-motion-theme" || m.version!==process.env.VERSION || !/^[0-9a-f]{64}$/.test(m.sha256)) process.exit(1);'
+          sha256sum -c "dist/mumega-motion-theme-${VERSION}.zip.sha256"
+
+      - name: Refuse to replace an existing tag
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Refusing to replace existing immutable tag ${TAG}." >&2
+            exit 1
+          fi
+
+      - name: Create immutable prerelease for the verified commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" \
+            "dist/mumega-motion-theme-${VERSION}.zip" \
+            "dist/mumega-motion-theme-${VERSION}.zip.sha256" \
+            "dist/manifest.json" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --prerelease \
+            --title "Mumega Motion ${VERSION}" \
+            --notes "Immutable edge package for ${GITHUB_SHA}."

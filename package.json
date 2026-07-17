@@ -5,7 +5,8 @@
   "description": "Mumega WordPress theme with React/Motion-powered interactive components. Shares WordPress core's own React instance instead of bundling a duplicate.",
   "scripts": {
     "build": "wp-scripts build",
-    "start": "wp-scripts start"
+    "start": "wp-scripts start",
+    "package": "npm run build && ./scripts/package-theme.sh"
   },
   "dependencies": {
     "motion": "^12.42.2"
