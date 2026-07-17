@@ -163,7 +163,7 @@ final class Mumega_Motion_Update_Api {
 		$tools[] = array(
 			'name'        => 'wp_update_mumega_motion',
 			'description' => 'Install the latest verified Mumega Motion theme release from its fixed repository.',
-			'rest_path'   => '/mumega-motion/v1/update',
+			'callback'    => array( $this, 'mcp_update' ),
 			'method'      => 'POST',
 			'category'    => 'admin',
 			'input_props' => array(
@@ -175,7 +175,7 @@ final class Mumega_Motion_Update_Api {
 		$tools[] = array(
 			'name'        => 'wp_rollback_mumega_motion',
 			'description' => 'Restore the newest verified local Mumega Motion theme backup.',
-			'rest_path'   => '/mumega-motion/v1/rollback',
+			'callback'    => array( $this, 'mcp_rollback' ),
 			'method'      => 'POST',
 			'category'    => 'admin',
 			'input_props' => array(),
@@ -184,6 +184,38 @@ final class Mumega_Motion_Update_Api {
 		);
 
 		return $tools;
+	}
+
+	/**
+	 * Runs the fixed update transaction after MCPWP has authorized the tool.
+	 *
+	 * This callback deliberately does not reuse the public REST permission
+	 * callback: direct REST calls require a WordPress user with update_themes,
+	 * while MCPWP has already applied its exact admin-scope and category gates.
+	 *
+	 * @param array $arguments Validated MCP tool arguments.
+	 * @return array|WP_Error Fixed updater result.
+	 */
+	public function mcp_update( $arguments = array() ) {
+		$force_check = true;
+
+		if ( is_array( $arguments ) && array_key_exists( 'force_check', $arguments ) ) {
+			$force_check = rest_sanitize_boolean( $arguments['force_check'] );
+		}
+
+		return $this->updater->update( $force_check );
+	}
+
+	/**
+	 * Runs the fixed rollback transaction after MCPWP has authorized the tool.
+	 *
+	 * @param array $arguments Validated MCP tool arguments, intentionally unused.
+	 * @return array|WP_Error Fixed updater result.
+	 */
+	public function mcp_rollback( $arguments = array() ) {
+		unset( $arguments );
+
+		return $this->updater->rollback();
 	}
 
 	/**
