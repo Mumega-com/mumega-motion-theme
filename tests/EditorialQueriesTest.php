@@ -19,18 +19,19 @@ final class EditorialQueriesTest extends TestCase {
 	 * Resets every configurable query and navigation double.
 	 */
 	protected function setUp(): void {
-		$GLOBALS['mumega_motion_test_options']                   = array();
-		$GLOBALS['mumega_motion_test_post_queries']              = array();
-		$GLOBALS['mumega_motion_test_get_posts_requests']        = array();
-		$GLOBALS['mumega_motion_test_categories_by_slug']        = array();
-		$GLOBALS['mumega_motion_test_category_by_slug_requests'] = array();
-		$GLOBALS['mumega_motion_test_categories']                = array();
-		$GLOBALS['mumega_motion_test_get_categories_requests']   = array();
-		$GLOBALS['mumega_motion_test_nav_menu_items']            = array();
-		$GLOBALS['mumega_motion_test_nav_menu_item_requests']    = array();
-		$GLOBALS['mumega_motion_test_nav_menu_locations']        = array();
-		$GLOBALS['mumega_motion_test_nav_menu_objects']          = array();
-		$GLOBALS['mumega_motion_test_nav_menu_object_requests']  = array();
+		$GLOBALS['mumega_motion_test_options']                    = array();
+		$GLOBALS['mumega_motion_test_post_queries']               = array();
+		$GLOBALS['mumega_motion_test_get_posts_requests']         = array();
+		$GLOBALS['mumega_motion_test_categories_by_slug']         = array();
+		$GLOBALS['mumega_motion_test_category_by_slug_requests']  = array();
+		$GLOBALS['mumega_motion_test_categories']                 = array();
+		$GLOBALS['mumega_motion_test_get_categories_requests']    = array();
+		$GLOBALS['mumega_motion_test_nav_menu_items']             = array();
+		$GLOBALS['mumega_motion_test_nav_menu_item_requests']     = array();
+		$GLOBALS['mumega_motion_test_nav_menu_locations']         = array();
+		$GLOBALS['mumega_motion_test_nav_menu_location_requests'] = array();
+		$GLOBALS['mumega_motion_test_nav_menu_objects']           = array();
+		$GLOBALS['mumega_motion_test_nav_menu_object_requests']   = array();
 	}
 
 	/**
@@ -167,6 +168,10 @@ final class EditorialQueriesTest extends TestCase {
 		);
 
 		$this->assertSame( array( 7, 3 ), mumega_motion_menu_category_ids() );
+		$this->assertSame(
+			array( true ),
+			$GLOBALS['mumega_motion_test_nav_menu_location_requests']
+		);
 		$this->assertSame( array( 21 ), $GLOBALS['mumega_motion_test_nav_menu_object_requests'] );
 		$this->assertSame( array( 21 ), $GLOBALS['mumega_motion_test_nav_menu_item_requests'] );
 	}
@@ -187,7 +192,10 @@ final class EditorialQueriesTest extends TestCase {
 		$this->assertSame( array( 3, 4, 5 ), mumega_motion_select_rail_categories( array( 10 ) ) );
 		$this->assertCount( 4, $GLOBALS['mumega_motion_test_get_posts_requests'] );
 		$this->assertSame( array( 5 ), $GLOBALS['mumega_motion_test_get_posts_requests'][3]['category__in'] );
-		$this->assertSame( array( 10 ), $GLOBALS['mumega_motion_test_get_posts_requests'][0]['post__not_in'] );
+
+		foreach ( $GLOBALS['mumega_motion_test_get_posts_requests'] as $request ) {
+			$this->assertSame( array( 10 ), $request['post__not_in'] );
+		}
 	}
 
 	/**

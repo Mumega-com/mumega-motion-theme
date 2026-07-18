@@ -47,6 +47,7 @@ $GLOBALS['mumega_motion_test_get_categories_requests'] = array();
 $GLOBALS['mumega_motion_test_nav_menu_items']   = array();
 $GLOBALS['mumega_motion_test_nav_menu_item_requests'] = array();
 $GLOBALS['mumega_motion_test_nav_menu_locations'] = array();
+$GLOBALS['mumega_motion_test_nav_menu_location_requests'] = array();
 $GLOBALS['mumega_motion_test_nav_menu_objects'] = array();
 $GLOBALS['mumega_motion_test_nav_menu_object_requests'] = array();
 
@@ -543,6 +544,8 @@ function get_categories( $args = array() ) {
  * @return array
  */
 function get_nav_menu_locations() {
+	$GLOBALS['mumega_motion_test_nav_menu_location_requests'][] = true;
+
 	return $GLOBALS['mumega_motion_test_nav_menu_locations'];
 }
 
