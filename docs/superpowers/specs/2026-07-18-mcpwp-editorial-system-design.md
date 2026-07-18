@@ -1,7 +1,7 @@
 # MCPWP editorial system for Mumega Motion
 
 **Date:** 2026-07-18  
-**Status:** Approved; implementation plans prepared
+**Status:** Approved; implementation contract amended for WordPress-native knowledge publishing
 **Repository:** `Mumega-com/mumega-motion-theme`  
 **Site:** `https://mcpwp.net`  
 **Implementation branch:** `feat/mcpwp-editorial-system`
@@ -179,8 +179,21 @@ These names and slugs belong to the MCPWP site profile, not to the reusable them
 - A category with slug `field-notes` activates the optional dated-notes module.
 - A category with slug `releases` is excluded from automatic lead/supporting selection unless one of its posts is sticky.
 - A published page with slug `newsletter` activates the optional newsletter module and Subscribe link.
+- A published page with slug `affiliate-disclosure` supplies the policy URL for the article fallback disclosure. The article still renders its visible disclosure text when the page is absent, but it never emits a dead policy link; MCPWP public launch requires the policy page.
 - Sites without any of these optional convention slugs still render a complete lead desk, topic rails, and footer.
 - Site name, tagline, menus, category names, excerpts, page content, and media supply all public text. Theme PHP must not hard-code `MCPWP`, `WordPress + AI`, `MCP`, author names, article titles, benchmark values, or newsletter copy.
+
+### WordPress-native knowledge model
+
+MCPWP treats the publication as the public projection of a connected knowledge base while keeping normal WordPress data as the first-release source of truth.
+
+- Primary-menu category items declare durable, living topic hubs. Category archives render the term title, editorial description, current posts, and pagination rather than behaving as unlabeled result lists.
+- Native post tags provide a controlled vocabulary for public entities, tools, protocols, organizations, and concepts. The first-release rule treats every assigned tag as a public entity except slugs in the reserved operational list. The list defaults to `affiliate` and can be extended through the documented `mumega_motion_operational_tag_slugs` filter.
+- Contextual hyperlinks authored inside Gutenberg content are the canonical directed edges between public knowledge nodes. Links use descriptive anchor text and canonical internal URLs.
+- Article templates expose the selected topic and public entity tags. Topic-derived recommendations are labeled **More from this topic** because the first release does not calculate semantic similarity.
+- The homepage is an entry point into the knowledge system: lead stories, Test Lab evidence, Field Notes, and topic rails all lead into durable topic or entity archives.
+- The first release stores and renders only WordPress posts, pages, categories, tags, descriptions, and links. It adds no graph database, custom content API, vector store, Cloudflare Worker, or headless frontend.
+- Link extraction, backlink presentation, graph visualization, edge-aware recommendation ranking, and agent graph tools are later work after the native publication model is stable.
 
 ### Existing-category migration
 
@@ -294,8 +307,8 @@ The `single.php` template provides:
 - Featured image with WordPress responsive image attributes.
 - A readable article column with optional wide media.
 - Author biography.
-- Related stories chosen from the primary category and excluding the current post.
-- A global affiliate-disclosure link and visible disclosure block when the post has the `affiliate` tag.
+- **More from this topic** stories chosen from the primary category and excluding the current post.
+- A visible disclosure block when the post has the `affiliate` tag, plus a policy link resolved from the published `affiliate-disclosure` page when available.
 - Previous/next navigation where appropriate.
 
 The first release does not auto-generate a table of contents. Authors and agents may insert a supplied Article Brief Gutenberg pattern containing:
@@ -315,10 +328,10 @@ Reading time is the ceiling of visible article words divided by 225 words per mi
 
 The theme registers patterns, not custom content storage:
 
-1. **Article Brief:** summary, key takeaways, and contents.
+1. **Article Brief:** summary, key takeaways, contents, methodology, sources, and corrections/update note.
 2. **Test Method:** question, environment, models/tools tested, procedure, date, limitations, and results.
 3. **Evidence Table:** claim, observation, source, and confidence.
-4. **Affiliate Disclosure:** standardized disclosure text and policy link.
+4. **Affiliate Disclosure:** standardized disclosure text and an editable link to the site's affiliate policy.
 5. **Correction Note:** dated correction with the previous claim and revised finding.
 6. **Newsletter Page:** title, description, consent copy, and a standard form-block insertion area. MCPWP.net inserts its existing WPForms block.
 
@@ -361,6 +374,7 @@ theme.json
 ```
 
 This file map is the implementation contract. Additional test fixtures and development-only files may be added without changing these production responsibilities.
+The legacy `stream-demo.php` endpoint is not part of the editorial runtime package. Its reusable `StreamingText` island may remain available behind an explicit bounded mount, but the standalone endpoint is excluded from the production allowlist.
 
 ## Visual system
 
@@ -397,6 +411,7 @@ This file map is the implementation contract. Additional test fixtures and devel
 
 - Semantic `header`, `nav`, `main`, `article`, `section`, `aside`, and `footer` landmarks.
 - One H1 per page and ordered heading levels.
+- The linked site-title masthead is not a heading; the page or article title is the sole H1.
 - Visible skip link and focus indicators.
 - Keyboard-operable menus, search, forms, and links.
 - WCAG 2.2 AA color contrast.
@@ -443,6 +458,7 @@ This file map is the implementation contract. Additional test fixtures and devel
 - PHPUnit tests for lead selection, fallback selection, category lookup, exclusion-list behavior, Release exclusion, and graceful missing-content states.
 - PHPUnit tests for reading-time and summary helpers.
 - PHPUnit tests for menu-derived rail selection and primary-category selection.
+- PHPUnit template-contract tests for the single H1 owner, topic descriptions, public entity-tag archives, and **More from this topic** labeling.
 - PHP syntax checks on PHP 7.4 and the current supported PHP version.
 - WordPress Coding Standards on new PHP files.
 - Existing update-channel tests remain green.
@@ -457,6 +473,7 @@ This file map is the implementation contract. Additional test fixtures and devel
 - Verify keyboard navigation, focus order, skip link, and reduced motion.
 - Disable JavaScript and verify that all editorial content, links, search, and fallbacks remain usable.
 - Verify article, category, search, page, 404, and posts-index templates.
+- Verify living topic/category archives, public entity/tag archives, contextual internal links, and no orphaned featured articles.
 - Verify existing Elementor product pages still render unchanged.
 - Verify Yoast emits one canonical and one schema graph after its separate warning is fixed.
 - Verify no theme PHP warnings, browser console errors, mixed content, or failed assets.
@@ -480,6 +497,7 @@ After changing the static homepage setting:
 - Consolidating analytics plugins.
 - Fixing Yoast's existing option warning.
 - Building a paywall, membership system, recommendation engine, or personalized feed.
+- Extracting backlinks, computing a graph, or ranking related content semantically.
 - Automatically publishing agent-generated content.
 - Creating custom post types for experiments or reviews.
 - Building an AI chatbot or “Ask MCPWP” interface.
@@ -497,6 +515,7 @@ The editorial-system implementation is complete only when:
 - The approved editorial hierarchy is present on desktop and mobile.
 - Homepage modules are driven by real posts/categories and never duplicate stories.
 - Topic rails and primary-category labels are driven by WordPress menu/category configuration, not MCPWP-specific PHP constants.
+- Category archives function as living topic hubs, public entity tags have usable archives, contextual internal links remain intact, and category-derived recommendations are honestly labeled **More from this topic**.
 - Gutenberg patterns support consistent human and agent-assisted publishing.
 - MCPWP.net's existing WPForms form works when embedded in its Gutenberg Newsletter page; the reusable theme owns only its presentation.
 - Existing Elementor pages remain intact.

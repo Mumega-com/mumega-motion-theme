@@ -20,7 +20,7 @@
 - Reuse WordPress core React; never bundle another React runtime.
 - Preserve PHP 7.4 compatibility.
 - Escape on output, translate public fallbacks, reset post data after secondary loops, and preserve globals when rendering a page outside the main loop.
-- Each code task follows red, green, refactor, verification, then a focused commit.
+- Each new or changed PHP/JavaScript behavior follows red, green, refactor, verification, then a focused commit. CSS, `theme.json`, documentation, and manual rendered QA use their explicit build, lint, accessibility, and visual gates.
 
 ## File and Interface Map
 
@@ -69,6 +69,8 @@ npm run build
 
 Expected: all existing tests pass, package checks end with Package and release workflow checks passed., and the bundle builds.
 
+- [ ] Before Task 5, execute the read-only portions of the site-launch baseline: record the current static homepage ID, assigned page template, Elementor template metadata when visible, and the same facts for representative key Elementor pages. Capture logged-out screenshots without changing WordPress. Add each observed page-template mode to the Task 5 disposable fixtures so the new global shell can prove that legacy content still reaches `the_content()` and receives no editorial-only assets.
+
 - [ ] Record the command output in the PR notes. Do not commit dist output.
 
 ### Task 2: Add Pure Editorial Helpers
@@ -79,7 +81,7 @@ Expected: all existing tests pass, package checks end with Package and release w
 - Modify: tests/bootstrap.php
 - Modify: functions.php
 
-- [ ] Add minimal WP_Post and WP_Term test values plus controllable doubles for wp_strip_all_tags, strip_shortcodes, get_the_excerpt, get_post_field, get_the_terms, and get_option.
+- [ ] Add minimal WP_Post and WP_Term test values plus controllable doubles for wp_strip_all_tags, strip_shortcodes, get_the_excerpt, get_post_field, get_the_terms, get_the_tags, apply_filters, and get_option.
 
 - [ ] Write failing tests with these exact methods:
 
@@ -92,6 +94,9 @@ public function test_primary_category_prefers_first_assigned_category_in_menu_or
 public function test_primary_category_falls_back_to_alphabetical_non_default_category(): void;
 public function test_primary_category_returns_null_without_categories(): void;
 public function test_modified_date_requires_a_24_hour_difference(): void;
+public function test_public_entity_tags_exclude_reserved_operational_tags(): void;
+public function test_operational_tag_slug_filter_can_extend_the_reserved_list(): void;
+public function test_affiliate_policy_lookup_requires_a_published_unprotected_page(): void;
 ~~~
 
 Use fixed 1, 225, and 226-word fixtures. Include block comments, HTML, and a shortcode in summary fixtures.
@@ -112,6 +117,9 @@ function mumega_motion_card_summary( $post, $limit = 28 );
 function mumega_motion_primary_category( $post_id, $menu_category_ids = array() );
 function mumega_motion_has_meaningful_modified_date( $post_id );
 function mumega_motion_newsletter_page();
+function mumega_motion_affiliate_policy_page();
+function mumega_motion_operational_tag_slugs();
+function mumega_motion_public_entity_tags( $post_id );
 ~~~
 
 Implementation contract:
@@ -122,6 +130,9 @@ Implementation contract:
 4. Primary category is the first assigned category appearing in Primary-menu order. Fallback is the alphabetically first assigned non-default category. Return null if none remains.
 5. Show modified date only when post_modified_gmt is at least DAY_IN_SECONDS after post_date_gmt.
 6. Newsletter lookup requests one published, non-password-protected page with slug newsletter and returns null otherwise.
+7. Operational tag slugs default to `array( 'affiliate' )`, pass through the `mumega_motion_operational_tag_slugs` filter, and are normalized to unique non-empty slugs.
+8. Public entity tags are the post's assigned native tags excluding every slug in the operational list; return an empty array when no public tags remain.
+9. Affiliate policy lookup requests one published, non-password-protected page with slug `affiliate-disclosure` and returns null otherwise.
 
 - [ ] Require the helper file from functions.php, run focused and full suites, then commit.
 
@@ -153,7 +164,7 @@ public function test_menu_categories_preserve_order_and_ignore_non_categories():
 public function test_rails_require_three_eligible_posts_and_stop_at_three(): void;
 public function test_no_menu_fallback_uses_six_largest_non_empty_categories(): void;
 public function test_missing_special_category_returns_no_posts_without_querying(): void;
-public function test_related_posts_share_primary_category_and_exclude_current_post(): void;
+public function test_more_from_topic_posts_share_primary_category_and_exclude_current_post(): void;
 ~~~
 
 - [ ] Implement these public functions:
@@ -166,7 +177,7 @@ function mumega_motion_select_supporting_posts( &$used_ids, $limit = 3 );
 function mumega_motion_select_rail_categories( $used_ids, $limit = 3 );
 function mumega_motion_select_category_posts( $term_id, &$used_ids, $limit = 3 );
 function mumega_motion_select_special_posts( $slug, &$used_ids, $limit );
-function mumega_motion_select_related_posts( $post_id, $term_id, $limit = 3 );
+function mumega_motion_select_more_from_topic_posts( $post_id, $term_id, $limit = 3 );
 ~~~
 
 The base query must contain:
@@ -193,7 +204,7 @@ Selection policy:
 6. Without a Primary menu, use get_categories with hide_empty true, number 6, orderby count, order DESC.
 7. A rail qualifies only if a dry query returns three eligible posts after exclusions. Stop after three rails.
 8. A missing convention term returns an empty array without a post query.
-9. Related posts use the same eligibility policy, the chosen category, and exclude the current ID.
+9. More-from-topic posts use the same eligibility policy, the chosen category, and exclude the current ID. They are category-derived and make no semantic-similarity claim.
 
 - [ ] Require the module after helpers. Run tests and commit.
 
@@ -210,10 +221,12 @@ git commit -m "feat: add deterministic editorial queries"
 - Create: inc/editorial-setup.php
 - Create: tests/EditorialSetupTest.php
 - Create: theme.json
+- Create: assets/css/editorial.css
+- Create: assets/css/print.css
 - Modify: functions.php
 - Modify: tests/bootstrap.php
 
-- [ ] Write failing tests that require primary and footer menu locations; title-tag, post-thumbnails, HTML5, responsive-embeds, align-wide, editor-styles, and wp-block-styles supports; print media for print.css; conditional editorial CSS; and conditional Motion.
+- [ ] Write failing tests that require primary and footer menu locations; title-tag, post-thumbnails, HTML5, responsive-embeds, align-wide, editor-styles, and wp-block-styles supports; print media for print.css; conditional editorial CSS; and conditional Motion. Create the two CSS entry files in this task so every enqueued runtime asset exists when the tests turn green.
 
 - [ ] Move setup registration into inc/editorial-setup.php and keep its after_setup_theme hook.
 
@@ -236,7 +249,7 @@ Editorial view is true for the Editorial Home page template, singular posts, pos
 vendor/bin/phpunit -c phpunit.xml.dist tests/EditorialSetupTest.php
 vendor/bin/phpunit -c phpunit.xml.dist
 vendor/bin/phpcs --standard=WordPress inc functions.php tests
-git add functions.php inc/editorial-setup.php tests/bootstrap.php tests/EditorialSetupTest.php theme.json
+git add functions.php inc/editorial-setup.php tests/bootstrap.php tests/EditorialSetupTest.php theme.json assets/css/editorial.css assets/css/print.css
 git commit -m "feat: register editorial theme system"
 ~~~
 
@@ -248,13 +261,15 @@ git commit -m "feat: register editorial theme system"
 - Create: page.php
 - Create: 404.php
 - Create: template-parts/empty-state.php
-- Create: assets/css/editorial.css
+- Create: tests/EditorialShellTest.php
+- Modify: assets/css/editorial.css
 - Modify: index.php
 - Modify: style.css
+- Modify: tests/bootstrap.php
 
 - [ ] Replace the demo document shell in index.php with get_header and get_footer. Remove the streaming demo from the production loop.
 
-- [ ] Build header.php in this order: wp_head/body hooks, first-focusable Skip to content link, site-title masthead, optional tagline, Primary menu, non-empty category fallback when no menu is assigned, native search, optional Subscribe link only when a published newsletter page exists, and a native details/summary mobile menu.
+- [ ] First write and verify failing template-contract tests named `test_header_site_title_is_not_an_h1`, `test_header_starts_with_a_skip_link_and_calls_body_hooks`, `test_header_omits_empty_navigation_landmarks`, `test_page_templates_use_one_main_primary`, `test_legacy_page_modes_render_the_content_without_editorial_assets`, and `test_footer_calls_wp_footer`. Populate the legacy-page data provider with every exact page-template/Elementor mode recorded in Task 1. Build header.php in this order: wp_head/body hooks, first-focusable Skip to content link, linked non-heading site-title masthead, optional tagline, Primary menu, non-empty category fallback when no menu is assigned, native search, optional Subscribe link only when a published newsletter page exists, and a native details/summary mobile menu.
 
 - [ ] Never emit an empty navigation landmark. Site title and tagline come only from WordPress identity settings.
 
@@ -273,7 +288,7 @@ find functions.php index.php header.php footer.php page.php 404.php inc template
 vendor/bin/phpcs --standard=WordPress functions.php index.php header.php footer.php page.php 404.php inc template-parts
 vendor/bin/phpunit -c phpunit.xml.dist
 npm run build
-git add style.css assets/css/editorial.css header.php footer.php page.php index.php 404.php template-parts/empty-state.php
+git add style.css assets/css/editorial.css header.php footer.php page.php index.php 404.php template-parts/empty-state.php tests/bootstrap.php tests/EditorialShellTest.php
 git commit -m "feat: add semantic editorial shell"
 ~~~
 
@@ -286,7 +301,9 @@ git commit -m "feat: add semantic editorial shell"
 - Create: template-parts/content-card-compact.php
 - Create: template-parts/section-heading.php
 - Create: template-parts/newsletter.php
+- Create: tests/EditorialHomeTemplateTest.php
 - Modify: assets/css/editorial.css
+- Modify: tests/bootstrap.php
 
 - [ ] Add this exact template header and no front-page.php:
 
@@ -299,6 +316,8 @@ git commit -m "feat: add semantic editorial shell"
  * @package Mumega_Motion
  */
 ~~~
+
+- [ ] First write and verify failing tests named `test_editorial_home_is_a_named_page_template`, `test_front_page_php_is_absent`, `test_home_selection_uses_one_shared_used_id_list`, `test_lead_heading_is_the_only_home_h1`, and `test_newsletter_render_restores_the_previous_global_post`.
 
 - [ ] Initialize one shared list and select modules in this order:
 
@@ -334,7 +353,7 @@ vendor/bin/phpunit -c phpunit.xml.dist
 vendor/bin/phpcs --standard=WordPress functions.php inc page-templates template-parts
 find page-templates template-parts -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 npm run build
-git add page-templates template-parts assets/css/editorial.css
+git add page-templates template-parts assets/css/editorial.css tests/bootstrap.php tests/EditorialHomeTemplateTest.php
 git commit -m "feat: add data-driven editorial homepage"
 ~~~
 
@@ -346,10 +365,14 @@ git commit -m "feat: add data-driven editorial homepage"
 - Create: archive.php
 - Create: search.php
 - Create: template-parts/article-meta.php
-- Create: assets/css/print.css
+- Create: tests/EditorialContentTemplatesTest.php
+- Modify: assets/css/print.css
 - Modify: assets/css/editorial.css
+- Modify: tests/bootstrap.php
 
-- [ ] Build single.php in this order: primary category, H1, manual excerpt, author, published date, modified date only after 24 hours, reading time, featured image/caption, Gutenberg content, author bio, affiliate disclosure, three related posts, previous/next navigation.
+- [ ] First write and verify failing template-contract tests named `test_single_has_one_content_h1`, `test_single_renders_primary_topic_and_public_entity_tags`, `test_operational_affiliate_tag_is_not_presented_as_an_entity`, `test_archive_renders_category_and_tag_descriptions`, `test_listing_templates_paginate`, and `test_single_labels_category_recommendations_more_from_this_topic`.
+
+- [ ] Build single.php in this order: primary category, H1, manual excerpt, author, published date, modified date only after 24 hours, reading time, featured image/caption, Gutenberg content, author bio, public entity tags excluding operational-only presentation, affiliate disclosure, three **More from this topic** posts, previous/next navigation.
 
 - [ ] Show this fallback disclosure only for posts tagged affiliate and only when the content does not already contain the Affiliate Disclosure pattern:
 
@@ -357,11 +380,13 @@ git commit -m "feat: add data-driven editorial homepage"
 This article may contain affiliate links. Our editorial conclusions are independent, and we may earn a commission when you purchase through a link.
 ~~~
 
+Append a `Read our affiliate disclosure` link only when `mumega_motion_affiliate_policy_page()` returns a published page. Never create a guessed or dead URL. MCPWP launch must supply and verify that policy page before featuring an affiliate post.
+
 - [ ] Do not add an automatic table of contents or theme schema.
 
-- [ ] Build home.php, archive.php, and search.php with the shared cards, descriptive H1, pagination, and empty states. Use native WordPress search.
+- [ ] Build home.php, archive.php, and search.php with the shared cards, descriptive H1, pagination, and empty states. Category and tag archives render their term descriptions when non-empty; tag archives therefore work as public entity pages. Use native WordPress search.
 
-- [ ] Print CSS hides navigation, search, newsletter, related cards, motion decoration, and footer menus; prints article text black on white and displays external article-body link URLs.
+- [ ] Print CSS hides navigation, search, newsletter, more-from-topic cards, motion decoration, and footer menus; prints article text black on white and displays external article-body link URLs.
 
 - [ ] Verify with Yoast active in a disposable/preview environment that only Yoast emits canonical/schema data.
 
@@ -371,7 +396,7 @@ This article may contain affiliate links. Our editorial conclusions are independ
 vendor/bin/phpunit -c phpunit.xml.dist
 vendor/bin/phpcs --standard=WordPress single.php home.php archive.php search.php inc template-parts
 find single.php home.php archive.php search.php inc template-parts -type f -name '*.php' -print0 | xargs -0 -n1 php -l
-git add single.php home.php archive.php search.php template-parts/article-meta.php assets/css/editorial.css assets/css/print.css
+git add single.php home.php archive.php search.php template-parts/article-meta.php assets/css/editorial.css assets/css/print.css tests/bootstrap.php tests/EditorialContentTemplatesTest.php
 git commit -m "feat: add editorial content templates"
 ~~~
 
@@ -402,12 +427,12 @@ Required contents:
 
 | Pattern | Required structure |
 |---|---|
-| Article Brief | What happened; Why it matters; What to do next |
-| Test Method | Question; Environment; Method; Results; Limitations; Reproduction steps |
-| Evidence Table | Claim; Evidence; Source; Checked |
-| Affiliate Disclosure | Same independent-editorial disclosure as single.php |
-| Correction Note | Correction; visible date; explanation |
-| Newsletter Page | H2, benefit paragraph, three benefits, instruction to insert existing WPForms block |
+| Article Brief | Summary; Key takeaways; table of contents block or linked heading list; Methodology; Sources; Corrections/update note |
+| Test Method | Question; Environment; Models/tools tested; Procedure; Date; Limitations; Results |
+| Evidence Table | Claim; Observation; Source; Confidence |
+| Affiliate Disclosure | Same independent-editorial disclosure as single.php plus an editable link to the site's affiliate policy |
+| Correction Note | Correction; visible date; previous claim; revised finding; explanation |
+| Newsletter Page | Title; description; consent copy; standard form-block insertion area for the site's existing provider |
 
 - [ ] Add no custom block and no automatic TOC.
 
@@ -505,7 +530,6 @@ home.php
 archive.php
 search.php
 404.php
-stream-demo.php
 build
 inc
 assets
@@ -543,17 +567,29 @@ Expected: both printed SHA-256 values are identical.
 - [ ] Run the clean local gate:
 
 ~~~bash
-rm -rf node_modules vendor
-npm ci
-composer install --no-interaction --prefer-dist
-npm run test:js
-npm run build
-vendor/bin/phpunit -c phpunit.xml.dist
-vendor/bin/phpcs --standard=WordPress functions.php index.php header.php footer.php page.php single.php home.php archive.php search.php 404.php inc page-templates template-parts tests
-find functions.php index.php header.php footer.php page.php single.php home.php archive.php search.php 404.php inc page-templates template-parts -type f -name '*.php' -print0 | xargs -0 -n1 php -l
-./scripts/test-package-release.sh
-git diff --check
-git status --short
+verify_parent="$(mktemp -d "${TMPDIR:-/tmp}/mumega-motion-theme-verify.XXXXXX")"
+verify_worktree="$verify_parent/worktree"
+cleanup_verify_worktree() {
+    git worktree remove --force "$verify_worktree" 2>/dev/null || true
+    rmdir "$verify_parent" 2>/dev/null || true
+}
+trap cleanup_verify_worktree EXIT INT TERM
+git worktree add "$verify_worktree" --detach HEAD
+(
+    cd "$verify_worktree"
+    npm ci
+    composer install --no-interaction --prefer-dist
+    npm run test:js
+    npm run build
+    vendor/bin/phpunit -c phpunit.xml.dist
+    vendor/bin/phpcs --standard=WordPress functions.php index.php header.php footer.php page.php single.php home.php archive.php search.php 404.php inc page-templates template-parts tests
+    find functions.php index.php header.php footer.php page.php single.php home.php archive.php search.php 404.php inc page-templates template-parts -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+    ./scripts/test-package-release.sh
+    git diff --check
+    git status --short
+)
+cleanup_verify_worktree
+trap - EXIT INT TERM
 ~~~
 
 - [ ] Install a local package in a disposable WordPress 6.5+ environment on PHP 7.4 and PHP 8.3. Test one site with convention categories and a second without them.

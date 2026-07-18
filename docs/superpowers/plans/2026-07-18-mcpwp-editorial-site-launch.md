@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Execute this plan only after the theme implementation plan is complete, reviewed, merged, and available through a verified edge release.
+- The read-only inspection portions of Tasks 1 and 2 may execute before theme implementation so compatibility requirements are known. Every export, live mutation, issue write, theme update, and approval-gated action waits until the theme implementation plan is complete, reviewed, merged, and available through a verified edge release.
 - Never paste API keys into source, GitHub issues, screenshots, logs, or plan notes.
 - Do not uninstall/deactivate plugins, delete categories, mass-change slugs, rewrite permalinks, or edit the existing Elementor homepage.
 - Do not publish agent-authored content automatically. Create drafts and obtain editorial approval.
@@ -43,7 +43,7 @@
 - Create locally: docs/superpowers/evidence/mcpwp-launch/homepage-before.png
 - Do not commit exports containing private user/form/order data
 
-- [ ] Inspect the live site read-only and record: active theme/version, WordPress version, PHP version when visible, active plugin versions, homepage ID/title/URL, posts-page setting, permalink structure, site title/tagline, assigned menu locations, category IDs/slugs/counts, published newsletter page if any, and available WPForms forms.
+- [ ] Inspect the live site read-only and record: active theme/version, WordPress version, PHP version when visible, active plugin versions, homepage ID/title/URL, posts-page setting, permalink structure, site title/tagline, assigned menu locations, category IDs/slugs/counts, published newsletter page if any, and available WPForms forms. For the current homepage and representative key Elementor pages, also record the assigned WordPress page-template slug, Elementor template/canvas mode when visible, and whether the active theme supplies their outer header/footer.
 
 - [ ] Export WordPress posts, pages, categories, tags, authors, and media references through Tools → Export → All content. Store the XML outside the repository in a dated private backup location.
 
@@ -75,6 +75,8 @@ git commit -m "docs: record MCPWP launch baseline"
 - [ ] List analytics emitters visible in page source/network. Do not disable any. Open a separate consolidation issue if duplicate pageview events are confirmed.
 
 - [ ] Verify the site has a working privacy/cookie approach for the existing analytics and newsletter form. Treat legal copy as owner-approved site content, not theme-generated text.
+
+- [ ] Verify a published, non-password-protected page with slug `affiliate-disclosure` exists and contains owner-approved policy copy before any affiliate-tagged article is featured. Confirm the article fallback links to its canonical URL and emits no dead link when tested without the page.
 
 - [ ] Approval gate: the user explicitly accepts the blocker classification before the theme update.
 
@@ -122,6 +124,10 @@ git commit -m "docs: record MCPWP launch baseline"
 
 - [ ] Create missing categories through normal WordPress category operations. Give each a concise human-readable description used by archive pages and section headings.
 
+- [ ] Treat these Primary-menu categories as durable topic hubs. Their descriptions define the hub's editorial purpose, scope, and inclusion boundary.
+
+- [ ] Audit existing tags for collisions, spelling variants, and operational markers before introducing controlled public entity tags. Do not expose `affiliate` as a knowledge entity.
+
 - [ ] Preserve all existing categories. Do not delete General or rename old slugs during launch.
 
 - [ ] Create a new menu named MCPWP Editorial Primary rather than rewriting the current live menu. Add category links in this exact order:
@@ -147,7 +153,7 @@ Guides
 - Modify assignments, excerpts, featured images, sticky state, and draft content only
 - Preserve post slugs and permalinks
 
-- [ ] Produce a spreadsheet or Markdown inventory of published posts with ID, title, URL, date, modified date, existing categories, proposed primary topic, proposed secondary format/series, excerpt status, featured image status, currency risk, duplicate/canonical risk, affiliate status, and launch decision.
+- [ ] Produce a spreadsheet or Markdown inventory of published posts with ID, title, URL, date, modified date, existing categories, proposed primary topic, proposed public entity tags, proposed secondary format/series, contextual internal outbound links, orphan status, hub/cornerstone role, excerpt status, featured image status, currency risk, duplicate/canonical risk, affiliate status, and launch decision.
 
 - [ ] Apply this mapping without removing old categories in the first pass:
 
@@ -176,6 +182,8 @@ Guides
 - [ ] Reviews/comparisons require visible methodology and affiliate disclosure before being featured.
 
 - [ ] Do not merge duplicate posts during initial launch. Record canonical/redirect proposals in a separate issue because redirects require independent validation.
+
+- [ ] Add contextual internal links only where they help a reader move to a prerequisite, source, topic hub, entity archive, or next action. Preserve canonical URLs and prohibit link stuffing.
 
 - [ ] Approval gate: user reviews the proposed lead, supporting stories, three rail categories, and any Test Lab/Field Notes content before publication or sticky changes.
 
@@ -220,7 +228,10 @@ Guides
   - archive, search, page, 404, and post index work;
   - author/date/modified/reading-time rules are correct;
   - affiliate disclosure appears where required;
-  - related posts exclude current post;
+  - More from this topic posts exclude the current post;
+  - topic hubs show their descriptions and current posts;
+  - public entity-tag archives resolve and explain the entity when descriptions exist;
+  - contextual internal links use canonical URLs and no featured article is orphaned;
   - print view is readable.
 
 - [ ] Compatibility checks:
@@ -280,6 +291,8 @@ Guides
 - [ ] Keep publishing draft-first. Initial agent roles may research, prepare briefs, audit links/claims, draft posts, and propose updates. Publishing remains a human approval action.
 
 - [ ] Open narrowly scoped issues for verified follow-ups: Yoast warning, analytics consolidation, redirect/canonical cleanup, custom interactive Test Lab islands, intelligent search, content automation, and optional Mumega/Mupot agent orchestration.
+
+- [ ] Keep backlink extraction, edge-aware related-content ranking, graph visualization, and graph-oriented MCP tools as later issues after the native topic/entity/link model is stable.
 
 - [ ] Do not add broad theme-file editing or automatic publishing tools merely to accelerate operations.
 
