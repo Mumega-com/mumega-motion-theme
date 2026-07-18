@@ -61,6 +61,11 @@ require get_template_directory() . '/inc/figma-tokens.php';
 require get_template_directory() . '/inc/editorial-helpers.php';
 
 /**
+ * Deterministic editorial eligibility and category discovery.
+ */
+require get_template_directory() . '/inc/editorial-queries.php';
+
+/**
  * Fixed-repository verified update system, with dashboard fallback independent
  * of the optional MCPWP extension hook.
  */

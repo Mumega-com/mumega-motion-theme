@@ -40,6 +40,15 @@ $GLOBALS['mumega_motion_test_post_tags']        = array();
 $GLOBALS['mumega_motion_test_options']          = array();
 $GLOBALS['mumega_motion_test_post_queries']     = array();
 $GLOBALS['mumega_motion_test_get_posts_requests'] = array();
+$GLOBALS['mumega_motion_test_categories_by_slug'] = array();
+$GLOBALS['mumega_motion_test_category_by_slug_requests'] = array();
+$GLOBALS['mumega_motion_test_categories']       = array();
+$GLOBALS['mumega_motion_test_get_categories_requests'] = array();
+$GLOBALS['mumega_motion_test_nav_menu_items']   = array();
+$GLOBALS['mumega_motion_test_nav_menu_item_requests'] = array();
+$GLOBALS['mumega_motion_test_nav_menu_locations'] = array();
+$GLOBALS['mumega_motion_test_nav_menu_objects'] = array();
+$GLOBALS['mumega_motion_test_nav_menu_object_requests'] = array();
 
 /**
  * Minimal post value used by editorial helper tests.
@@ -500,6 +509,69 @@ function get_posts( $args = array() ) {
 	return empty( $GLOBALS['mumega_motion_test_post_queries'] )
 		? array()
 		: array_shift( $GLOBALS['mumega_motion_test_post_queries'] );
+}
+
+/**
+ * Retrieves a configured category convention term.
+ *
+ * @param string $slug Category slug.
+ * @return WP_Term|false
+ */
+function get_category_by_slug( $slug ) {
+	$GLOBALS['mumega_motion_test_category_by_slug_requests'][] = $slug;
+
+	return isset( $GLOBALS['mumega_motion_test_categories_by_slug'][ $slug ] )
+		? $GLOBALS['mumega_motion_test_categories_by_slug'][ $slug ]
+		: false;
+}
+
+/**
+ * Retrieves configured category values and records query arguments.
+ *
+ * @param array $args Category query arguments.
+ * @return array
+ */
+function get_categories( $args = array() ) {
+	$GLOBALS['mumega_motion_test_get_categories_requests'][] = $args;
+
+	return $GLOBALS['mumega_motion_test_categories'];
+}
+
+/**
+ * Retrieves configured menu-location assignments.
+ *
+ * @return array
+ */
+function get_nav_menu_locations() {
+	return $GLOBALS['mumega_motion_test_nav_menu_locations'];
+}
+
+/**
+ * Retrieves a configured navigation-menu object.
+ *
+ * @param int $menu Menu identifier.
+ * @return WP_Term|false
+ */
+function wp_get_nav_menu_object( $menu ) {
+	$GLOBALS['mumega_motion_test_nav_menu_object_requests'][] = (int) $menu;
+
+	return isset( $GLOBALS['mumega_motion_test_nav_menu_objects'][ (int) $menu ] )
+		? $GLOBALS['mumega_motion_test_nav_menu_objects'][ (int) $menu ]
+		: false;
+}
+
+/**
+ * Retrieves configured navigation-menu items and records menu identifiers.
+ *
+ * @param int $menu Menu identifier.
+ * @return array|false
+ */
+function wp_get_nav_menu_items( $menu ) {
+	$GLOBALS['mumega_motion_test_nav_menu_item_requests'][] = (int) $menu;
+
+	return isset( $GLOBALS['mumega_motion_test_nav_menu_items'][ (int) $menu ] )
+		? $GLOBALS['mumega_motion_test_nav_menu_items'][ (int) $menu ]
+		: false;
 }
 
 /**
