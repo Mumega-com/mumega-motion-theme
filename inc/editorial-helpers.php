@@ -58,7 +58,7 @@ function mumega_motion_trim_words( $text, $limit ) {
  * @return string
  */
 function mumega_motion_card_summary( $post, $limit = 28 ) {
-	$excerpt = get_the_excerpt( $post );
+	$excerpt = is_object( $post ) && isset( $post->post_excerpt ) ? $post->post_excerpt : '';
 
 	if ( '' !== trim( (string) $excerpt ) ) {
 		return $excerpt;

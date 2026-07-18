@@ -21,6 +21,7 @@ final class EditorialHelpersTest extends TestCase {
 	protected function setUp(): void {
 		$GLOBALS['mumega_motion_test_filters']            = array();
 		$GLOBALS['mumega_motion_test_posts']             = array();
+		$GLOBALS['mumega_motion_test_generated_excerpts'] = array();
 		$GLOBALS['mumega_motion_test_post_terms']        = array();
 		$GLOBALS['mumega_motion_test_post_tags']         = array();
 		$GLOBALS['mumega_motion_test_options']           = array();
@@ -66,6 +67,22 @@ final class EditorialHelpersTest extends TestCase {
 				'post_content' => '<!-- wp:paragraph --><p>' . $this->words( 14 ) . ' <strong>' . $this->words( 14, 15 ) . '</strong> [gallery ids="1"] ' . $this->words( 1, 29 ) . '</p><!-- /wp:paragraph -->',
 			)
 		);
+
+		$this->assertSame( $this->words( 28 ) . '…', mumega_motion_card_summary( $post ) );
+	}
+
+	/**
+	 * Ignores a generated display excerpt when no manual excerpt was authored.
+	 */
+	public function test_card_summary_uses_content_when_wordpress_generates_an_excerpt(): void {
+		$post = new WP_Post(
+			array(
+				'ID'           => 9,
+				'post_excerpt' => '',
+				'post_content' => $this->words( 29 ),
+			)
+		);
+		$GLOBALS['mumega_motion_test_generated_excerpts'][9] = 'Generated display excerpt.';
 
 		$this->assertSame( $this->words( 28 ) . '…', mumega_motion_card_summary( $post ) );
 	}
@@ -183,6 +200,47 @@ final class EditorialHelpersTest extends TestCase {
 			$GLOBALS['mumega_motion_test_get_posts_requests'][0]
 		);
 
+		$this->assertNull( mumega_motion_affiliate_policy_page() );
+	}
+
+	/**
+	 * Resolves the newsletter only through its constrained public page query.
+	 */
+	public function test_newsletter_page_lookup_requires_a_published_unprotected_page(): void {
+		$newsletter = new WP_Post(
+			array(
+				'ID'            => 41,
+				'post_status'   => 'publish',
+				'post_password' => '',
+			)
+		);
+		$GLOBALS['mumega_motion_test_post_queries'][] = array( $newsletter );
+
+		$this->assertSame( $newsletter, mumega_motion_newsletter_page() );
+		$this->assertSame(
+			array(
+				'post_type'    => 'page',
+				'name'         => 'newsletter',
+				'post_status'  => 'publish',
+				'has_password' => false,
+				'numberposts'  => 1,
+			),
+			$GLOBALS['mumega_motion_test_get_posts_requests'][0]
+		);
+	}
+
+	/**
+	 * Rejects convention pages if a query result is not public and unprotected.
+	 */
+	public function test_convention_page_lookups_reject_draft_and_password_protected_posts(): void {
+		$GLOBALS['mumega_motion_test_post_queries'][] = array(
+			new WP_Post( array( 'post_status' => 'draft', 'post_password' => '' ) ),
+		);
+		$GLOBALS['mumega_motion_test_post_queries'][] = array(
+			new WP_Post( array( 'post_status' => 'publish', 'post_password' => 'secret' ) ),
+		);
+
+		$this->assertNull( mumega_motion_newsletter_page() );
 		$this->assertNull( mumega_motion_affiliate_policy_page() );
 	}
 

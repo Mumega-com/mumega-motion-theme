@@ -34,6 +34,7 @@ $GLOBALS['mumega_motion_test_copy_count']       = 0;
 $GLOBALS['mumega_motion_test_copy_after_file']  = null;
 $GLOBALS['mumega_motion_test_salt']             = 'mumega-motion-test-secret';
 $GLOBALS['mumega_motion_test_posts']            = array();
+$GLOBALS['mumega_motion_test_generated_excerpts'] = array();
 $GLOBALS['mumega_motion_test_post_terms']       = array();
 $GLOBALS['mumega_motion_test_post_tags']        = array();
 $GLOBALS['mumega_motion_test_options']          = array();
@@ -425,7 +426,13 @@ function get_the_excerpt( $post = null ) {
 			: null;
 	}
 
-	return $post instanceof WP_Post ? $post->post_excerpt : '';
+	if ( ! $post instanceof WP_Post ) {
+		return '';
+	}
+
+	return array_key_exists( $post->ID, $GLOBALS['mumega_motion_test_generated_excerpts'] )
+		? $GLOBALS['mumega_motion_test_generated_excerpts'][ $post->ID ]
+		: $post->post_excerpt;
 }
 
 /**
