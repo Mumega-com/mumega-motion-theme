@@ -14,6 +14,10 @@ if ( ! defined( 'MINUTE_IN_SECONDS' ) ) {
 	define( 'MINUTE_IN_SECONDS', 60 );
 }
 
+if ( ! defined( 'DAY_IN_SECONDS' ) ) {
+	define( 'DAY_IN_SECONDS', 86400 );
+}
+
 $GLOBALS['mumega_motion_test_filters']          = array();
 $GLOBALS['mumega_motion_test_actions']          = array();
 $GLOBALS['mumega_motion_test_routes']           = array();
@@ -29,6 +33,74 @@ $GLOBALS['mumega_motion_test_copy_fail_after']  = null;
 $GLOBALS['mumega_motion_test_copy_count']       = 0;
 $GLOBALS['mumega_motion_test_copy_after_file']  = null;
 $GLOBALS['mumega_motion_test_salt']             = 'mumega-motion-test-secret';
+$GLOBALS['mumega_motion_test_posts']            = array();
+$GLOBALS['mumega_motion_test_post_terms']       = array();
+$GLOBALS['mumega_motion_test_post_tags']        = array();
+$GLOBALS['mumega_motion_test_options']          = array();
+$GLOBALS['mumega_motion_test_post_queries']     = array();
+$GLOBALS['mumega_motion_test_get_posts_requests'] = array();
+
+/**
+ * Minimal post value used by editorial helper tests.
+ */
+class WP_Post {
+	/** @var int */
+	public $ID = 0;
+
+	/** @var string */
+	public $post_content = '';
+
+	/** @var string */
+	public $post_excerpt = '';
+
+	/** @var string */
+	public $post_date_gmt = '';
+
+	/** @var string */
+	public $post_modified_gmt = '';
+
+	/** @var string */
+	public $post_status = 'publish';
+
+	/** @var string */
+	public $post_password = '';
+
+	/**
+	 * Creates a test post from the supplied property values.
+	 *
+	 * @param array $values Post property values.
+	 */
+	public function __construct( $values = array() ) {
+		foreach ( $values as $property => $value ) {
+			$this->$property = $value;
+		}
+	}
+}
+
+/**
+ * Minimal term value used by editorial helper tests.
+ */
+class WP_Term {
+	/** @var int */
+	public $term_id = 0;
+
+	/** @var string */
+	public $name = '';
+
+	/** @var string */
+	public $slug = '';
+
+	/**
+	 * Creates a test term from the supplied property values.
+	 *
+	 * @param array $values Term property values.
+	 */
+	public function __construct( $values = array() ) {
+		foreach ( $values as $property => $value ) {
+			$this->$property = $value;
+		}
+	}
+}
 
 /**
  * Minimal WP_Error implementation for unit tests.
@@ -315,6 +387,112 @@ function apply_filters( $hook_name, $value, ...$args ) {
 	}
 
 	return $value;
+}
+
+/**
+ * Removes shortcodes from a test content string.
+ *
+ * @param string $content Content to strip.
+ * @return string
+ */
+function strip_shortcodes( $content ) {
+	return preg_replace( '/\[[^\]]*\]/', '', (string) $content );
+}
+
+/**
+ * Removes HTML tags from a test content string.
+ *
+ * @param string $content       Content to strip.
+ * @param bool   $remove_breaks Whether to remove line breaks.
+ * @return string
+ */
+function wp_strip_all_tags( $content, $remove_breaks = false ) {
+	$text = strip_tags( (string) $content );
+
+	return $remove_breaks ? preg_replace( '/[\r\n\t ]+/', ' ', $text ) : $text;
+}
+
+/**
+ * Retrieves a post excerpt from a test post value.
+ *
+ * @param WP_Post|int|null $post Post value or ID.
+ * @return string
+ */
+function get_the_excerpt( $post = null ) {
+	if ( is_numeric( $post ) ) {
+		$post = isset( $GLOBALS['mumega_motion_test_posts'][ (int) $post ] )
+			? $GLOBALS['mumega_motion_test_posts'][ (int) $post ]
+			: null;
+	}
+
+	return $post instanceof WP_Post ? $post->post_excerpt : '';
+}
+
+/**
+ * Retrieves a post field from the configured test post values.
+ *
+ * @param string      $field   Field name.
+ * @param WP_Post|int $post_id Post value or ID.
+ * @return mixed
+ */
+function get_post_field( $field, $post_id ) {
+	$post = $post_id instanceof WP_Post
+		? $post_id
+		: ( isset( $GLOBALS['mumega_motion_test_posts'][ (int) $post_id ] ) ? $GLOBALS['mumega_motion_test_posts'][ (int) $post_id ] : null );
+
+	return $post instanceof WP_Post && isset( $post->$field ) ? $post->$field : '';
+}
+
+/**
+ * Retrieves configured taxonomy terms for a post.
+ *
+ * @param int    $post_id Post ID.
+ * @param string $taxonomy Taxonomy name.
+ * @return array|false
+ */
+function get_the_terms( $post_id, $taxonomy ) {
+	return isset( $GLOBALS['mumega_motion_test_post_terms'][ (int) $post_id ][ $taxonomy ] )
+		? $GLOBALS['mumega_motion_test_post_terms'][ (int) $post_id ][ $taxonomy ]
+		: false;
+}
+
+/**
+ * Retrieves configured native tags for a post.
+ *
+ * @param int $post_id Post ID.
+ * @return array|false
+ */
+function get_the_tags( $post_id ) {
+	return isset( $GLOBALS['mumega_motion_test_post_tags'][ (int) $post_id ] )
+		? $GLOBALS['mumega_motion_test_post_tags'][ (int) $post_id ]
+		: false;
+}
+
+/**
+ * Retrieves a configured option or its fallback.
+ *
+ * @param string $option  Option name.
+ * @param mixed  $default Default value.
+ * @return mixed
+ */
+function get_option( $option, $default = false ) {
+	return array_key_exists( $option, $GLOBALS['mumega_motion_test_options'] )
+		? $GLOBALS['mumega_motion_test_options'][ $option ]
+		: $default;
+}
+
+/**
+ * Returns queued posts and records each editorial convention query.
+ *
+ * @param array $args Query arguments.
+ * @return array
+ */
+function get_posts( $args = array() ) {
+	$GLOBALS['mumega_motion_test_get_posts_requests'][] = $args;
+
+	return empty( $GLOBALS['mumega_motion_test_post_queries'] )
+		? array()
+		: array_shift( $GLOBALS['mumega_motion_test_post_queries'] );
 }
 
 /**

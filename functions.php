@@ -56,6 +56,11 @@ add_action( 'wp_enqueue_scripts', 'mumega_motion_enqueue_styles' );
 require get_template_directory() . '/inc/figma-tokens.php';
 
 /**
+ * Pure editorial content and taxonomy helpers.
+ */
+require get_template_directory() . '/inc/editorial-helpers.php';
+
+/**
  * Fixed-repository verified update system, with dashboard fallback independent
  * of the optional MCPWP extension hook.
  */
