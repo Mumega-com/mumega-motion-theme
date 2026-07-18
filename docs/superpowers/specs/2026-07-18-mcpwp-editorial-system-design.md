@@ -8,11 +8,33 @@
 
 ## Objective
 
-Turn Mumega Motion into a reusable, server-rendered editorial system that launches MCPWP as a credible publication about the intersection of WordPress, AI, and the Model Context Protocol.
+Turn Mumega Motion into a reusable, AI-first WordPress editorial system, with MCPWP.net as its first production implementation and reference site.
 
 MCPWP must read as an independent media and research property, not as a landing page for the MCPWP or Mumega MCP plugin. The publication should help WordPress owners, agencies, developers, and content teams understand and adopt AI without abandoning their existing sites.
 
 The primary launch conversion is subscription to **The MCPWP Brief**. Authority and audience growth come before product promotion.
+
+## Product and strategy model
+
+The project has three distinct layers:
+
+| Layer | Role |
+|---|---|
+| Mumega Motion | Reusable presentation and interaction system for AI-first WordPress publications |
+| MCPWP.net | First site profile, editorial brand, content corpus, and production proving ground |
+| MCPWP / Mumega MCP plugin | Optional agent interface for controlled content operations, theme updates, and rollback |
+
+MCPWP.net is the first sample, not the only site the theme can render. Theme components must use WordPress content, menus, taxonomies, and site identity rather than hard-coded MCPWP labels or database IDs.
+
+The strategic loop is:
+
+1. Humans and agents create structured content in WordPress.
+2. MCPWP applies normal WordPress permissions and scoped operations.
+3. Mumega Motion renders complete, machine-readable editorial pages.
+4. React and Motion enhance the parts that benefit from interaction.
+5. MCPWP.net supplies real production feedback that improves the reusable theme.
+
+AI-first does **not** mean JavaScript-first or automatically generated. It means the system is structured for human and agent collaboration, machine-readable retrieval, explicit evidence, controlled operations, and interactive AI-era experiences without sacrificing normal WordPress publishing.
 
 ## Approved visual direction
 
@@ -43,16 +65,20 @@ The implementation must preserve existing Elementor pages and must not deactivat
 
 ## Chosen architecture
 
-### Hybrid classic theme with Gutenberg content
+### Gutenberg content, PHP rendering, React/Motion islands
 
-Mumega Motion remains a classic PHP theme with `theme.json` design tokens and Gutenberg as the article-authoring surface.
+Mumega Motion remains a classic PHP theme with `theme.json` design tokens and Gutenberg as the content-authoring surface. The first release is not a full Site Editor theme.
 
-PHP owns deterministic, semantic, server-rendered templates. Gutenberg owns article bodies and reusable editorial patterns. Motion remains progressive enhancement over HTML that is complete before JavaScript runs.
+PHP owns deterministic, semantic, server-rendered templates and WordPress queries. Gutenberg owns article bodies and reusable editorial patterns. React and Motion are isolated enhancements mounted onto server-rendered markup; they never own the canonical article, navigation, or homepage content.
+
+Use React/Motion only for capabilities that benefit materially from client-side state or animation, including interactive comparisons, Test Lab visualizations, intelligent search interfaces, live testing tools, and streaming demonstrations. Ordinary cards, menus, article text, forms, and links do not require React.
 
 This architecture was selected over:
 
 - **A full block-theme conversion:** flexible but unnecessarily broad for the first editorial release and more vulnerable to accidental template edits.
 - **An Elementor rebuild:** faster for one page but inconsistent with the theme's reason for existing, harder to govern through agents, and less deterministic.
+- **A full React application:** duplicates WordPress rendering and makes essential content dependent on a client runtime.
+- **An Astro/headless frontend:** adds a second deployment, routing, preview, authentication, and synchronization system while weakening direct WordPress plugin compatibility and making the existing theme update channel irrelevant.
 
 ### Safe homepage rollout
 
@@ -81,6 +107,7 @@ Rollback requires only restoring the previous Elementor page as the static homep
 - Responsive layout, typography, colors, focus states, and print styles.
 - Editorial query selection and duplicate exclusion.
 - Reusable Gutenberg patterns for consistent article structure.
+- Stable mount points and data contracts for optional React/Motion islands.
 - Progressive-enhancement motion and reduced-motion behavior.
 - Graceful empty states and plugin-independent fallbacks.
 
@@ -94,17 +121,33 @@ Rollback requires only restoring the previous Elementor page as the static homep
 
 - **MCPWP:** authenticated agent operations and explicit theme update/rollback tools.
 - **Yoast:** canonical URLs, sitemaps, and schema after its existing warning is fixed. The theme must not emit competing Article schema.
-- **WPForms or an email provider:** subscriber validation, storage, consent, confirmation, and delivery.
+- **WPForms on MCPWP.net:** subscriber validation, storage/integration, consent, and form errors. Forms are site content, not theme architecture.
 - **Analytics platform:** tracking and consent. The theme provides stable semantic hooks but no analytics vendor code.
 - **Elementor:** legacy product and documentation pages during migration.
 
-No new plugin is required for the first editorial theme release.
+No new plugin is required for the first editorial theme release. The existing WPForms installation is sufficient for the MCPWP sample.
+
+## MCPWP operating contract
+
+MCPWP is the optional control layer around normal WordPress data, not a rendering dependency.
+
+For the first editorial release, agents use MCPWP's standard scoped WordPress capabilities to:
+
+- inspect posts, pages, categories, tags, menus, media, and site configuration;
+- create and update drafts;
+- assign categories, excerpts, featured media, and sticky state;
+- preview content before publication;
+- perform the existing explicit, admin-scoped Mumega Motion update and rollback operations.
+
+Mumega Motion must not add a second content API or require special MCP-only post storage. A human editor using the WordPress dashboard and an authorized agent using MCPWP operate on the same posts, blocks, taxonomies, and revision history.
+
+The first release does not add automatic publishing or broad theme-file editing tools. Agent-authored content remains draft-first; publication follows the site's existing WordPress capability and editorial approval model.
 
 ## Editorial information architecture
 
-### Primary public sections
+### MCPWP site profile
 
-The primary navigation is:
+MCPWP.net configures this primary navigation through a normal WordPress menu:
 
 1. **WordPress + AI**
 2. **MCP**
@@ -113,7 +156,7 @@ The primary navigation is:
 5. **Tools & Reviews**
 6. **Guides**
 
-The theme queries section categories by stable slugs, never database IDs:
+MCPWP.net creates these categories with stable slugs:
 
 | Section | Slug |
 |---|---|
@@ -123,6 +166,21 @@ The theme queries section categories by stable slugs, never database IDs:
 | Test Lab | `test-lab` |
 | Tools & Reviews | `tools-reviews` |
 | Guides | `guides` |
+
+These names and slugs belong to the MCPWP site profile, not to the reusable theme engine.
+
+### Reusable theme discovery rules
+
+- The theme registers `primary` and `footer` menu locations.
+- The Editorial Home discovers topic rails from category menu items in the assigned Primary menu, preserving menu order.
+- Custom links and page links remain in navigation but are not treated as category rails.
+- The first three menu categories with at least three eligible posts become the topic rails.
+- A category with slug `test-lab` activates the optional research-feature module.
+- A category with slug `field-notes` activates the optional dated-notes module.
+- A category with slug `releases` is excluded from automatic lead/supporting selection unless one of its posts is sticky.
+- A published page with slug `newsletter` activates the optional newsletter module and Subscribe link.
+- Sites without any of these optional convention slugs still render a complete lead desk, topic rails, and footer.
+- Site name, tagline, menus, category names, excerpts, page content, and media supply all public text. Theme PHP must not hard-code `MCPWP`, `WordPress + AI`, `MCP`, author names, article titles, benchmark values, or newsletter copy.
 
 ### Existing-category migration
 
@@ -160,12 +218,12 @@ The Editorial Home template is fully server-rendered and data-driven. Editors do
 
 ### 1. Publication header
 
-- Text masthead rendered from the WordPress site title, which must be `MCPWP` at launch.
+- Text masthead rendered from the WordPress site title; MCPWP.net sets that title to `MCPWP`.
 - Primary navigation menu.
 - Native WordPress search form; it remains usable without JavaScript.
-- Persistent Subscribe link to the published `/newsletter/` page.
+- Persistent Subscribe link to the published page using the `newsletter` convention, when present.
 - Mobile navigation that works with keyboard and screen readers.
-- If no primary menu is assigned, fall back to links for the six primary section categories that exist; never emit an empty navigation landmark.
+- If no primary menu is assigned, fall back to the six non-empty categories with the highest post counts; never emit an empty navigation landmark.
 
 ### 2. Lead desk
 
@@ -178,6 +236,7 @@ The Editorial Home template is fully server-rendered and data-driven. Editors do
 
 ### 3. AI Visibility Lab
 
+- The module title comes from the category named by the optional `test-lab` convention; MCPWP.net names that category Test Lab and introduces it editorially as the AI Visibility Lab.
 - Uses the newest post in `test-lab` as the featured experiment.
 - Displays the experiment's featured image, title, excerpt, date, and a link to its visible methodology.
 - The first release does not invent or store benchmark data in theme options.
@@ -186,30 +245,28 @@ The Editorial Home template is fully server-rendered and data-driven. Editors do
 
 ### 4. Topic rails
 
-- Three initial rails: WordPress + AI, MCP, and the first section in the fixed order AI Visibility, Tools & Reviews, Guides that has at least three eligible posts.
+- Uses the first three eligible category items from the Primary menu in menu order.
 - Each rail shows one visual lead and two compact links.
 - A post already used above is excluded from every later module.
 - A missing or undersupplied category causes the layout to redistribute available rails rather than show placeholders.
 
 ### 5. Latest Field Notes
 
-- Shows the five newest posts in the existing `field-notes` category.
+- When the optional `field-notes` category exists, shows its five newest posts.
 - Emphasizes dates, titles, short descriptions, and reading time.
 - Omits the section if no eligible posts exist.
 
-### 6. The MCPWP Brief
+### 6. Newsletter module (The MCPWP Brief on MCPWP.net)
 
-- Dark, visually distinct newsletter module near the bottom of the page.
-- Copy: “One useful field note every week. Tests, tools and decisions—not recycled AI news.”
+- Dark, visually distinct newsletter module near the bottom of the page. MCPWP.net calls it The MCPWP Brief; other sites use their Newsletter page title.
 - The theme does not store subscribers.
-- The template looks for a published Gutenberg page with slug `newsletter-signup-embed` and renders its block content inside the form area. That page may contain a WPForms block or a provider's embed block.
-- Rendering the embed page must preserve and restore the homepage's global post state.
-- If the embed page does not exist or has no content, the module displays a Subscribe button only when a published page with slug `newsletter` exists. Otherwise it displays “Newsletter signup is being prepared” with no dead form or link.
-- Public launch requires either a working embed page or a published Newsletter page; the non-interactive fallback is for preview and failure handling only.
+- MCPWP.net creates one published Gutenberg page with slug `newsletter`, containing its title, description, consent copy, and existing WPForms block.
+- The template renders that page's block content inside the homepage newsletter module while preserving and restoring homepage global post state.
+- If no published Newsletter page exists, the module is omitted. Forms are not a blocker for theme development, but MCPWP public launch requires the page and a working form.
 
 ### 7. Publication footer
 
-- Short publication description.
+- Short publication description drawn from the WordPress site tagline.
 - Editorial Standards, Corrections Policy, Affiliate Disclosure, Privacy Policy, Terms, About, and Contact links.
 - Secondary resource links and social links supplied through WordPress menus.
 - No plugin sales CTA in the global footer.
@@ -224,7 +281,7 @@ The Editorial Home template is fully server-rendered and data-driven. Editors do
 - All post IDs already rendered are passed to later queries through one explicit exclusion list.
 - Category lookup failures return an empty result and never a fatal error.
 - All query state is reset after each module.
-- The primary category shown on cards and articles is the first assigned category found in this fixed priority: WordPress + AI, MCP, AI Visibility, Test Lab, Tools & Reviews, Guides. If none match, use the alphabetically first assigned category other than General.
+- The primary category shown on cards and articles is the first assigned category that also appears as a category item in the Primary menu. If none match, use the alphabetically first assigned category other than the site's default category.
 
 ## Article experience
 
@@ -263,7 +320,7 @@ The theme registers patterns, not custom content storage:
 3. **Evidence Table:** claim, observation, source, and confidence.
 4. **Affiliate Disclosure:** standardized disclosure text and policy link.
 5. **Correction Note:** dated correction with the previous claim and revised finding.
-6. **Newsletter Embed Page:** instructions and a provider-neutral block insertion area.
+6. **Newsletter Page:** title, description, consent copy, and a standard form-block insertion area. MCPWP.net inserts its existing WPForms block.
 
 Patterns use core blocks so content remains portable if the theme changes.
 
@@ -295,6 +352,7 @@ inc/
   editorial-queries.php
   editorial-patterns.php
   editorial-helpers.php
+  editorial-islands.php
 assets/
   css/
     editorial.css
@@ -329,6 +387,9 @@ This file map is the implementation contract. Additional test fixtures and devel
 - `prefers-reduced-motion: reduce` removes nonessential animation.
 - StreamingText is not used on the editorial homepage.
 - Motion must not move layout after interaction or delay access to article links.
+- Each React/Motion island has one bounded mount element, a documented server-rendered fallback, and JSON-safe `data-*` input owned by its PHP template part.
+- Islands share WordPress core's React instance through the theme's existing build system; the theme must not bundle another React copy.
+- Failure to mount an island leaves the server-rendered fallback visible and functional.
 
 ## Accessibility, performance, and machine readability
 
@@ -368,8 +429,9 @@ This file map is the implementation contract. Additional test fixtures and devel
 - Missing excerpt: generate a bounded plain-text summary from post content for cards only.
 - Missing sticky post: use the newest eligible post.
 - Missing editorial category: omit that module and redistribute the grid.
-- Missing newsletter embed page: link to the published Newsletter page when present; otherwise render the non-interactive preview fallback.
-- Missing Yoast, Elementor, WPForms, MCPWP, analytics, or Figma tokens: the theme continues rendering without fatal errors.
+- Missing Newsletter page: omit the homepage newsletter module without affecting other content.
+- Missing Yoast, Elementor, WPForms, MCPWP, analytics, or Figma tokens: the new editorial templates continue rendering without fatal errors.
+- Failed React/Motion island: retain its complete server-rendered fallback and log no uncaught browser error.
 - Failed image load: preserve article title and metadata layout.
 - Empty search/archive: show a useful empty state and navigation back to current sections.
 - Update discovery failure: continue using the installed theme exactly as the existing update design requires.
@@ -380,6 +442,7 @@ This file map is the implementation contract. Additional test fixtures and devel
 
 - PHPUnit tests for lead selection, fallback selection, category lookup, exclusion-list behavior, Release exclusion, and graceful missing-content states.
 - PHPUnit tests for reading-time and summary helpers.
+- PHPUnit tests for menu-derived rail selection and primary-category selection.
 - PHP syntax checks on PHP 7.4 and the current supported PHP version.
 - WordPress Coding Standards on new PHP files.
 - Existing update-channel tests remain green.
@@ -392,6 +455,7 @@ This file map is the implementation contract. Additional test fixtures and devel
 - Verify desktop, tablet, and mobile layouts, including 320-pixel width.
 - Verify homepage has one H1, no duplicated post cards, valid links, and no empty module headings.
 - Verify keyboard navigation, focus order, skip link, and reduced motion.
+- Disable JavaScript and verify that all editorial content, links, search, and fallbacks remain usable.
 - Verify article, category, search, page, 404, and posts-index templates.
 - Verify existing Elementor product pages still render unchanged.
 - Verify Yoast emits one canonical and one schema graph after its separate warning is fixed.
@@ -411,7 +475,7 @@ After changing the static homepage setting:
 ## Explicit non-goals for the first release
 
 - Removing Elementor or converting every existing page.
-- Installing or configuring an email service.
+- Rebuilding WPForms, subscriber storage, or email automation inside the theme.
 - Storing subscribers in the theme.
 - Consolidating analytics plugins.
 - Fixing Yoast's existing option warning.
@@ -419,6 +483,7 @@ After changing the static homepage setting:
 - Automatically publishing agent-generated content.
 - Creating custom post types for experiments or reviews.
 - Building an AI chatbot or “Ask MCPWP” interface.
+- Replacing WordPress with React, Astro, or another headless frontend.
 - Publishing `llms.txt` as a claimed visibility solution.
 - Rewriting or redirecting existing content without a separately approved migration map.
 - Adding a new comments interface or comment-notification workflow.
@@ -431,10 +496,12 @@ The editorial-system implementation is complete only when:
 - Homepage, article, archive, search, page, error, and posts-index templates render correctly.
 - The approved editorial hierarchy is present on desktop and mobile.
 - Homepage modules are driven by real posts/categories and never duplicate stories.
+- Topic rails and primary-category labels are driven by WordPress menu/category configuration, not MCPWP-specific PHP constants.
 - Gutenberg patterns support consistent human and agent-assisted publishing.
-- Newsletter integration is provider-neutral and has a working fallback.
-- Public launch has either a working newsletter embed or a published Newsletter destination; the non-interactive preview fallback is not sufficient for launch.
+- MCPWP.net's existing WPForms form works when embedded in its Gutenberg Newsletter page; the reusable theme owns only its presentation.
 - Existing Elementor pages remain intact.
 - Accessibility, PHP, coding-standard, build, packaging, unit, responsive, and rendered checks pass.
 - The homepage switch and one-setting rollback are documented and verified.
 - No required behavior in the new editorial templates depends on JavaScript, MCPWP, Yoast, Elementor, WPForms, analytics, or Figma being available. Untouched legacy pages may continue to depend on Elementor during migration.
+- React/Motion enhancements share WordPress core React, have bounded mount contracts, and preserve functional server-rendered fallbacks.
+- The same theme can render a second site with different site identity, menus, categories, posts, and newsletter copy without editing PHP template labels.
