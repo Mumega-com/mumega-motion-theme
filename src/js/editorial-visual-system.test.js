@@ -191,6 +191,26 @@ describe( 'editorial CSS contracts', () => {
 		).toBe( 'anywhere' );
 	} );
 
+	test( 'contains long labels in footer and recovery flex navigation', () => {
+		for ( const selector of [
+			'.footer-navigation a',
+			'.recovery-links a',
+		] ) {
+			expect(
+				computedDeclaration( editorialRoot, selector, 'overflow-wrap' )
+			).toBe( 'anywhere' );
+		}
+
+		for ( const selector of [
+			'.footer-navigation__list li',
+			'.recovery-links li',
+		] ) {
+			expect(
+				computedDeclaration( editorialRoot, selector, 'min-width' )
+			).toBe( '0' );
+		}
+	} );
+
 	test( 'locks a three-pixel two-layer focus indicator to 3:1 contrast', () => {
 		const focus = ruleFor( editorialRoot, ':focus-visible' );
 		expect( declaration( focus, 'outline' ) ).toBe(

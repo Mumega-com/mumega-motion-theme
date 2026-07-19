@@ -167,6 +167,11 @@ label {
 	text-transform: uppercase;
 }
 
+.footer-navigation__list li,
+.recovery-links li {
+	min-width: 0;
+}
+
 .primary-navigation a,
 .footer-navigation a,
 .subscribe-link {
@@ -740,7 +745,9 @@ label {
 .site-title,
 .site-footer__title,
 .primary-navigation a,
+.footer-navigation a,
 .mobile-navigation a,
+.recovery-links a,
 .archive-title,
 .page-entry__title,
 .post-summary__title {
