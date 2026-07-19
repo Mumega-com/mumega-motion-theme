@@ -114,8 +114,46 @@ test('WordPress mutation requires the actor to own the workflow transition', asy
   });
 
   assert.equal(result.valid, false);
-  assert.match(result.errors.join('\n'), /WordPress mutation actor does not own the workflow transition/);
+  assert.match(result.errors.join('\n'), /workflow attempt actor does not own the workflow transition/);
 });
+
+for (const attempt of [
+  {
+    name: 'unknown actor',
+    actor: 'publisher-bot',
+    from_state: 'brief_ready',
+    to_state: 'brief_accepted'
+  },
+  {
+    name: 'known actor on another role\'s edge',
+    actor: 'writer',
+    from_state: 'brief_ready',
+    to_state: 'brief_accepted'
+  }
+]) {
+  test(`non-mutating workflow attempt rejects ${attempt.name}`, async () => {
+    const validateContract = requireValidator();
+    const artifact = {
+      kind: 'workflow-attempt',
+      actor: attempt.actor,
+      from_state: attempt.from_state,
+      to_state: attempt.to_state,
+      wordpress_mutation: false,
+      validation_report_status: 'pass'
+    };
+
+    const result = await withTemporaryContract(async (temporaryRoot) => {
+      await writeFile(
+        join(temporaryRoot, 'editorial/examples/valid/workflow-attempt.json'),
+        `${JSON.stringify(artifact, null, 2)}\n`
+      );
+      return validateContract(temporaryRoot);
+    });
+
+    assert.equal(result.valid, false);
+    assert.match(result.errors.join('\n'), /workflow attempt actor does not own the workflow transition/);
+  });
+}
 
 test('workflow rejects an extra human transition outside the documented state machine', async () => {
   const validateContract = requireValidator();
@@ -135,3 +173,83 @@ test('workflow rejects an extra human transition outside the documented state ma
   assert.equal(result.valid, false);
   assert.match(result.errors.join('\n'), /human transition graph does not match documented state machine/);
 });
+
+test('role contract rejects a conflicting second transition declaration', async () => {
+  const validateContract = requireValidator();
+  const result = await withTemporaryContract(async (temporaryRoot) => {
+    const roleFile = join(temporaryRoot, 'editorial/agents/writer.md');
+    const content = await readFile(roleFile, 'utf8');
+    const changed = content.replace(
+      '`research_accepted` to `drafting`.\n\n## Stop conditions',
+      '`research_accepted` to `drafting`.\n\n`idea` to `brief_ready`.\n\n## Stop conditions'
+    );
+    assert.notEqual(changed, content);
+    await writeFile(roleFile, changed);
+    return validateContract(temporaryRoot);
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /must declare exactly one canonical transition/);
+});
+
+test('role contract rejects a negated canonical transition declaration', async () => {
+  const validateContract = requireValidator();
+  const result = await withTemporaryContract(async (temporaryRoot) => {
+    const roleFile = join(temporaryRoot, 'editorial/agents/writer.md');
+    const content = await readFile(roleFile, 'utf8');
+    const changed = content.replace(
+      '`research_accepted` to `drafting`.',
+      'Do not transition `research_accepted` to `drafting`.'
+    );
+    assert.notEqual(changed, content);
+    await writeFile(roleFile, changed);
+    return validateContract(temporaryRoot);
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /canonical transition declaration must be affirmative/);
+});
+
+const weakenedAuthorityCases = [
+  {
+    name: 'WordPress authorization authority',
+    file: 'editorial/rules/wordpress-handoff.md',
+    original: 'Only a human editor may authorize publication, scheduling, redirects, deletions, canonical changes, or exceptions.',
+    replacement: 'A human editor may authorize publication, scheduling, redirects, deletions, canonical changes, or exceptions.',
+    expected: 'WordPress handoff human authority declaration is missing or weakened'
+  },
+  {
+    name: 'correction and retirement authority',
+    file: 'editorial/rules/freshness-corrections.md',
+    original: 'Redirects, deletions, canonical changes, retirement, and public correction decisions require a human editor.',
+    replacement: 'Redirects, deletions, canonical changes, retirement, and public correction decisions may involve a human editor.',
+    expected: 'freshness and corrections human authority declaration is missing or weakened'
+  },
+  {
+    name: 'commercial conclusion authority',
+    file: 'editorial/rules/authorship-disclosure.md',
+    original: 'Only the human editor may approve exceptions, public authorship, publication, redirects, deletions, and commercial conclusions.',
+    replacement: 'Only the human editor may approve exceptions, public authorship, publication, redirects, deletions, and commercial recommendations.',
+    expected: 'authorship and disclosure human authority declaration is missing or weakened'
+  }
+];
+
+for (const { name, file, original, replacement, expected } of weakenedAuthorityCases) {
+  test(`contract rejects weakened ${name}`, async () => {
+    const validateContract = requireValidator();
+    const result = await withTemporaryContract(async (temporaryRoot) => {
+      const ruleFile = join(temporaryRoot, file);
+      const content = await readFile(ruleFile, 'utf8');
+      const changed = content.replace(original, replacement);
+      assert.notEqual(changed, content);
+      await writeFile(ruleFile, changed);
+      return validateContract(temporaryRoot);
+    });
+
+    assert.equal(result.valid, false);
+    assert.match(
+      result.errors.join('\n'),
+      new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    );
+  });
+}

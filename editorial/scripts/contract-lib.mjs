@@ -152,9 +152,79 @@ const validateDocumentVersions = async (root, manifest) => {
   return errors;
 };
 
-const roleTransitionText = (transition) => transition.from === null
-  ? ['from: null', `to: ${transition.to}`]
-  : [`\`${transition.from}\` to \`${transition.to}\``];
+const markdownSection = (content, heading, nextHeading = null) => {
+  const start = content.indexOf(`${heading}\n`);
+  if (start === -1) return '';
+  const bodyStart = start + heading.length + 1;
+  const end = nextHeading ? content.indexOf(`\n${nextHeading}\n`, bodyStart) : content.length;
+  return content.slice(bodyStart, end === -1 ? content.length : end).trim();
+};
+
+const authorityDeclarations = [
+  {
+    file: 'editorial/rules/wordpress-handoff.md',
+    section: '## Draft-only procedure',
+    nextSection: '## Fail closed',
+    declaration: 'Only a human editor may authorize publication, scheduling, redirects, deletions, canonical changes, or exceptions.',
+    error: 'WordPress handoff human authority declaration is missing or weakened'
+  },
+  {
+    file: 'editorial/rules/freshness-corrections.md',
+    section: '## Corrections and retirement',
+    nextSection: '## Fail closed',
+    declaration: 'Redirects, deletions, canonical changes, retirement, and public correction decisions require a human editor.',
+    error: 'freshness and corrections human authority declaration is missing or weakened'
+  },
+  {
+    file: 'editorial/rules/authorship-disclosure.md',
+    section: '## Authority boundary',
+    declaration: 'Only the human editor may approve exceptions, public authorship, publication, redirects, deletions, and commercial conclusions.',
+    error: 'authorship and disclosure human authority declaration is missing or weakened'
+  }
+];
+
+const validateHumanAuthorityDeclarations = async (root) => {
+  const errors = [];
+  for (const { file, section, nextSection, declaration, error } of authorityDeclarations) {
+    const content = await readFile(artifactPath(root, file), 'utf8');
+    const body = markdownSection(content, section, nextSection);
+    const occurrences = body.split(declaration).length - 1;
+    if (occurrences !== 1) {
+      errors.push(`${file}: ${error}`);
+    }
+  }
+  return errors;
+};
+
+const sentenceContaining = (content, index) => {
+  const priorPeriod = content.lastIndexOf('.', index - 1);
+  const priorNewline = content.lastIndexOf('\n', index - 1);
+  const start = Math.max(priorPeriod, priorNewline) + 1;
+  const nextPeriod = content.indexOf('.', index);
+  const nextNewline = content.indexOf('\n', index);
+  const candidates = [nextPeriod, nextNewline].filter((position) => position !== -1);
+  const end = candidates.length > 0 ? Math.min(...candidates) : content.length;
+  return content.slice(start, end);
+};
+
+const parseRoleTransitionDeclarations = (allowedSection) => {
+  const declarations = [];
+  const addMatches = (pattern, fromGroup, toGroup) => {
+    for (const match of allowedSection.matchAll(pattern)) {
+      declarations.push({
+        from: match[fromGroup] === 'null' ? null : match[fromGroup],
+        to: match[toGroup],
+        negated: /\b(?:do not|may not|must not|can(?:not| not)|never|prohibited|forbidden)\b/i.test(
+          sentenceContaining(allowedSection, match.index)
+        )
+      });
+    }
+  };
+
+  addMatches(/`([a-z_]+)`\s+to\s+`([a-z_]+)`/g, 1, 2);
+  addMatches(/`from:\s*(null|[a-z_]+)`\s+and\s+`to:\s*([a-z_]+)`/g, 1, 2);
+  return declarations;
+};
 
 const documentedHumanTransitions = async (root) => {
   const content = await readFile(
@@ -272,11 +342,24 @@ const validateWorkflow = async (root, manifest, validationReportSchema, workflow
 
     const roleFile = `editorial/agents/${role}.md`;
     const content = await readFile(artifactPath(root, roleFile), 'utf8').catch(() => '');
-    const allowedSection = content.split('## Allowed transition\n')[1]?.split('\n## Stop conditions')[0] ?? '';
-    for (const expectedText of roleTransitionText(ownedTransitions[0])) {
-      if (!allowedSection.includes(expectedText)) {
-        errors.push(`${roleFile}: allowed transition does not match workflow assignment ${expectedText}`);
-      }
+    const allowedSection = markdownSection(
+      content,
+      '## Allowed transition',
+      '## Stop conditions'
+    );
+    const declarations = parseRoleTransitionDeclarations(allowedSection);
+    if (declarations.length !== 1) {
+      errors.push(`${roleFile}: must declare exactly one canonical transition`);
+      continue;
+    }
+
+    const [declaration] = declarations;
+    const assignedTransition = ownedTransitions[0];
+    if (declaration.negated) {
+      errors.push(`${roleFile}: canonical transition declaration must be affirmative`);
+    } else if (declaration.from !== assignedTransition.from
+      || declaration.to !== assignedTransition.to) {
+      errors.push(`${roleFile}: allowed transition does not exactly match workflow assignment`);
     }
   }
 
@@ -334,17 +417,18 @@ const workflowAttemptErrors = (artifact, workflow, approvedStates, label) => {
     errors.push(`${label}: non-human transition to published is prohibited`);
   }
 
+  const actorOwnsTransition = workflow.transitions.some((transition) => (
+    transition.actor === artifact.actor
+    && transition.from === artifact.from_state
+    && transition.to === artifact.to_state
+  ));
+  if (!actorOwnsTransition) {
+    errors.push(`${label}: workflow attempt actor does not own the workflow transition`);
+  }
+
   if (artifact.wordpress_mutation) {
     if (artifact.validation_report_status !== 'pass') {
       errors.push(`${label}: WordPress mutation requires a passing validation report`);
-    }
-    const actorOwnsTransition = workflow.transitions.some((transition) => (
-      transition.actor === artifact.actor
-      && transition.from === artifact.from_state
-      && transition.to === artifact.to_state
-    ));
-    if (!actorOwnsTransition) {
-      errors.push(`${label}: WordPress mutation actor does not own the workflow transition`);
     }
   }
 
@@ -465,6 +549,7 @@ export const validateContract = async (root) => {
 
   errors.push(...await validateManifestInventory(root, manifest));
   errors.push(...await validateDocumentVersions(root, manifest));
+  errors.push(...await validateHumanAuthorityDeclarations(root));
 
   const validationReportSchema = await json(
     root,
