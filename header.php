@@ -18,7 +18,7 @@
 <a class="skip-link screen-reader-text" href="#primary"><?php esc_html_e( 'Skip to content', 'mumega-motion' ); ?></a>
 
 <?php
-$elementor_header_rendered = function_exists( 'elementor_theme_do_location' ) && elementor_theme_do_location( 'header' );
+$elementor_header_rendered = mumega_motion_render_elementor_location( 'header' );
 
 if ( ! $elementor_header_rendered ) :
 	$primary_menu_assigned = has_nav_menu( 'primary' );
