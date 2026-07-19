@@ -33,6 +33,198 @@ final class EditorialHelpersTest extends TestCase {
 		$GLOBALS['mumega_motion_test_nav_menu_location_requests'] = array();
 		$GLOBALS['mumega_motion_test_nav_menu_objects']           = array();
 		$GLOBALS['mumega_motion_test_nav_menu_object_requests']   = array();
+		$GLOBALS['mumega_motion_test_current_post']               = null;
+		$GLOBALS['mumega_motion_test_postdata_events']            = array();
+		unset( $GLOBALS['post'] );
+	}
+
+	/**
+	 * Filters a target post without echoing or leaking its global context.
+	 */
+	public function test_render_post_content_filters_target_and_restores_previous_post(): void {
+		$previous = new WP_Post(
+			array(
+				'ID'           => 10,
+				'post_content' => 'Previous content.',
+			)
+		);
+		$target   = new WP_Post(
+			array(
+				'ID'           => 20,
+				'post_content' => '<!-- wp:paragraph --><p>Target content.</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$GLOBALS['post']                            = $previous;
+		$GLOBALS['mumega_motion_test_current_post'] = $previous;
+		add_filter(
+			'the_content',
+			static function ( $content ) use ( $target ) {
+				$GLOBALS['mumega_motion_test_postdata_events'][] = array( 'filter', (int) $GLOBALS['post']->ID );
+				TestCase::assertSame( $target, $GLOBALS['post'] );
+				TestCase::assertSame( $target, $GLOBALS['mumega_motion_test_current_post'] );
+
+				return '<div class="rendered-blocks">' . $content . '</div>';
+			}
+		);
+
+		ob_start();
+		$rendered = mumega_motion_render_post_content( $target );
+		$echoed   = ob_get_clean();
+
+		$this->assertSame( '', $echoed );
+		$this->assertSame(
+			'<div class="rendered-blocks"><!-- wp:paragraph --><p>Target content.</p><!-- /wp:paragraph --></div>',
+			$rendered
+		);
+		$this->assertSame( $previous, $GLOBALS['post'] );
+		$this->assertSame( $previous, $GLOBALS['mumega_motion_test_current_post'] );
+		$this->assertSame(
+			array(
+				array( 'setup', 20 ),
+				array( 'filter', 20 ),
+				array( 'reset' ),
+				array( 'setup', 10 ),
+			),
+			$GLOBALS['mumega_motion_test_postdata_events']
+		);
+	}
+
+	/**
+	 * Restores the prior post even when filtering produces no markup.
+	 */
+	public function test_render_post_content_restores_previous_post_after_empty_filter_result(): void {
+		$previous = new WP_Post( array( 'ID' => 11 ) );
+		$target   = new WP_Post(
+			array(
+				'ID'           => 21,
+				'post_content' => 'Filtered away.',
+			)
+		);
+
+		$GLOBALS['post']                            = $previous;
+		$GLOBALS['mumega_motion_test_current_post'] = $previous;
+		add_filter(
+			'the_content',
+			static function () {
+				return '';
+			}
+		);
+
+		$this->assertSame( '', mumega_motion_render_post_content( $target ) );
+		$this->assertSame( $previous, $GLOBALS['post'] );
+		$this->assertSame( $previous, $GLOBALS['mumega_motion_test_current_post'] );
+		$this->assertSame(
+			array(
+				array( 'setup', 21 ),
+				array( 'reset' ),
+				array( 'setup', 11 ),
+			),
+			$GLOBALS['mumega_motion_test_postdata_events']
+		);
+	}
+
+	/**
+	 * Rejects invalid inputs without touching global post state.
+	 */
+	public function test_render_post_content_rejects_non_post_without_side_effects(): void {
+		$previous = new WP_Post( array( 'ID' => 12 ) );
+
+		$GLOBALS['post']                            = $previous;
+		$GLOBALS['mumega_motion_test_current_post'] = $previous;
+		add_filter(
+			'the_content',
+			static function () {
+				$GLOBALS['mumega_motion_test_postdata_events'][] = array( 'filter' );
+
+				return 'Unexpected content.';
+			}
+		);
+
+		$this->assertSame( '', mumega_motion_render_post_content( (object) array( 'post_content' => 'Invalid.' ) ) );
+		$this->assertSame( $previous, $GLOBALS['post'] );
+		$this->assertSame( $previous, $GLOBALS['mumega_motion_test_current_post'] );
+		$this->assertSame( array(), $GLOBALS['mumega_motion_test_postdata_events'] );
+	}
+
+	/**
+	 * Preserves an absent global post instead of inventing one during cleanup.
+	 */
+	public function test_render_post_content_restores_absent_global_post(): void {
+		$target = new WP_Post(
+			array(
+				'ID'           => 22,
+				'post_content' => 'Target content.',
+			)
+		);
+
+		$this->assertArrayNotHasKey( 'post', $GLOBALS );
+		$this->assertSame( 'Target content.', mumega_motion_render_post_content( $target ) );
+		$this->assertArrayNotHasKey( 'post', $GLOBALS );
+		$this->assertSame(
+			array(
+				array( 'setup', 22 ),
+				array( 'reset' ),
+			),
+			$GLOBALS['mumega_motion_test_postdata_events']
+		);
+	}
+
+	/**
+	 * Preserves an exact non-post global value after rendering.
+	 */
+	public function test_render_post_content_restores_non_post_global_value(): void {
+		$target = new WP_Post(
+			array(
+				'ID'           => 23,
+				'post_content' => 'Target content.',
+			)
+		);
+
+		$GLOBALS['post'] = false;
+
+		$this->assertSame( 'Target content.', mumega_motion_render_post_content( $target ) );
+		$this->assertFalse( $GLOBALS['post'] );
+	}
+
+	/**
+	 * Restores global context before propagating content-filter failures.
+	 */
+	public function test_render_post_content_restores_previous_post_when_filter_throws(): void {
+		$previous = new WP_Post( array( 'ID' => 13 ) );
+		$target   = new WP_Post(
+			array(
+				'ID'           => 24,
+				'post_content' => 'Target content.',
+			)
+		);
+
+		$GLOBALS['post']                            = $previous;
+		$GLOBALS['mumega_motion_test_current_post'] = $previous;
+		add_filter(
+			'the_content',
+			static function () {
+				throw new RuntimeException( 'Filter failed.' );
+			}
+		);
+
+		try {
+			mumega_motion_render_post_content( $target );
+			$this->fail( 'Expected the content filter exception to propagate.' );
+		} catch ( RuntimeException $exception ) {
+			$this->assertSame( 'Filter failed.', $exception->getMessage() );
+		}
+
+		$this->assertSame( $previous, $GLOBALS['post'] );
+		$this->assertSame( $previous, $GLOBALS['mumega_motion_test_current_post'] );
+		$this->assertSame(
+			array(
+				array( 'setup', 24 ),
+				array( 'reset' ),
+				array( 'setup', 13 ),
+			),
+			$GLOBALS['mumega_motion_test_postdata_events']
+		);
 	}
 
 	/**

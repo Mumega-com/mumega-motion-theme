@@ -51,6 +51,42 @@ function mumega_motion_trim_words( $text, $limit ) {
 }
 
 /**
+ * Renders one post's block content without leaking its global post context.
+ *
+ * @param WP_Post $post Post whose content should be rendered.
+ * @return string
+ */
+function mumega_motion_render_post_content( $post ) {
+	if ( ! $post instanceof WP_Post ) {
+		return '';
+	}
+
+	$had_previous_post = array_key_exists( 'post', $GLOBALS );
+	$previous_post     = $had_previous_post ? $GLOBALS['post'] : null;
+
+	// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- The content filter requires the target as WordPress's current global post.
+	$GLOBALS['post'] = $post;
+	setup_postdata( $post );
+
+	try {
+		return (string) apply_filters( 'the_content', $post->post_content );
+	} finally {
+		wp_reset_postdata();
+
+		if ( $previous_post instanceof WP_Post ) {
+			// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Restore the exact prior post after the temporary content context.
+			$GLOBALS['post'] = $previous_post;
+			setup_postdata( $previous_post );
+		} elseif ( $had_previous_post ) {
+			// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Restore the exact non-post value that existed before rendering.
+			$GLOBALS['post'] = $previous_post;
+		} else {
+			unset( $GLOBALS['post'] );
+		}
+	}
+}
+
+/**
  * Returns the concise summary used by editorial cards.
  *
  * @param WP_Post $post  Post to summarize.

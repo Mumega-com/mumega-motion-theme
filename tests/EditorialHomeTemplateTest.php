@@ -150,6 +150,18 @@ PHP;
 	}
 
 	/**
+	 * Delegates newsletter content filtering to the shared restoration helper.
+	 */
+	public function test_newsletter_delegates_content_rendering_to_shared_helper(): void {
+		$source = $this->theme_source( 'template-parts/newsletter.php' );
+
+		$this->assertStringContainsString( 'mumega_motion_render_post_content( $newsletter_post )', $source );
+		$this->assertStringNotContainsString( 'setup_postdata(', $source );
+		$this->assertStringNotContainsString( 'wp_reset_postdata(', $source );
+		$this->assertStringNotContainsString( "apply_filters( 'the_content'", $source );
+	}
+
+	/**
 	 * Renders block-aware newsletter content without leaking its post globally.
 	 */
 	public function test_newsletter_render_restores_the_previous_global_post(): void {
