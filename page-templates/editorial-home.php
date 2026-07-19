@@ -37,8 +37,7 @@ $newsletter_page = mumega_motion_newsletter_page();
 $has_template_motion_mount = ! empty( $supporting ) ||
 	( ! empty( $test_lab ) && $test_lab_term instanceof WP_Term ) ||
 	! empty( $rail_groups ) ||
-	( ! empty( $field_notes ) && $field_notes_term instanceof WP_Term ) ||
-	$newsletter_page instanceof WP_Post;
+	( ! empty( $field_notes ) && $field_notes_term instanceof WP_Term );
 
 if ( $has_template_motion_mount ) {
 	add_filter(
@@ -208,7 +207,7 @@ get_header();
 	<?php endif; ?>
 
 	<?php if ( $newsletter_page instanceof WP_Post ) : ?>
-		<section class="home-newsletter" data-motion="fade-in">
+		<section class="home-newsletter">
 			<?php
 			get_template_part(
 				'template-parts/newsletter',

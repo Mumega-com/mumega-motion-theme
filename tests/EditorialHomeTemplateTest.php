@@ -128,6 +128,15 @@ PHP;
 	}
 
 	/**
+	 * Leaves interactive plugin forms outside React-owned Motion mounts.
+	 */
+	public function test_newsletter_section_is_not_a_motion_mount(): void {
+		$source = $this->theme_source( 'page-templates/editorial-home.php' );
+
+		$this->assertStringContainsString( '<section class="home-newsletter">', $source );
+	}
+
+	/**
 	 * Renders block-aware newsletter content without leaking its post globally.
 	 */
 	public function test_newsletter_render_restores_the_previous_global_post(): void {
