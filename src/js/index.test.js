@@ -1,3 +1,26 @@
+jest.mock( '../components/FadeIn', () => {
+	const React = require( 'react' );
+	const actual = jest.requireActual( '../components/FadeIn' );
+
+	return {
+		__esModule: true,
+		...actual,
+		default: ( props ) => {
+			if (
+				props.dangerouslySetInnerHTML.__html.includes(
+					'data-test-react-render-error'
+				)
+			) {
+				throw new Error( 'descendant render failed' );
+			}
+
+			return React.createElement( actual.default, props );
+		},
+	};
+} );
+
+import { act } from 'react';
+import { createRoot as createReactRoot } from 'react-dom/client';
 import {
 	mountFadeInNode,
 	mountMotionIslands,
@@ -8,6 +31,7 @@ import {
 function createRootRecorder( onRender = () => {} ) {
 	const mountedNodes = [];
 	const renderedElements = [];
+	const unmountedNodes = [];
 	const createRoot = jest.fn( ( node ) => {
 		mountedNodes.push( node );
 
@@ -16,10 +40,11 @@ function createRootRecorder( onRender = () => {} ) {
 				renderedElements.push( element );
 				onRender( node, element );
 			},
+			unmount: () => unmountedNodes.push( node ),
 		};
 	} );
 
-	return { createRoot, mountedNodes, renderedElements };
+	return { createRoot, mountedNodes, renderedElements, unmountedNodes };
 }
 
 describe( 'editorial Motion islands', () => {
@@ -77,7 +102,9 @@ describe( 'editorial Motion islands', () => {
 			recorder.createRoot
 		);
 
-		expect( recorder.renderedElements[ 0 ].props ).toMatchObject( {
+		expect(
+			recorder.renderedElements[ 0 ].props.children.props
+		).toMatchObject( {
 			delay: 0,
 			y: 24,
 			duration: 0.5,
@@ -118,7 +145,72 @@ describe( 'editorial Motion islands', () => {
 		expect( first.innerHTML ).toBe( '<strong>First fallback</strong>' );
 		expect( first.dataset.motionFailed ).toBe( 'true' );
 		expect( recorder.mountedNodes ).toEqual( [ first, second ] );
+		expect( recorder.unmountedNodes ).toEqual( [ first ] );
 		expect( recorder.renderedElements ).toHaveLength( 2 );
+	} );
+
+	test( 'recovers an asynchronous React render failure without blocking a later real root', async () => {
+		document.body.innerHTML = `
+			<section id="first" data-motion="fade-in"><strong data-test-react-render-error>First fallback</strong></section>
+			<section id="second" data-motion="fade-in"><em>Second fallback</em></section>
+		`;
+		const first = document.getElementById( 'first' );
+		const second = document.getElementById( 'second' );
+		const originalFirstHTML = first.innerHTML;
+		const originalSecondHTML = second.innerHTML;
+		const previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+		globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+		const roots = [];
+		const createTrackedReactRoot = ( node ) => {
+			const root = createReactRoot( node );
+			const unmount = root.unmount.bind( root );
+
+			root.unmount = jest.fn( unmount );
+			roots.push( { node, root } );
+
+			return root;
+		};
+		const consoleError = jest
+			.spyOn( console, 'error' )
+			.mockImplementation( () => {} );
+
+		try {
+			await act( async () => {
+				mountMotionIslands( document, createTrackedReactRoot );
+			} );
+
+			const reactDiagnostics = consoleError.mock.calls
+				.flat()
+				.map( String )
+				.join( '\n' );
+
+			expect( reactDiagnostics ).not.toContain(
+				'Attempted to synchronously unmount a root while React was already rendering'
+			);
+			expect( reactDiagnostics ).not.toContain( 'not wrapped in act' );
+			expect( reactDiagnostics ).not.toContain(
+				'The current testing environment is not configured to support act'
+			);
+			expect( first.innerHTML ).toBe( originalFirstHTML );
+			expect( first.dataset.motionFailed ).toBe( 'true' );
+			expect(
+				roots.find( ( { node } ) => node === first ).root.unmount
+			).toHaveBeenCalledTimes( 1 );
+			expect(
+				roots.find( ( { node } ) => node === second ).root.unmount
+			).not.toHaveBeenCalled();
+			expect( second.dataset.motionFailed ).toBeUndefined();
+			expect( second.innerHTML ).not.toBe( originalSecondHTML );
+			expect( second.textContent ).toBe( 'Second fallback' );
+		} finally {
+			consoleError.mockRestore();
+
+			if ( previousActEnvironment === undefined ) {
+				delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+			} else {
+				globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
+			}
+		}
 	} );
 
 	test( 'does not mount StreamingText without its explicit stream marker', () => {
@@ -144,7 +236,9 @@ describe( 'editorial Motion islands', () => {
 		expect( recorder.mountedNodes ).toEqual( [
 			document.getElementById( 'stream' ),
 		] );
-		expect( recorder.renderedElements[ 0 ].props ).toMatchObject( {
+		expect(
+			recorder.renderedElements[ 0 ].props.children.props
+		).toMatchObject( {
 			streamUrl: '/stream',
 			siblingText: 'Evidence',
 		} );

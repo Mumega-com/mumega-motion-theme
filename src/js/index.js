@@ -1,3 +1,4 @@
+import { Component } from 'react';
 import { createRoot } from 'react-dom/client';
 import { LazyMotion, domAnimation, m, LayoutGroup } from 'motion/react';
 import FadeIn, { FADE_IN_DEFAULTS } from '../components/FadeIn';
@@ -40,6 +41,39 @@ export function shouldReduceMotion(
 }
 
 /**
+ * Catches descendant render failures inside one React island.
+ *
+ * Recovery is deferred until React has completed the current commit stack. A
+ * synchronous unmount from componentDidCatch would otherwise trigger React's
+ * update-during-render warning and could leave the root in an undefined state.
+ */
+class MotionIslandErrorBoundary extends Component {
+	constructor( props ) {
+		super( props );
+		this.state = { failed: false };
+	}
+
+	static getDerivedStateFromError() {
+		return { failed: true };
+	}
+
+	componentDidCatch() {
+		const { onError } = this.props;
+
+		if ( typeof queueMicrotask === 'function' ) {
+			queueMicrotask( onError );
+			return;
+		}
+
+		Promise.resolve().then( onError );
+	}
+
+	render() {
+		return this.state.failed ? null : this.props.children;
+	}
+}
+
+/**
  * Wraps server-rendered fallback HTML in the bounded FadeIn component.
  *
  * @param {Element}  element        Explicit fade-in mount.
@@ -52,32 +86,73 @@ export function mountFadeInNode( element, createRootImpl = createRoot ) {
 	}
 
 	const originalHTML = element.innerHTML;
+	let reactRoot;
+	const recover = createIslandRecovery(
+		element,
+		originalHTML,
+		() => reactRoot
+	);
 
 	try {
-		createRootImpl( element ).render(
-			<AutoMount
-				html={ originalHTML }
-				delay={ parseMotionNumber(
-					element.dataset.motionDelay,
-					FADE_IN_DEFAULTS.delay
-				) }
-				y={ parseMotionNumber(
-					element.dataset.motionY,
-					FADE_IN_DEFAULTS.y
-				) }
-				duration={ parseMotionNumber(
-					element.dataset.motionDuration,
-					FADE_IN_DEFAULTS.duration
-				) }
-			/>
+		reactRoot = createRootImpl( element );
+		reactRoot.render(
+			<MotionIslandErrorBoundary onError={ recover }>
+				<AutoMount
+					html={ originalHTML }
+					delay={ parseMotionNumber(
+						element.dataset.motionDelay,
+						FADE_IN_DEFAULTS.delay
+					) }
+					y={ parseMotionNumber(
+						element.dataset.motionY,
+						FADE_IN_DEFAULTS.y
+					) }
+					duration={ parseMotionNumber(
+						element.dataset.motionDuration,
+						FADE_IN_DEFAULTS.duration
+					) }
+				/>
+			</MotionIslandErrorBoundary>
 		);
 		delete element.dataset.motionFailed;
 		return true;
 	} catch {
-		element.innerHTML = originalHTML;
-		element.dataset.motionFailed = 'true';
+		recover();
 		return false;
 	}
+}
+
+/**
+ * Creates an idempotent fallback restoration for a single island root.
+ *
+ * @param {Element}  element Server-rendered mount node.
+ * @param {string}   html    Original inner HTML.
+ * @param {Function} getRoot Returns the node's React root, when created.
+ * @return {Function} Recovery callback.
+ */
+function createIslandRecovery( element, html, getRoot ) {
+	let recovered = false;
+
+	return () => {
+		if ( recovered ) {
+			return;
+		}
+
+		recovered = true;
+
+		try {
+			const root = getRoot();
+
+			if ( root && typeof root.unmount === 'function' ) {
+				root.unmount();
+			}
+		} catch {
+			// Restoration below remains mandatory even if root cleanup fails.
+		} finally {
+			element.innerHTML = html;
+			element.dataset.motionFailed = 'true';
+		}
+	};
 }
 
 /**
@@ -174,19 +249,27 @@ function StreamMount( { streamUrl, siblingText } ) {
  */
 function mountStreamingTextNode( element, createRootImpl ) {
 	const originalHTML = element.innerHTML;
+	let reactRoot;
+	const recover = createIslandRecovery(
+		element,
+		originalHTML,
+		() => reactRoot
+	);
 
 	try {
-		createRootImpl( element ).render(
-			<StreamMount
-				streamUrl={ element.dataset.motionStream }
-				siblingText={ element.dataset.motionStreamSibling || '' }
-			/>
+		reactRoot = createRootImpl( element );
+		reactRoot.render(
+			<MotionIslandErrorBoundary onError={ recover }>
+				<StreamMount
+					streamUrl={ element.dataset.motionStream }
+					siblingText={ element.dataset.motionStreamSibling || '' }
+				/>
+			</MotionIslandErrorBoundary>
 		);
 		delete element.dataset.motionFailed;
 		return true;
 	} catch {
-		element.innerHTML = originalHTML;
-		element.dataset.motionFailed = 'true';
+		recover();
 		return false;
 	}
 }
