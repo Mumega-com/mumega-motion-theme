@@ -1,58 +1,42 @@
 <?php
 /**
- * Theme fallback template.
+ * Theme fallback and posts-index template.
  *
  * @package Mumega_Motion
  */
 
+get_header();
 ?>
-<!DOCTYPE html>
-<html <?php language_attributes(); ?>>
-<head>
-	<meta charset="<?php bloginfo( 'charset' ); ?>">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<?php wp_head(); ?>
-</head>
-<body <?php body_class(); ?>>
-	<?php wp_body_open(); ?>
 
-	<header>
-		<div
-			data-motion="fade-in"
-			data-motion-y="16"
-			data-motion-duration="0.6"
-		>
-			<h1><?php bloginfo( 'name' ); ?></h1>
-			<p><?php bloginfo( 'description' ); ?></p>
-		</div>
+<main id="primary" class="site-main">
+	<header class="archive-header">
+		<h1 class="archive-title"><?php esc_html_e( 'Latest stories', 'mumega-motion' ); ?></h1>
 	</header>
 
-	<main>
-		<?php if ( have_posts() ) : ?>
-			<?php while ( have_posts() ) : ?>
-				<?php the_post(); ?>
-				<article <?php post_class(); ?> id="post-<?php the_ID(); ?>">
-					<div
-						data-motion="fade-in"
-						data-motion-delay="0.1"
-					>
-						<h2><?php the_title(); ?></h2>
+	<?php if ( have_posts() ) : ?>
+		<div class="posts-list">
+			<?php
+			while ( have_posts() ) :
+				the_post();
+				?>
+				<article id="post-<?php the_ID(); ?>" <?php post_class( 'post-summary' ); ?>>
+					<h2 class="post-summary__title">
+						<a href="<?php echo esc_url( get_permalink() ); ?>">
+							<?php echo esc_html( get_the_title() ); ?>
+						</a>
+					</h2>
+					<div class="post-summary__content">
 						<?php the_content(); ?>
 					</div>
 				</article>
 			<?php endwhile; ?>
-		<?php else : ?>
-			<p><?php esc_html_e( 'Nothing found.', 'mumega-motion' ); ?></p>
-		<?php endif; ?>
+		</div>
 
-		<section id="ai-stream-demo" style="max-width:260px;">
-			<div
-				data-motion-stream="<?php echo esc_url( get_template_directory_uri() . '/stream-demo.php' ); ?>"
-				data-motion-stream-sibling="<?php esc_attr_e( 'This card sits below the streaming text — its position is under Motion\'s control too, so it animates as the streaming content above it grows.', 'mumega-motion' ); ?>"
-			></div>
-		</section>
-	</main>
+		<?php the_posts_pagination(); ?>
+	<?php else : ?>
+		<?php get_template_part( 'template-parts/empty-state' ); ?>
+	<?php endif; ?>
+</main>
 
-	<?php wp_footer(); ?>
-</body>
-</html>
+<?php
+get_footer();

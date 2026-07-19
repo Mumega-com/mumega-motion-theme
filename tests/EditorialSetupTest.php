@@ -138,24 +138,13 @@ final class EditorialSetupTest extends TestCase {
 	}
 
 	/**
-	 * Lets only the legacy posts-index demo mounts opt in before asset enqueue.
+	 * Leaves a mount-free posts index outside the optional Motion bundle.
 	 */
-	public function test_legacy_posts_index_declaration_enqueues_motion_without_a_queried_post(): void {
-		$this->assertTrue( function_exists( 'mumega_motion_declare_legacy_demo_mounts' ) );
+	public function test_posts_index_without_explicit_mount_does_not_load_motion(): void {
 		$GLOBALS['mumega_motion_test_conditionals'] = array( 'is_home' => true );
 		$this->assertSame( 0, get_queried_object_id() );
-		mumega_motion_declare_legacy_demo_mounts();
-		mumega_motion_enqueue_motion_assets();
-		$this->assertArrayHasKey( 'mumega-motion', $GLOBALS['mumega_motion_test_enqueued_scripts'] );
-	}
-
-	/**
-	 * Leaves an ordinary Elementor page outside the legacy demo opt-in.
-	 */
-	public function test_legacy_demo_declaration_does_not_enqueue_motion_for_an_ordinary_page(): void {
-		$this->assertTrue( function_exists( 'mumega_motion_declare_legacy_demo_mounts' ) );
-		mumega_motion_declare_legacy_demo_mounts();
 		mumega_motion_enqueue_motion_assets();
 		$this->assertArrayNotHasKey( 'mumega-motion', $GLOBALS['mumega_motion_test_enqueued_scripts'] );
+		$this->assertFalse( function_exists( 'mumega_motion_declare_legacy_demo_mounts' ) );
 	}
 }

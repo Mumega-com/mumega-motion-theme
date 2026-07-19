@@ -1,5 +1,77 @@
 /*
- * Editorial presentation entry point.
- *
- * Structural and component rules are introduced with the editorial templates.
+ * Editorial templates and content components.
  */
+
+.site-main {
+	margin-inline: auto;
+	max-width: 72rem;
+	min-height: 50vh;
+	padding: clamp(2rem, 5vw, 5rem) 1.25rem;
+}
+
+.archive-header,
+.page-entry,
+.error-404,
+.empty-state {
+	margin-inline: auto;
+	max-width: 48rem;
+}
+
+.archive-title,
+.page-entry__title,
+.error-404 h1,
+.empty-state h2 {
+	font-family: var(--figma-typography-heading-h1-font-family, Georgia, serif);
+	line-height: 1.1;
+}
+
+.posts-list {
+	display: grid;
+	gap: 2rem;
+	margin-block: 2rem;
+}
+
+.post-summary {
+	border-top: 1px solid var(--figma-color-border, #d9d9d9);
+	padding-top: 1.5rem;
+}
+
+.post-summary__title {
+	margin-top: 0;
+}
+
+.post-summary__title a {
+	text-decoration: none;
+}
+
+.page-entry__content > :first-child,
+.post-summary__content > :first-child {
+	margin-top: 0;
+}
+
+.page-entry__content > :last-child,
+.post-summary__content > :last-child {
+	margin-bottom: 0;
+}
+
+.pagination,
+.recovery-links ul {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+}
+
+.recovery-links ul {
+	list-style: none;
+	padding: 0;
+}
+
+.empty-state,
+.error-404 {
+	padding-block: 2rem;
+}
+
+.empty-state .search-form,
+.error-404 .search-form {
+	margin-block: 1.5rem;
+}

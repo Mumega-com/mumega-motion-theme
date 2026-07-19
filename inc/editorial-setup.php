@@ -67,32 +67,6 @@ function mumega_motion_page_has_motion_mounts() {
 }
 
 /**
- * Enables Motion for the temporary legacy posts-index demonstration mounts.
- *
- * @return bool
- */
-function mumega_motion_enable_legacy_demo_motion() {
-	return true;
-}
-
-/**
- * Declares the current posts-index demo mounts before front-end assets enqueue.
- *
- * The fallback index template is universal, so this transitional declaration
- * remains limited to the posts index. Task 5 removes it with the demo mounts.
- *
- * @return void
- */
-function mumega_motion_declare_legacy_demo_mounts() {
-	if ( ! is_home() ) {
-		return;
-	}
-
-	add_filter( 'mumega_motion_enqueue_motion', 'mumega_motion_enable_legacy_demo_motion' );
-}
-add_action( 'template_redirect', 'mumega_motion_declare_legacy_demo_mounts' );
-
-/**
  * Enqueues styles owned by editorial request types.
  *
  * @return void

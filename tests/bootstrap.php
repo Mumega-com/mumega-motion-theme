@@ -57,6 +57,17 @@ $GLOBALS['mumega_motion_test_enqueued_scripts'] = array();
 $GLOBALS['mumega_motion_test_conditionals']     = array();
 $GLOBALS['mumega_motion_test_page_template']    = '';
 $GLOBALS['mumega_motion_test_queried_object_id'] = 0;
+$GLOBALS['mumega_motion_test_bloginfo']         = array(
+	'name'        => 'Mumega',
+	'description' => 'Independent technology reporting.',
+	'charset'     => 'UTF-8',
+);
+$GLOBALS['mumega_motion_test_has_nav_menu']     = array();
+$GLOBALS['mumega_motion_test_nav_menu_markup']  = '<ul class="menu"><li><a href="https://example.test/topic/">Topic</a></li></ul>';
+$GLOBALS['mumega_motion_test_loop_posts']       = array();
+$GLOBALS['mumega_motion_test_loop_index']       = 0;
+$GLOBALS['mumega_motion_test_current_post']     = null;
+$GLOBALS['mumega_motion_test_elementor_edit_mode'] = '';
 
 /**
  * Minimal post value used by editorial helper tests.
@@ -359,6 +370,125 @@ function __( $text, $domain = 'default' ) { // phpcs:ignore Generic.CodeAnalysis
 }
 
 /**
+ * Prints a translated string unchanged in tests.
+ *
+ * @param string $text   Text to translate.
+ * @param string $domain Optional text domain.
+ * @return void
+ */
+function esc_html_e( $text, $domain = 'default' ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
+	echo htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
+}
+
+/**
+ * Escapes visible HTML text.
+ *
+ * @param string $text Text to escape.
+ * @return string
+ */
+function esc_html( $text ) {
+	return htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
+}
+
+/**
+ * Prints a translated attribute string unchanged in tests.
+ *
+ * @param string $text   Text to translate.
+ * @param string $domain Optional text domain.
+ * @return void
+ */
+function esc_attr_e( $text, $domain = 'default' ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
+	echo htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
+}
+
+/**
+ * Escapes an HTML attribute.
+ *
+ * @param string $text Text to escape.
+ * @return string
+ */
+function esc_attr( $text ) {
+	return htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
+}
+
+/**
+ * Escapes a URL for deterministic template assertions.
+ *
+ * @param string $url URL to escape.
+ * @return string
+ */
+function esc_url( $url ) {
+	return htmlspecialchars( $url, ENT_QUOTES, 'UTF-8' );
+}
+
+/**
+ * Returns a deterministic site URL.
+ *
+ * @param string $path Optional path.
+ * @return string
+ */
+function home_url( $path = '' ) {
+	return 'https://example.test' . ( '/' === $path ? '/' : '/' . ltrim( $path, '/' ) );
+}
+
+/**
+ * Prints configured language attributes.
+ *
+ * @return void
+ */
+function language_attributes() {
+	echo 'lang="en-CA"';
+}
+
+/**
+ * Prints configured site identity values.
+ *
+ * @param string $show Identity field.
+ * @return void
+ */
+function bloginfo( $show = '' ) {
+	echo isset( $GLOBALS['mumega_motion_test_bloginfo'][ $show ] )
+		? esc_html( $GLOBALS['mumega_motion_test_bloginfo'][ $show ] )
+		: '';
+}
+
+/**
+ * Prints deterministic body classes.
+ *
+ * @return void
+ */
+function body_class() {
+	echo 'class="test-body"';
+}
+
+/**
+ * Marks the WordPress head hook in rendered template output.
+ *
+ * @return void
+ */
+function wp_head() {
+	echo '<!-- wp_head -->';
+}
+
+/**
+ * Marks the body-open hook in rendered template output.
+ *
+ * @return void
+ */
+function wp_body_open() {
+	echo '<!-- wp_body_open -->';
+}
+
+/**
+ * Marks the WordPress footer hook in rendered template output.
+ *
+ * @return void
+ */
+function wp_footer() {
+	echo '<!-- wp_footer -->';
+}
+
+/**
  * Registers a filter callback and preserves WordPress's return contract.
  *
  * @param string   $hook_name     Filter name.
@@ -503,6 +633,192 @@ function get_option( $option, $default = false ) {
 	return array_key_exists( $option, $GLOBALS['mumega_motion_test_options'] )
 		? $GLOBALS['mumega_motion_test_options'][ $option ]
 		: $default;
+}
+
+/**
+ * Returns the configured Elementor edit mode for template compatibility tests.
+ *
+ * @param int    $post_id Post identifier.
+ * @param string $key     Metadata key.
+ * @param bool   $single  Whether a scalar is requested.
+ * @return string|array
+ */
+function get_post_meta( $post_id, $key = '', $single = false ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found
+	$value = '_elementor_edit_mode' === $key ? $GLOBALS['mumega_motion_test_elementor_edit_mode'] : '';
+
+	return $single ? $value : array( $value );
+}
+
+/**
+ * Reports whether a menu is assigned to a location.
+ *
+ * @param string $location Menu location.
+ * @return bool
+ */
+function has_nav_menu( $location ) {
+	return ! empty( $GLOBALS['mumega_motion_test_has_nav_menu'][ $location ] );
+}
+
+/**
+ * Prints deterministic native menu markup.
+ *
+ * @param array $args Menu arguments.
+ * @return void
+ */
+function wp_nav_menu( $args = array() ) {
+	$markup = $GLOBALS['mumega_motion_test_nav_menu_markup'];
+
+	if ( isset( $args['echo'] ) && false === $args['echo'] ) {
+		return $markup;
+	}
+
+	echo $markup; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Native menu markup fixture.
+}
+
+/**
+ * Prints a native search form marker.
+ *
+ * @return void
+ */
+function get_search_form() {
+	echo '<form role="search" class="search-form"><label>Search<input type="search"></label></form>';
+}
+
+/**
+ * Returns a deterministic category URL.
+ *
+ * @param int $category_id Category identifier.
+ * @return string
+ */
+function get_category_link( $category_id ) {
+	return 'https://example.test/category/' . (int) $category_id . '/';
+}
+
+/**
+ * Returns a deterministic post permalink.
+ *
+ * @param WP_Post|int $post Post value or identifier.
+ * @return string
+ */
+function get_permalink( $post = 0 ) {
+	if ( 0 === $post && $GLOBALS['mumega_motion_test_current_post'] instanceof WP_Post ) {
+		$post = $GLOBALS['mumega_motion_test_current_post'];
+	}
+
+	$post_id = $post instanceof WP_Post ? $post->ID : (int) $post;
+
+	return 'https://example.test/?p=' . $post_id;
+}
+
+/**
+ * Reports whether another configured loop post is available.
+ *
+ * @return bool
+ */
+function have_posts() {
+	return $GLOBALS['mumega_motion_test_loop_index'] < count( $GLOBALS['mumega_motion_test_loop_posts'] );
+}
+
+/**
+ * Advances the configured template loop.
+ *
+ * @return void
+ */
+function the_post() {
+	$GLOBALS['mumega_motion_test_current_post'] = $GLOBALS['mumega_motion_test_loop_posts'][ $GLOBALS['mumega_motion_test_loop_index'] ];
+	++$GLOBALS['mumega_motion_test_loop_index'];
+}
+
+/**
+ * Prints the current post identifier.
+ *
+ * @return void
+ */
+function the_ID() {
+	echo (int) $GLOBALS['mumega_motion_test_current_post']->ID;
+}
+
+/**
+ * Prints deterministic post classes.
+ *
+ * @return void
+ */
+function post_class( $class = '', $post_id = null ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
+	$classes = trim( 'post ' . $class );
+
+	echo 'class="' . esc_attr( $classes ) . '"';
+}
+
+/**
+ * Returns the current post title.
+ *
+ * @return string
+ */
+function get_the_title() {
+	return isset( $GLOBALS['mumega_motion_test_current_post']->post_title )
+		? $GLOBALS['mumega_motion_test_current_post']->post_title
+		: '';
+}
+
+/**
+ * Prints the current post content.
+ *
+ * @return void
+ */
+function the_content() {
+	echo $GLOBALS['mumega_motion_test_current_post']->post_content; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- WordPress content contract.
+}
+
+/**
+ * Marks a header template call without nesting template fixtures.
+ *
+ * @return void
+ */
+function get_header() {
+	echo '<!-- get_header -->';
+}
+
+/**
+ * Marks a footer template call without nesting template fixtures.
+ *
+ * @return void
+ */
+function get_footer() {
+	echo '<!-- get_footer -->';
+}
+
+/**
+ * Includes a theme template part when it exists.
+ *
+ * @param string $slug Template-part slug.
+ * @param string $name Optional specialized name.
+ * @return void
+ */
+function get_template_part( $slug, $name = null ) {
+	$path = get_template_directory() . '/' . $slug . ( null === $name ? '' : '-' . $name ) . '.php';
+
+	if ( file_exists( $path ) ) {
+		require $path;
+	}
+}
+
+/**
+ * Prints deterministic posts pagination.
+ *
+ * @return void
+ */
+function the_posts_pagination() {
+	echo '<nav class="pagination" aria-label="Posts"><a href="#page-2">Next</a></nav>';
+}
+
+/**
+ * Returns the current year for footer fixtures.
+ *
+ * @param string $format Date format.
+ * @return string
+ */
+function wp_date( $format ) {
+	return 'Y' === $format ? '2026' : '';
 }
 
 /**
@@ -970,7 +1286,13 @@ function wp_remote_retrieve_body( $response ) {
  * @return string
  */
 function get_bloginfo( $show = '', $filter = 'raw' ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
-	return 'version' === $show ? '6.5' : '';
+	if ( 'version' === $show ) {
+		return '6.5';
+	}
+
+	return isset( $GLOBALS['mumega_motion_test_bloginfo'][ $show ] )
+		? $GLOBALS['mumega_motion_test_bloginfo'][ $show ]
+		: '';
 }
 
 /**
