@@ -9,6 +9,9 @@ readonly VERSION='0.1.987'
 readonly ARCHIVE="mumega-motion-theme-${VERSION}.zip"
 readonly DIST_DIR="${ROOT_DIR}/dist"
 readonly WORKFLOW="${ROOT_DIR}/.github/workflows/edge-release.yml"
+readonly PUBLISHED_AT='2026-07-19T01:02:03Z'
+
+export MUMEGA_MOTION_MANIFEST_PUBLISHED_AT="${PUBLISHED_AT}"
 
 fail() {
 
@@ -62,8 +65,9 @@ const expected = {
   version,
   package_url: `https://github.com/Mumega-com/mumega-motion-theme/releases/download/edge-v${version}/${archive}`,
   sha256: digest,
-  requires_wp: '6.5',
+  requires_wordpress: '6.5',
   requires_php: '7.4',
+  published_at: '2026-07-19T01:02:03Z',
 };
 if (JSON.stringify(manifest) !== JSON.stringify(expected)) {
   throw new Error(`Unexpected manifest: ${JSON.stringify(manifest)}`);
@@ -180,8 +184,13 @@ assert_contains 'git tag -a "${TAG}" "${GITHUB_SHA}"' "${WORKFLOW}"
 assert_contains 'git config --local user.name "github-actions[bot]"' "${WORKFLOW}"
 assert_contains 'git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"' "${WORKFLOW}"
 assert_contains 'push --porcelain origin "refs/tags/${TAG}:refs/tags/${TAG}"' "${WORKFLOW}"
-assert_contains 'echo "VERSION=0.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"' "${WORKFLOW}"
-assert_contains 'echo "TAG=edge-v0.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"' "${WORKFLOW}"
+assert_contains 'echo "VERSION=0.1.${GITHUB_RUN_NUMBER}"' "${WORKFLOW}"
+assert_contains 'echo "TAG=edge-v0.1.${GITHUB_RUN_NUMBER}"' "${WORKFLOW}"
+assert_contains '} >> "$GITHUB_ENV"' "${WORKFLOW}"
+manifest_timestamp_derivation_count="$(grep -Fc 'git show -s --format=%cI "${GITHUB_SHA}"' "${WORKFLOW}" || true)"
+test "${manifest_timestamp_derivation_count}" -eq 2 || fail 'Verify and release jobs must derive the manifest timestamp from the triggering commit.'
+manifest_timestamp_export_count="$(grep -Fc 'echo "MUMEGA_MOTION_MANIFEST_PUBLISHED_AT=${published_at}"' "${WORKFLOW}" || true)"
+test "${manifest_timestamp_export_count}" -eq 2 || fail 'Verify and release jobs must pass the manifest timestamp through the environment.'
 assert_contains 'git rev-parse "refs/tags/${TAG}^{}"' "${WORKFLOW}"
 assert_contains 'credential.helper=!f() {' "${WORKFLOW}"
 assert_contains 'GITHUB_TOKEN: ${{ github.token }}' "${WORKFLOW}"
@@ -237,8 +246,11 @@ assert_contains "-iname '*.map'" "${ROOT_DIR}/scripts/package-theme.sh"
 assert_contains "-iname '*.md'" "${ROOT_DIR}/scripts/package-theme.sh"
 assert_contains 'find functions.php index.php header.php footer.php page.php single.php home.php archive.php search.php 404.php page-templates template-parts inc -type f -name' "${WORKFLOW}"
 assert_step_contains 'Run JavaScript behavior tests' 'npm run test:js'
+assert_step_contains 'Run PHPUnit and lint shipped PHP' 'vendor/bin/phpunit -c phpunit.xml.dist'
 assert_step_contains 'Verify package layout and manifest' 'expected_top_level_paths='
 assert_step_contains 'Verify package layout and manifest' 'actual_top_level_paths='
+assert_step_contains 'Verify package layout and manifest' 'requires_wordpress:"6.5"'
+assert_step_contains 'Verify package layout and manifest' 'published_at:process.env.MUMEGA_MOTION_MANIFEST_PUBLISHED_AT'
 for required in "${required_runtime_files[@]}"; do
 	assert_step_contains 'Verify package layout and manifest' "${required}"
 done

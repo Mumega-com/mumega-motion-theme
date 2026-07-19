@@ -21,6 +21,21 @@ readonly ARCHIVE_NAME="${SLUG}-${VERSION}.zip"
 readonly ARCHIVE_PATH="${DIST_DIR}/${ARCHIVE_NAME}"
 readonly SHA_PATH="${ARCHIVE_PATH}.sha256"
 readonly MANIFEST_PATH="${DIST_DIR}/manifest.json"
+
+if [[ -n ${MUMEGA_MOTION_MANIFEST_PUBLISHED_AT+x} ]]; then
+	manifest_published_at="${MUMEGA_MOTION_MANIFEST_PUBLISHED_AT}"
+else
+	manifest_published_at="$(git -C "${ROOT_DIR}" show -s --format=%cI HEAD)"
+fi
+
+if [[ ! ${manifest_published_at} =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2})$ ]]; then
+	printf 'MUMEGA_MOTION_MANIFEST_PUBLISHED_AT must be a nonempty ISO-8601 timestamp.\n' >&2
+	exit 64
+fi
+
+readonly MANIFEST_PUBLISHED_AT="${manifest_published_at}"
+unset manifest_published_at
+
 readonly STAGING_DIR="$(mktemp -d "${TMPDIR:-/tmp}/${SLUG}.XXXXXX")"
 readonly STAGED_THEME="${STAGING_DIR}/${SLUG}"
 
@@ -141,8 +156,9 @@ cat > "${MANIFEST_PATH}" <<EOF
   "version": "${VERSION}",
   "package_url": "https://github.com/Mumega-com/mumega-motion-theme/releases/download/edge-v${VERSION}/${ARCHIVE_NAME}",
   "sha256": "${SHA256}",
-  "requires_wp": "${REQUIRES_WP}",
-  "requires_php": "${REQUIRES_PHP}"
+  "requires_wordpress": "${REQUIRES_WP}",
+  "requires_php": "${REQUIRES_PHP}",
+  "published_at": "${MANIFEST_PUBLISHED_AT}"
 }
 EOF
 
