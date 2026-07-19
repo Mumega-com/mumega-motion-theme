@@ -158,6 +158,47 @@ function mumega_motion_select_lead_post( &$used_ids ) {
 }
 
 /**
+ * Selects a complete pair of related stories as one transaction.
+ *
+ * Underfilled or invalid results leave the shared exclusion list unchanged so
+ * their valid candidates can remain eligible for later homepage modules.
+ *
+ * @param array $used_ids Post identifiers already rendered.
+ * @return array
+ */
+function mumega_motion_select_related_posts( &$used_ids ) {
+	$overrides  = array( 'numberposts' => 2 );
+	$release_id = mumega_motion_releases_category_id();
+
+	if ( $release_id > 0 ) {
+		$overrides['category__not_in'] = array( $release_id );
+	}
+
+	$posts = get_posts( mumega_motion_base_post_query_args( $overrides, $used_ids ) );
+
+	if ( 2 !== count( $posts ) ) {
+		return array();
+	}
+
+	$candidate_ids = array();
+	$excluded_ids  = array_values( array_unique( array_map( 'intval', $used_ids ) ) );
+
+	foreach ( $posts as $post ) {
+		$post_id = $post instanceof WP_Post ? (int) $post->ID : 0;
+
+		if ( $post_id <= 0 || in_array( $post_id, $excluded_ids, true ) || in_array( $post_id, $candidate_ids, true ) ) {
+			return array();
+		}
+
+		$candidate_ids[] = $post_id;
+	}
+
+	$used_ids = array_merge( $used_ids, $candidate_ids );
+
+	return array_values( $posts );
+}
+
+/**
  * Selects newest supporting stories while preserving lead exclusions.
  *
  * @param array $used_ids Post identifiers already rendered.

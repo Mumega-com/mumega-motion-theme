@@ -133,6 +133,72 @@ final class EditorialQueriesTest extends TestCase {
 	}
 
 	/**
+	 * Commits a complete pair of eligible related posts as one transaction.
+	 */
+	public function test_related_posts_commit_exactly_two_non_release_posts(): void {
+		$this->assertTrue( function_exists( 'mumega_motion_select_related_posts' ) );
+		$GLOBALS['mumega_motion_test_categories_by_slug']['releases'] = new WP_Term( array( 'term_id' => 8 ) );
+		$related                                      = array( $this->post( 12 ), $this->post( 13 ) );
+		$GLOBALS['mumega_motion_test_post_queries'][] = $related;
+		$used_ids                                     = array( 11 );
+
+		$this->assertSame( $related, mumega_motion_select_related_posts( $used_ids ) );
+		$this->assertSame( array( 11, 12, 13 ), $used_ids );
+		$this->assertSame(
+			array_merge(
+				$this->base_args( array( 11 ) ),
+				array(
+					'numberposts'      => 2,
+					'category__not_in' => array( 8 ),
+				)
+			),
+			$GLOBALS['mumega_motion_test_get_posts_requests'][0]
+		);
+	}
+
+	/**
+	 * Lets a sparse related candidate fall through to the coverage feature.
+	 */
+	public function test_underfilled_related_posts_remain_available_for_coverage(): void {
+		$this->assertTrue( function_exists( 'mumega_motion_select_related_posts' ) );
+		$candidate                                  = $this->post( 12 );
+		$GLOBALS['mumega_motion_test_post_queries'] = array(
+			array( $candidate ),
+			array( $candidate ),
+		);
+		$used_ids                                   = array( 11 );
+
+		$this->assertSame( array(), mumega_motion_select_related_posts( $used_ids ) );
+		$this->assertSame( array( 11 ), $used_ids );
+		$this->assertSame( $candidate, mumega_motion_select_coverage_feature( $used_ids ) );
+		$this->assertSame( array( 11, 12 ), $used_ids );
+		$this->assertSame( array( 11 ), $GLOBALS['mumega_motion_test_get_posts_requests'][1]['post__not_in'] );
+	}
+
+	/**
+	 * Rejects a nominal pair unless both related values are valid posts.
+	 */
+	public function test_related_posts_reject_invalid_pairs_without_committing_ids(): void {
+		$this->assertTrue( function_exists( 'mumega_motion_select_related_posts' ) );
+		$GLOBALS['mumega_motion_test_post_queries'][] = array( $this->post( 12 ), (object) array( 'ID' => 13 ) );
+		$used_ids                                     = array( 11 );
+
+		$this->assertSame( array(), mumega_motion_select_related_posts( $used_ids ) );
+		$this->assertSame( array( 11 ), $used_ids );
+	}
+
+	/**
+	 * Treats numeric-string exclusions as already used during pair validation.
+	 */
+	public function test_related_posts_reject_candidates_already_present_as_numeric_strings(): void {
+		$GLOBALS['mumega_motion_test_post_queries'][] = array( $this->post( 11 ), $this->post( 12 ) );
+		$used_ids                                     = array( '11' );
+
+		$this->assertSame( array(), mumega_motion_select_related_posts( $used_ids ) );
+		$this->assertSame( array( '11' ), $used_ids );
+	}
+
+	/**
 	 * Selects the newest unused non-Release post as the coverage feature.
 	 */
 	public function test_coverage_feature_excludes_releases_and_commits_its_id(): void {
@@ -172,6 +238,7 @@ final class EditorialQueriesTest extends TestCase {
 	 * Reserves seven unique posts across related, feature and coverage modules.
 	 */
 	public function test_related_feature_and_support_posts_share_one_unique_transaction(): void {
+		$this->assertTrue( function_exists( 'mumega_motion_select_related_posts' ) );
 		$this->assertTrue( function_exists( 'mumega_motion_select_coverage_feature' ) );
 		$related                                    = array( $this->post( 12 ), $this->post( 13 ) );
 		$feature                                    = $this->post( 14 );
@@ -183,7 +250,7 @@ final class EditorialQueriesTest extends TestCase {
 		);
 		$used_ids                                   = array( 11 );
 
-		$this->assertSame( $related, mumega_motion_select_supporting_posts( $used_ids, 2 ) );
+		$this->assertSame( $related, mumega_motion_select_related_posts( $used_ids ) );
 		$this->assertSame( $feature, mumega_motion_select_coverage_feature( $used_ids ) );
 		$this->assertSame( $support, mumega_motion_select_supporting_posts( $used_ids, 4 ) );
 		$this->assertSame( array( 11, 12, 13, 14, 15, 16, 17, 18 ), $used_ids );
@@ -413,6 +480,7 @@ final class EditorialQueriesTest extends TestCase {
 	 * Keeps tools and reviews distinct from every earlier homepage module.
 	 */
 	public function test_tool_posts_exclude_every_post_reserved_by_earlier_modules(): void {
+		$this->assertTrue( function_exists( 'mumega_motion_select_related_posts' ) );
 		$this->assertTrue( function_exists( 'mumega_motion_select_coverage_feature' ) );
 		$this->configure_primary_menu( array( 2 ) );
 		$GLOBALS['mumega_motion_test_categories_by_slug']['tools-reviews'] = new WP_Term( array( 'term_id' => 9 ) );
@@ -433,7 +501,7 @@ final class EditorialQueriesTest extends TestCase {
 		$used_ids                                   = array();
 
 		$this->assertSame( $lead, mumega_motion_select_lead_post( $used_ids ) );
-		$this->assertSame( $related, mumega_motion_select_supporting_posts( $used_ids, 2 ) );
+		$this->assertSame( $related, mumega_motion_select_related_posts( $used_ids ) );
 		$this->assertSame( $feature, mumega_motion_select_coverage_feature( $used_ids ) );
 		$this->assertSame( $support, mumega_motion_select_supporting_posts( $used_ids, 4 ) );
 		$this->assertCount( 1, mumega_motion_select_rail_groups( $used_ids, 4, 2 ) );
