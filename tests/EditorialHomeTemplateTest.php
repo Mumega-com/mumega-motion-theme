@@ -116,6 +116,18 @@ PHP;
 	}
 
 	/**
+	 * Declares Motion only when the template will render a bounded mount.
+	 */
+	public function test_rendered_template_mount_declares_motion_before_the_header(): void {
+		$this->render_editorial_home(
+			$this->post( 10, 'Lead investigation' ),
+			array( $this->post( 11, 'Supporting report' ) )
+		);
+
+		$this->assertTrue( apply_filters( 'mumega_motion_enqueue_motion', false ) );
+	}
+
+	/**
 	 * Renders block-aware newsletter content without leaking its post globally.
 	 */
 	public function test_newsletter_render_restores_the_previous_global_post(): void {

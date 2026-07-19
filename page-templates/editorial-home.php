@@ -6,8 +6,6 @@
  * @package Mumega_Motion
  */
 
-get_header();
-
 $used_ids    = array();
 $lead        = mumega_motion_select_lead_post( $used_ids );
 $supporting  = mumega_motion_select_supporting_posts( $used_ids, 3 );
@@ -35,6 +33,23 @@ foreach ( $rails as $rail_term_id ) {
 }
 
 $newsletter_page = mumega_motion_newsletter_page();
+
+$has_template_motion_mount = ! empty( $supporting ) ||
+	( ! empty( $test_lab ) && $test_lab_term instanceof WP_Term ) ||
+	! empty( $rail_groups ) ||
+	( ! empty( $field_notes ) && $field_notes_term instanceof WP_Term ) ||
+	$newsletter_page instanceof WP_Post;
+
+if ( $has_template_motion_mount ) {
+	add_filter(
+		'mumega_motion_enqueue_motion',
+		static function () {
+			return true;
+		}
+	);
+}
+
+get_header();
 ?>
 
 <main id="primary" class="site-main editorial-home">
