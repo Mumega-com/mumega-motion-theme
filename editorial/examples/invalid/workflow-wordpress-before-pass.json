@@ -1,0 +1,9 @@
+{
+  "kind": "workflow-attempt",
+  "actor": "writer",
+  "from_state": "research_accepted",
+  "to_state": "drafting",
+  "wordpress_mutation": true,
+  "validation_report_status": "fail",
+  "_expected_errors": ["WordPress mutation requires a passing validation report"]
+}

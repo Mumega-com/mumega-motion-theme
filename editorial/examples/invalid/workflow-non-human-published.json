@@ -1,0 +1,9 @@
+{
+  "kind": "workflow-attempt",
+  "actor": "writer",
+  "from_state": "approved",
+  "to_state": "published",
+  "wordpress_mutation": false,
+  "validation_report_status": "pass",
+  "_expected_errors": ["non-human transition to published is prohibited"]
+}

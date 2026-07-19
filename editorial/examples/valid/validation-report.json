@@ -1,0 +1,29 @@
+{
+  "contract_version": "1.0.0",
+  "canonical_slug": "prepare-safe-wordpress-draft",
+  "role": "technical-verifier",
+  "state_transition": {
+    "from": "drafting",
+    "to": "technical_verification"
+  },
+  "timestamp": "2026-07-19T16:30:00Z",
+  "artifact_hashes": {
+    "content-brief.json": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "research-packet.json": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "gate_results": [
+    {
+      "gate": "schema",
+      "status": "pass",
+      "details": "All artifacts match editorial contract 1.0.0."
+    },
+    {
+      "gate": "evidence",
+      "status": "pass",
+      "details": "Every material claim has a source URL or evidence reference."
+    }
+  ],
+  "unresolved_risks": [],
+  "next_allowed_role": "discovery-reviewer",
+  "overall_status": "pass"
+}

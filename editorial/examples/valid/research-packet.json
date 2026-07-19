@@ -1,0 +1,24 @@
+{
+  "contract_version": "1.0.0",
+  "canonical_slug": "prepare-safe-wordpress-draft",
+  "claims": [
+    {
+      "claim": "WordPress supports creating posts with draft status.",
+      "claim_type": "sourced-fact",
+      "source_url": "https://developer.wordpress.org/rest-api/reference/posts/",
+      "evidence_reference": null,
+      "publisher": "WordPress.org",
+      "published_at": null,
+      "accessed_at": "2026-07-19",
+      "version_environment": "WordPress 6.8",
+      "confidence": "high",
+      "uncertainty": "Installed authorization layers can further restrict post operations.",
+      "stale_trigger": "The WordPress REST API changes post status behavior.",
+      "target_section": "Prerequisites and permissions"
+    }
+  ],
+  "counterevidence": ["A site-specific authorization policy can reject an otherwise documented operation."],
+  "normalized_entities": ["WordPress", "MCPWP"],
+  "forbidden_claims": ["An editorial agent may publish without human approval."],
+  "artifacts": ["https://example.com/artifacts/wordpress-draft-test.json"]
+}

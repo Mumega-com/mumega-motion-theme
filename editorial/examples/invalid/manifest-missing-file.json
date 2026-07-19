@@ -1,0 +1,11 @@
+{
+  "editorial_contract": "1.0.0",
+  "mcpwp_profile": "1.0.0",
+  "requires_theme": ">=0.2.0 <0.3.0",
+  "mcpwp_plugin_required": false,
+  "tested_mcpwp_plugin": "3.6.1",
+  "schemas": ["content-brief", "research-packet", "validation-report"],
+  "formats": ["explainer", "practical-guide", "test-report", "comparison-review", "news-briefing", "analysis-opinion"],
+  "roles": ["scout", "brief-creator", "researcher", "writer", "technical-verifier", "discovery-reviewer", "editor-handoff", "missing-role"],
+  "_expected_errors": ["manifest item has no matching file"]
+}
