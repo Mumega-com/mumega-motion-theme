@@ -57,6 +57,8 @@ $GLOBALS['mumega_motion_test_theme_supports']   = array();
 $GLOBALS['mumega_motion_test_menu_locations']   = array();
 $GLOBALS['mumega_motion_test_enqueued_styles']  = array();
 $GLOBALS['mumega_motion_test_enqueued_scripts'] = array();
+$GLOBALS['mumega_motion_test_dequeued_styles']  = array();
+$GLOBALS['mumega_motion_test_dequeued_scripts'] = array();
 $GLOBALS['mumega_motion_test_conditionals']     = array();
 $GLOBALS['mumega_motion_test_page_template']    = '';
 $GLOBALS['mumega_motion_test_queried_object_id'] = 0;
@@ -1271,6 +1273,26 @@ function wp_enqueue_script( $handle, $src = '', $deps = array(), $ver = false, $
 		'ver'       => $ver,
 		'in_footer' => $in_footer,
 	);
+}
+
+/**
+ * Records a dequeued stylesheet for assertions.
+ *
+ * @param string $handle Stylesheet handle.
+ * @return void
+ */
+function wp_dequeue_style( $handle ) {
+	$GLOBALS['mumega_motion_test_dequeued_styles'][] = $handle;
+}
+
+/**
+ * Records a dequeued script for assertions.
+ *
+ * @param string $handle Script handle.
+ * @return void
+ */
+function wp_dequeue_script( $handle ) {
+	$GLOBALS['mumega_motion_test_dequeued_scripts'][] = $handle;
 }
 
 /**
