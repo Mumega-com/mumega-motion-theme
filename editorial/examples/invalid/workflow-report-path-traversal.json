@@ -8,6 +8,9 @@
     "canonical_slug": "prepare-safe-wordpress-draft",
     "authorized_fields": ["title", "content", "excerpt"]
   },
-  "validation_report_status": "fail",
-  "_expected_errors": ["every workflow attempt requires a passing validation report"]
+  "validation_report_ref": {
+    "path": "../validation-report.json",
+    "sha256": "d8a6803c20d607456c70df2be553d86cc970a769263726fdf6eafd5ff12085af"
+  },
+  "_expected_errors": ["validation_report_ref/path"]
 }

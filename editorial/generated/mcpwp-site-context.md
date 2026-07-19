@@ -1,7 +1,7 @@
 # MCPWP Site Context
 
 Editorial Contract: 1.0.0
-Contract SHA-256: da7e8a3aa02c1973ac6db48ed5ba98a247e94f11994e028491e5dc3130f201a4
+Contract SHA-256: e76513b70197fd9ffec26cdadf50b093543ead032769147265c3c03ebe7c7431
 Draft-only: true
 Human publication required: true
 
@@ -21,7 +21,7 @@ Human publication required: true
 - `brief_ready` → `brief_accepted` — actor `human-editor` — gates `schema`, `scope-duplication`, `human` — next `researcher` — human-only
 - `brief_accepted` → `research_ready` — actor `researcher` — gates `schema`, `evidence` — next `human-editor`
 - `research_ready` → `research_accepted` — actor `human-editor` — gates `schema`, `evidence`, `human` — next `writer` — human-only
-- `research_accepted` → `drafting` — actor `writer` — gates `schema`, `scope-duplication`, `evidence`, `template`, `wordpress` — next `technical-verifier`
+- `research_accepted` → `drafting` — actor `writer` — gates `schema`, `scope-duplication`, `evidence`, `template` — next `technical-verifier`
 - `drafting` → `technical_verification` — actor `technical-verifier` — gates `schema`, `evidence`, `template`, `wordpress` — next `discovery-reviewer`
 - `technical_verification` → `discovery_review` — actor `discovery-reviewer` — gates `schema`, `scope-duplication`, `discovery` — next `editor-handoff`
 - `discovery_review` → `human_review` — actor `editor-handoff` — gates `schema`, `scope-duplication`, `evidence`, `template`, `wordpress`, `discovery` — next `human-editor`
@@ -173,11 +173,11 @@ Accepted brief, accepted research packet, and selected template.
 
 **Output**
 
-WordPress draft and validation artifact.
+WordPress draft and an immutable reference to the exact preflight validation artifact.
 
 **May**
 
-Synthesize, organize, and explain supported material; request only `create-draft` or `update-draft` with a strict `wordpress_target` for the authorized WordPress draft and fields when the required operation is exposed and authorized.
+Synthesize, organize, and explain supported material; complete the required preflight gates before content mutation; bind the workflow attempt to the exact report bytes; request only `create-draft` or `update-draft` with a strict `wordpress_target` for the authorized WordPress draft and fields when the required operation is exposed and authorized.
 
 **May not**
 
@@ -185,7 +185,7 @@ Introduce unsupported material claims, publish, change canonical URLs, create re
 
 **Stop conditions**
 
-Stop before content mutation when the contract is missing or incompatible, either input artifact is unaccepted or invalid, canonical intent conflicts, required evidence is absent, the selected template cannot be satisfied, or a required WordPress operation is unavailable or unauthorized. Preserve the last valid revision when Gutenberg markup breaks and report the actual missing capability.
+Stop before content mutation when the contract or immutable validation-report binding is missing or incompatible, either input artifact is unaccepted or invalid, canonical intent conflicts, required evidence is absent, the selected template cannot be satisfied, or a required WordPress operation is unavailable or unauthorized. Preserve the last valid revision when Gutenberg markup breaks and report the actual missing capability; post-draft WordPress validation belongs to technical verification.
 
 ## Format evidence gates and stop conditions
 
@@ -385,11 +385,15 @@ WordPress uses only its normal `draft`, `pending`, `scheduled`, `published`, and
 
 **Workflow attempt contract**
 
-Every bounded automation attempt is a strict object with `kind: workflow-attempt`, a manifest-declared `actor`, `from_state`, `to_state`, `validation_report_status: pass`, and `wordpress_operation: none | create-draft | update-draft`. Every transition attempt requires `pass`, including attempts that do not touch WordPress.
+Every bounded automation attempt is a strict object with `kind: workflow-attempt`, a manifest-declared `actor`, `from_state`, `to_state`, `wordpress_operation: none | create-draft | update-draft`, and a strict `validation_report_ref`. That reference contains only a safe repository-relative POSIX `path` to the repository-owned `editorial/` validation-report artifact namespace and a lowercase `sha256`. Report basenames are `validation-report.json` or `validation-report-<identifier>.json`; the path is never absolute, contains no `.` or `..` segments or backslashes, cannot escape through a symbolic link, and cannot name an arbitrary JSON artifact.
+
+The SHA-256 covers the exact report file bytes as read from disk, with no JSON reserialization, whitespace normalization, or key sorting. It binds an attempt to the externally produced and repository-stored bytes; it is an integrity check, not an authenticity signature. Validation resolves that immutable report and requires Editorial Contract `1.0.0`, the WordPress target's `canonical_slug` when a target exists, the attempt actor as report role, the exact attempt edge, `overall_status: pass`, exactly one passing result for every edge-required gate with no extras, and the edge's exact next role. A status asserted by the attempt itself is never authority.
 
 `wordpress_operation: none` omits `wordpress_target`. `create-draft` and `update-draft` require a strict `wordpress_target` containing the same `canonical_slug` join key and a non-empty, unique `authorized_fields` list. Authorized field names are exactly `title`, `content`, `excerpt`, `featured_media`, `categories`, and `tags`.
 
 Only `writer` on its owned `research_accepted` to `drafting` edge may request `create-draft` or `update-draft`; all other roles and edges require `none`. Publication, scheduling, redirects, deletion, canonical changes, public corrections, and retirement have no WordPress operation value and cannot be represented by a bounded automation attempt.
+
+The writer's bound report is a preflight completed before WordPress mutation. Its `research_accepted` to `drafting` edge proves the `schema`, `scope-duplication`, `evidence`, and `template` gates; it cannot claim that a draft which does not yet exist passed WordPress checks. The `wordpress` gate is post-draft: it begins on `drafting` to `technical_verification` and is retained by later workflow edges that require it.
 
 ## Stop conditions
 

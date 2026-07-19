@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
-import { readdir, readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { readdir, readFile, realpath } from 'node:fs/promises';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
@@ -13,6 +14,10 @@ const artifactPath = (root, relativePath) => (
   root instanceof URL
     ? new URL(relativePath, root)
     : resolve(root, relativePath)
+);
+
+const filesystemRoot = (root) => (
+  root instanceof URL ? fileURLToPath(root) : resolve(root)
 );
 
 const requiredManifestKeys = [
@@ -431,6 +436,22 @@ const authorizedWordPressDraftFields = [
   'tags'
 ];
 
+const validationReportReferenceSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['path', 'sha256'],
+  properties: {
+    path: {
+      type: 'string',
+      pattern: '^editorial/(?:[a-z0-9][a-z0-9._-]*/)*validation-report(?:-[a-z0-9][a-z0-9-]*)?\\.json$'
+    },
+    sha256: {
+      type: 'string',
+      pattern: '^[a-f0-9]{64}$'
+    }
+  }
+};
+
 const workflowAttemptErrors = (artifact, manifest, workflow, approvedStates, label) => {
   const schema = {
     type: 'object',
@@ -441,7 +462,7 @@ const workflowAttemptErrors = (artifact, manifest, workflow, approvedStates, lab
       'from_state',
       'to_state',
       'wordpress_operation',
-      'validation_report_status'
+      'validation_report_ref'
     ],
     properties: {
       kind: { const: 'workflow-attempt' },
@@ -467,7 +488,7 @@ const workflowAttemptErrors = (artifact, manifest, workflow, approvedStates, lab
           }
         }
       },
-      validation_report_status: { enum: ['pass', 'fail'] }
+      validation_report_ref: validationReportReferenceSchema
     },
     allOf: [
       {
@@ -489,17 +510,15 @@ const workflowAttemptErrors = (artifact, manifest, workflow, approvedStates, lab
     return errors;
   }
 
-  if (artifact.validation_report_status !== 'pass') {
-    errors.push(`${label}: every workflow attempt requires a passing validation report`);
-  }
-
-  const transition = workflow.transitions.find(({ from, to }) => (
-    from === artifact.from_state && to === artifact.to_state
+  const transitions = Array.isArray(workflow?.transitions) ? workflow.transitions : [];
+  const transition = transitions.find((candidate) => (
+    candidate?.from === artifact.from_state && candidate?.to === artifact.to_state
   ));
   if (transition?.human_only) {
     errors.push(`${label}: workflow attempts cannot represent human-only transitions`);
   }
-  if (!manifest.roles.includes(artifact.actor)
+  if (!Array.isArray(manifest?.roles)
+    || !manifest.roles.includes(artifact.actor)
     || !transition
     || transition.actor !== artifact.actor) {
     errors.push(`${label}: workflow attempt actor does not own the workflow transition`);
@@ -521,8 +540,10 @@ const workflowAttemptErrors = (artifact, manifest, workflow, approvedStates, lab
 
 const validationReportWorkflowErrors = (artifact, workflow, approvedStates, label) => {
   const errors = [];
-  const transition = workflow.transitions.find(({ from, to }) => (
-    from === artifact.state_transition.from && to === artifact.state_transition.to
+  const transitions = Array.isArray(workflow?.transitions) ? workflow.transitions : [];
+  const transition = transitions.find((candidate) => (
+    candidate?.from === artifact.state_transition.from
+      && candidate?.to === artifact.state_transition.to
   ));
 
   if (!transition || transition.actor !== artifact.role) {
@@ -542,9 +563,7 @@ const validationReportWorkflowErrors = (artifact, workflow, approvedStates, labe
     }
   }
 
-  if (artifact.overall_status !== 'pass'
-    || !transition
-    || !Array.isArray(transition.required_gates)) {
+  if (!transition || !Array.isArray(transition.required_gates)) {
     return errors;
   }
 
@@ -565,6 +584,116 @@ const validationReportWorkflowErrors = (artifact, workflow, approvedStates, labe
 
   if (artifact.next_allowed_role !== transition.next_allowed_role) {
     errors.push(`${label}: next_allowed_role does not match workflow transition`);
+  }
+
+  return errors;
+};
+
+const referencedReportPath = (root, referencePath) => {
+  const rootPath = filesystemRoot(root);
+  const candidate = resolve(rootPath, referencePath);
+  const relativePath = relative(rootPath, candidate);
+  if (relativePath === '..'
+    || relativePath.startsWith(`..${sep}`)
+    || isAbsolute(relativePath)) {
+    throw new Error('validation report path must remain inside the contract root');
+  }
+  return candidate;
+};
+
+const pathEscapesRoot = (rootPath, candidate) => {
+  const relativePath = relative(rootPath, candidate);
+  return relativePath === '..'
+    || relativePath.startsWith(`..${sep}`)
+    || isAbsolute(relativePath);
+};
+
+const validateWorkflowAttemptBinding = async (
+  root,
+  artifact,
+  manifest,
+  workflow,
+  validationReportSchema,
+  label
+) => {
+  const approvedStates = validationReportSchema?.$defs?.state?.enum ?? [];
+  const errors = workflowAttemptErrors(
+    artifact,
+    manifest,
+    workflow,
+    approvedStates,
+    label
+  );
+  if (errors.length > 0) {
+    return errors;
+  }
+
+  let reportFile;
+  try {
+    reportFile = referencedReportPath(root, artifact.validation_report_ref.path);
+  } catch (error) {
+    return [`${label}: invalid validation_report_ref path: ${error.message}`];
+  }
+
+  let canonicalRoot;
+  try {
+    [canonicalRoot, reportFile] = await Promise.all([
+      realpath(filesystemRoot(root)),
+      realpath(reportFile)
+    ]);
+  } catch (error) {
+    return [`${label}: could not read referenced validation report: ${error.message}`];
+  }
+  if (pathEscapesRoot(canonicalRoot, reportFile)) {
+    return [`${label}: validation report symlink resolves outside the contract root`];
+  }
+
+  let reportBytes;
+  try {
+    reportBytes = await readFile(reportFile);
+  } catch (error) {
+    return [`${label}: could not read referenced validation report: ${error.message}`];
+  }
+
+  const actualHash = createHash('sha256').update(reportBytes).digest('hex');
+  if (actualHash !== artifact.validation_report_ref.sha256) {
+    return [`${label}: validation report SHA-256 does not match exact file bytes`];
+  }
+
+  let report;
+  try {
+    report = JSON.parse(reportBytes.toString('utf8'));
+  } catch (error) {
+    return [`${label}: referenced validation report is not valid JSON: ${error.message}`];
+  }
+
+  const validateReport = validatorFor(validationReportSchema);
+  if (!validateReport(report)) {
+    return schemaErrors(validateReport, `${label}: referenced validation report`);
+  }
+
+  errors.push(...validationReportWorkflowErrors(
+    report,
+    workflow,
+    approvedStates,
+    `${label}: referenced validation report`
+  ));
+  if (report.contract_version !== manifest.editorial_contract) {
+    errors.push(`${label}: bound validation report contract_version does not match active contract`);
+  }
+  if (report.role !== artifact.actor) {
+    errors.push(`${label}: bound validation report role does not match workflow attempt actor`);
+  }
+  if (report.state_transition.from !== artifact.from_state
+    || report.state_transition.to !== artifact.to_state) {
+    errors.push(`${label}: bound validation report transition does not match workflow attempt edge`);
+  }
+  if (artifact.wordpress_target
+    && report.canonical_slug !== artifact.wordpress_target.canonical_slug) {
+    errors.push(`${label}: bound validation report canonical_slug does not match WordPress target`);
+  }
+  if (report.overall_status !== 'pass') {
+    errors.push(`${label}: bound validation report overall_status must be pass`);
   }
 
   return errors;
@@ -627,11 +756,12 @@ const validateFixtureArtifact = async (
     );
   }
   if (type === 'workflow-attempt') {
-    return workflowAttemptErrors(
+    return validateWorkflowAttemptBinding(
+      root,
       artifact,
       manifest,
       workflow,
-      validationReportSchema.$defs.state.enum,
+      validationReportSchema,
       label
     );
   }
@@ -659,6 +789,28 @@ export const validateArtifact = async (root, schemaName, artifact) => {
     valid,
     errors: normalizeErrors(validate.errors ?? [])
   };
+};
+
+export const validateWorkflowAttempt = async (root, artifact) => {
+  const label = 'workflow-attempt';
+  try {
+    const [manifest, workflow, validationReportSchema] = await Promise.all([
+      loadManifest(root),
+      json(root, 'editorial/workflow.json'),
+      json(root, 'editorial/schemas/validation-report.schema.json')
+    ]);
+    const errors = await validateWorkflowAttemptBinding(
+      root,
+      artifact,
+      manifest,
+      workflow,
+      validationReportSchema,
+      label
+    );
+    return { valid: errors.length === 0, errors };
+  } catch (error) {
+    return { valid: false, errors: [`${label}: ${error.message}`] };
+  }
 };
 
 export const validateContract = async (root) => {

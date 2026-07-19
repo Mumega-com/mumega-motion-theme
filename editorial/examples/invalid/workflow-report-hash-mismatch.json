@@ -10,6 +10,7 @@
   },
   "validation_report_ref": {
     "path": "editorial/examples/valid/validation-report.json",
-    "sha256": "d8a6803c20d607456c70df2be553d86cc970a769263726fdf6eafd5ff12085af"
-  }
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "_expected_errors": ["validation report SHA-256 does not match exact file bytes"]
 }

@@ -71,6 +71,11 @@ test('site context is deterministic, complete, and safe for MCPWP handoff', asyn
     /`wordpress_operation: none \| create-draft \| update-draft`/
   );
   assert.match(committedOutput, /unique `authorized_fields`/);
+  assert.match(committedOutput, /`validation_report_ref`/);
+  assert.match(committedOutput, /exact report file bytes/);
+  assert.match(committedOutput, /preflight[\s\S]*before WordPress mutation/i);
+  assert.match(committedOutput, /`wordpress` gate[\s\S]*post-draft/i);
+  assert.doesNotMatch(committedOutput, /validation_report_status/);
 
   assert.doesNotMatch(committedOutput, /^[A-Z][A-Z0-9_]*=/m);
   assert.doesNotMatch(committedOutput, /(?:api[_-]?key|token|secret)\s*[:=]\s*['\"][A-Za-z0-9_-]{16,}/i);

@@ -61,7 +61,7 @@
       "to": "drafting",
       "actor": "writer",
       "human_only": false,
-      "required_gates": ["schema", "scope-duplication", "evidence", "template", "wordpress"],
+      "required_gates": ["schema", "scope-duplication", "evidence", "template"],
       "next_allowed_role": "technical-verifier"
     },
     {

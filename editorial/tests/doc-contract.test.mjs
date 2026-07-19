@@ -112,7 +112,7 @@ const transitions = [
     to: 'drafting',
     actor: 'writer',
     human_only: false,
-    required_gates: ['schema', 'scope-duplication', 'evidence', 'template', 'wordpress'],
+    required_gates: ['schema', 'scope-duplication', 'evidence', 'template'],
     next_allowed_role: 'technical-verifier'
   },
   {
@@ -333,13 +333,20 @@ test('WordPress attempt contract documents the exact fail-closed shape', async (
 
   assert.match(attemptContract, /`kind: workflow-attempt`/);
   assert.match(attemptContract, /`wordpress_operation: none \| create-draft \| update-draft`/);
+  assert.match(attemptContract, /`validation_report_ref`/);
+  assert.match(attemptContract, /repository-relative POSIX `path`/);
+  assert.match(attemptContract, /`sha256`/);
+  assert.match(attemptContract, /exact report file bytes/);
+  assert.match(attemptContract, /no JSON reserialization, whitespace normalization, or key sorting/i);
+  assert.doesNotMatch(attemptContract, /validation_report_status/);
   assert.match(attemptContract, /`wordpress_target`/);
   assert.match(attemptContract, /`canonical_slug`/);
   assert.match(attemptContract, /unique `authorized_fields`/);
   for (const field of ['title', 'content', 'excerpt', 'featured_media', 'categories', 'tags']) {
     assert.match(attemptContract, new RegExp('`' + field + '`'));
   }
-  assert.match(attemptContract, /Every transition attempt requires `pass`/);
+  assert.match(attemptContract, /preflight[\s\S]*before WordPress mutation/i);
+  assert.match(attemptContract, /`wordpress` gate[\s\S]*post-draft/i);
   assert.match(attemptContract, /Only `writer`[\s\S]*`research_accepted` to `drafting`/);
   assert.match(attemptContract, /all other roles and edges require `none`/);
 });

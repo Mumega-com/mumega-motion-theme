@@ -14,7 +14,7 @@
 - Initial contract version is exactly `1.0.0`.
 - The full contract remains private; generated site context contains no secrets.
 - Small agents never publish, schedule, redirect, delete, change canonical URLs, decide public corrections, or retire content.
-- Every bounded workflow attempt requires a passing validation report; only the writer's owned drafting edge may request an explicitly targeted draft creation or update.
+- Every bounded workflow attempt is bound by path and exact-byte SHA-256 to a passing validation report; only the writer's owned drafting edge may request an explicitly targeted draft creation or update.
 - Contract validation must stop before WordPress mutation on incompatibility.
 - `canonical_slug` is the first-release join key between GitHub and WordPress.
 - Do not introduce a new database, custom WordPress post status, or workflow plugin.
@@ -51,6 +51,7 @@
 export async function loadManifest(root): Promise<object>
 export async function createValidators(root): Promise<Map<string, ValidateFunction>>
 export async function validateArtifact(root, schemaName, value): Promise<{ valid: boolean, errors: string[] }>
+export async function validateWorkflowAttempt(root, value): Promise<{ valid: boolean, errors: string[] }>
 export async function validateContract(root): Promise<{ valid: boolean, errors: string[] }>
 export async function contractSourceHash(root): Promise<string>
 
@@ -222,7 +223,7 @@ Require all fields shown in the approved brief contract. Permit `null` only for 
 
 Require at least one claim and enforce that each claim has either `source_url` or `evidence_reference` through `anyOf`.
 
-`validation-report.schema.json` requires contract version, canonical slug, role, state transition, timestamp, artifact hashes, gate results, unresolved risks, next allowed role, and overall `pass | fail` status. If any gate result is `fail`, overall status must be `fail`. Contract cross-reference validation uses `editorial/workflow.json` to require the exact edge actor, exactly one passing result for every transition-required gate with no duplicate gate identifiers, and the transition's exact `next_allowed_role` whenever the overall report passes.
+`validation-report.schema.json` requires contract version, canonical slug, role, state transition, timestamp, artifact hashes, gate results, unresolved risks, next allowed role, and overall `pass | fail` status. If any gate result is `fail`, overall status must be `fail`. Contract cross-reference validation uses `editorial/workflow.json` to require the exact edge actor, exactly one passing result for every transition-required gate with no duplicate gate identifiers, and the transition's exact `next_allowed_role` whenever the overall report passes. The writer edge is a preflight before WordPress mutation and therefore requires `schema`, `scope-duplication`, `evidence`, and `template`; the `wordpress` gate begins post-draft on `drafting -> technical_verification` and remains on later edges that require it.
 
 - [ ] **Step 5: Implement `contract-lib.mjs`**
 
@@ -332,7 +333,7 @@ Assert `validateContract(root)` returns no errors for the repository and targete
 - missing evidence on a material claim;
 - non-human transition to `published`;
 - manifest item without a matching file;
-- any transition attempt before a passing validation report;
+- any transition attempt without an immutable reference to a passing validation report;
 - a missing required gate or duplicate gate identifier;
 - an incorrect next allowed role;
 - a non-writer draft operation or a forbidden WordPress operation string.
@@ -346,7 +347,7 @@ Expected: FAIL because fixtures and cross-reference validation are absent.
 
 Create a valid brief for each of the six formats, one valid research packet, one complete passing validation report, and one valid structured workflow attempt. Create one invalid file per failure case and include an `_expected_errors` array used only by the test harness; strip that field before validation.
 
-Every workflow attempt retains `kind: "workflow-attempt"`, `actor`, `from_state`, `to_state`, and `validation_report_status`, and replaces the obsolete mutation boolean with `wordpress_operation: "none" | "create-draft" | "update-draft"`. `none` forbids a target. Draft operations require a strict `wordpress_target` with `canonical_slug` and a non-empty, unique `authorized_fields` list containing only the documented draft fields. Only `writer` on `research_accepted -> drafting` may request a draft operation; every other manifest role and edge must use `none`. Every attempt requires `validation_report_status: "pass"`, so human-only publish, scheduling, redirect, deletion, canonical, correction, and retirement operations have no representable attempt value.
+Every workflow attempt retains `kind: "workflow-attempt"`, `actor`, `from_state`, and `to_state`, replaces the obsolete mutation boolean with `wordpress_operation: "none" | "create-draft" | "update-draft"`, and requires a strict `validation_report_ref` containing only a safe repository-relative POSIX JSON `path` in the `editorial/` validation-report artifact namespace and lowercase `sha256`. The basename is `validation-report.json` or `validation-report-<identifier>.json`; lexical traversal, symbolic-link escape, and arbitrary JSON artifacts are rejected. The digest covers the exact report file bytes without reserialization or normalization. It binds repository-stored bytes for integrity and is not an authenticity signature. `none` forbids a target. Draft operations require a strict `wordpress_target` with `canonical_slug` and a non-empty, unique `authorized_fields` list containing only the documented draft fields. Only `writer` on `research_accepted -> drafting` may request a draft operation; every other manifest role and edge must use `none`. Validation resolves the reference and cross-checks contract `1.0.0`, canonical slug, actor, edge, passing status, exact gates, and next role, so a self-attested status or unrelated report cannot authorize an attempt. Human-only publish, scheduling, redirect, deletion, canonical, correction, and retirement operations have no representable attempt value.
 
 - [ ] **Step 4: Implement cross-reference checks**
 
@@ -358,7 +359,7 @@ Every workflow attempt retains `kind: "workflow-attempt"`, `actor`, `from_state`
 4. ensure document `Contract version` values equal the manifest;
 5. validate `workflow.json`, ensure role files declare the same assignments, and ensure the complete transition graph, gate enum references, human gates, and next-role metadata match the approved state machine;
 6. cross-reference every passing validation report against the workflow's exact edge, actor, required gates, and next role;
-7. reject prohibited human-only attempts, non-writer draft operations, unknown operations or fields, targets on `none`, and any attempt whose report status is not `pass`;
+7. reject prohibited human-only attempts, non-writer draft operations, unknown operations or fields, targets on `none`, unsafe or missing report references, hash mismatches, and reports not bound exactly to the attempt;
 8. preserve `canonical_slug` across each valid brief, research packet, validation report, and WordPress target;
 9. ensure every format has a valid brief fixture;
 10. ensure every invalid fixture fails with every declared expected error fragment.

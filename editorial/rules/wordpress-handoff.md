@@ -22,11 +22,15 @@ WordPress uses only its normal `draft`, `pending`, `scheduled`, `published`, and
 
 ## Workflow attempt contract
 
-Every bounded automation attempt is a strict object with `kind: workflow-attempt`, a manifest-declared `actor`, `from_state`, `to_state`, `validation_report_status: pass`, and `wordpress_operation: none | create-draft | update-draft`. Every transition attempt requires `pass`, including attempts that do not touch WordPress.
+Every bounded automation attempt is a strict object with `kind: workflow-attempt`, a manifest-declared `actor`, `from_state`, `to_state`, `wordpress_operation: none | create-draft | update-draft`, and a strict `validation_report_ref`. That reference contains only a safe repository-relative POSIX `path` to the repository-owned `editorial/` validation-report artifact namespace and a lowercase `sha256`. Report basenames are `validation-report.json` or `validation-report-<identifier>.json`; the path is never absolute, contains no `.` or `..` segments or backslashes, cannot escape through a symbolic link, and cannot name an arbitrary JSON artifact.
+
+The SHA-256 covers the exact report file bytes as read from disk, with no JSON reserialization, whitespace normalization, or key sorting. It binds an attempt to the externally produced and repository-stored bytes; it is an integrity check, not an authenticity signature. Validation resolves that immutable report and requires Editorial Contract `1.0.0`, the WordPress target's `canonical_slug` when a target exists, the attempt actor as report role, the exact attempt edge, `overall_status: pass`, exactly one passing result for every edge-required gate with no extras, and the edge's exact next role. A status asserted by the attempt itself is never authority.
 
 `wordpress_operation: none` omits `wordpress_target`. `create-draft` and `update-draft` require a strict `wordpress_target` containing the same `canonical_slug` join key and a non-empty, unique `authorized_fields` list. Authorized field names are exactly `title`, `content`, `excerpt`, `featured_media`, `categories`, and `tags`.
 
 Only `writer` on its owned `research_accepted` to `drafting` edge may request `create-draft` or `update-draft`; all other roles and edges require `none`. Publication, scheduling, redirects, deletion, canonical changes, public corrections, and retirement have no WordPress operation value and cannot be represented by a bounded automation attempt.
+
+The writer's bound report is a preflight completed before WordPress mutation. Its `research_accepted` to `drafting` edge proves the `schema`, `scope-duplication`, `evidence`, and `template` gates; it cannot claim that a draft which does not yet exist passed WordPress checks. The `wordpress` gate is post-draft: it begins on `drafting` to `technical_verification` and is retained by later workflow edges that require it.
 
 ## Human-only authority
 

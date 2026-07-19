@@ -1,10 +1,10 @@
 {
   "contract_version": "1.0.0",
   "canonical_slug": "prepare-safe-wordpress-draft",
-  "role": "editor-handoff",
+  "role": "writer",
   "state_transition": {
-    "from": "discovery_review",
-    "to": "human_review"
+    "from": "research_accepted",
+    "to": "drafting"
   },
   "timestamp": "2026-07-19T16:30:00Z",
   "artifact_hashes": {
@@ -15,12 +15,7 @@
     {
       "gate": "schema",
       "status": "pass",
-      "details": "All artifacts match editorial contract 1.0.0."
-    },
-    {
-      "gate": "evidence",
-      "status": "pass",
-      "details": "Every material claim has a source URL or evidence reference."
+      "details": "All preflight artifacts match editorial contract 1.0.0."
     },
     {
       "gate": "scope-duplication",
@@ -28,22 +23,17 @@
       "details": "The accepted canonical intent is unique in the current corpus."
     },
     {
+      "gate": "evidence",
+      "status": "pass",
+      "details": "Every material claim has a source URL or evidence reference."
+    },
+    {
       "gate": "template",
       "status": "pass",
-      "details": "The draft satisfies the selected format contract."
-    },
-    {
-      "gate": "wordpress",
-      "status": "pass",
-      "details": "The draft uses only the authorized target and fields with valid block markup."
-    },
-    {
-      "gate": "discovery",
-      "status": "pass",
-      "details": "Intent, metadata, links, entities, crawl, and canonical prerequisites passed discovery review."
+      "details": "The selected format contract can be satisfied before draft creation."
     }
   ],
   "unresolved_risks": [],
-  "next_allowed_role": "human-editor",
+  "next_allowed_role": "technical-verifier",
   "overall_status": "pass"
 }

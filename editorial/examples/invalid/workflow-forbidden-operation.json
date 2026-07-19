@@ -8,6 +8,9 @@
     "canonical_slug": "prepare-safe-wordpress-draft",
     "authorized_fields": ["content"]
   },
-  "validation_report_status": "pass",
+  "validation_report_ref": {
+    "path": "editorial/examples/valid/validation-report.json",
+    "sha256": "d8a6803c20d607456c70df2be553d86cc970a769263726fdf6eafd5ff12085af"
+  },
   "_expected_errors": ["wordpress_operation"]
 }
