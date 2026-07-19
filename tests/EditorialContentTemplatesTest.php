@@ -426,6 +426,24 @@ final class EditorialContentTemplatesTest extends TestCase {
 			'/\.home-newsletter\s+input,\s*\.home-newsletter\s+select,\s*\.home-newsletter\s+textarea,\s*\.home-newsletter\s+button\s*\{[^}]*display:\s*none\s*!important;/s',
 			$source
 		);
+
+		// The methodology marker badge is white-on-teal on screen; the print override
+		// strips the background but must also set its own color directly, since an
+		// ancestor's inherited color never wins over a rule targeting the element itself.
+		$this->assertMatchesRegularExpression(
+			'/\.home-methodology__marker\s*\{[^}]*color:\s*#000/s',
+			$source,
+			'.home-methodology__marker print override must set a dark color or the badge text is invisible on white paper.'
+		);
+
+		// The newsletter link is pale lavender on screen (readable on the dark callout);
+		// print must override the anchor's own color directly, since .home-newsletter's
+		// color never cascades over a more specific rule on .home-newsletter a.
+		$this->assertMatchesRegularExpression(
+			'/\.home-newsletter\s+a\s*\{[^}]*color:\s*#000\s*!important;/s',
+			$source,
+			'.home-newsletter a print override must set a dark color or the link is illegible on white paper.'
+		);
 	}
 
 	/**

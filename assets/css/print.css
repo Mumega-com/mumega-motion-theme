@@ -42,6 +42,7 @@
 	.home-methodology__marker {
 		background: none !important;
 		border: 1px solid #000;
+		color: #000;
 	}
 
 	/* .home-newsletter is styled as an inverted dark callout on screen; repaint
@@ -49,6 +50,14 @@
 	.home-newsletter {
 		color: #000 !important;
 		margin-inline: 0;
+	}
+
+	/* .home-newsletter a is lavender on screen (readable on the dark callout);
+	   on paper it must be overridden directly, since the ancestor's color
+	   never wins over a rule that targets the anchor itself. */
+	.home-newsletter a {
+		color: #000 !important;
+		text-decoration: underline;
 	}
 
 	/* The subscribe form is not functional on paper; the surrounding heading,
