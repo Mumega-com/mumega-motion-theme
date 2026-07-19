@@ -211,7 +211,7 @@ function AutoMount( { html, delay, y, duration } ) {
  * StreamingText remains available only through data-motion-stream. Merely
  * loading this bundle or emitting a future island boundary never invokes it.
  */
-function StreamMount( { streamUrl, siblingText } ) {
+function StreamMount( { streamUrl, siblingText, onError } ) {
 	return (
 		<LazyMotion features={ domAnimation }>
 			<LayoutGroup>
@@ -219,7 +219,7 @@ function StreamMount( { streamUrl, siblingText } ) {
 					layout
 					transition={ { duration: 0.8, ease: 'easeInOut' } }
 				>
-					<StreamingText streamUrl={ streamUrl } />
+					<StreamingText streamUrl={ streamUrl } onError={ onError } />
 					{ siblingText && (
 						<m.div
 							id="stream-demo-sibling"
@@ -263,6 +263,7 @@ function mountStreamingTextNode( element, createRootImpl ) {
 				<StreamMount
 					streamUrl={ element.dataset.motionStream }
 					siblingText={ element.dataset.motionStreamSibling || '' }
+					onError={ recover }
 				/>
 			</MotionIslandErrorBoundary>
 		);

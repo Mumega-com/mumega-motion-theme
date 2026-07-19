@@ -28,6 +28,9 @@ import {
 	shouldReduceMotion,
 } from './index';
 
+const originalFetch = global.fetch;
+const originalTextDecoder = global.TextDecoder;
+
 function createRootRecorder( onRender = () => {} ) {
 	const mountedNodes = [];
 	const renderedElements = [];
@@ -51,6 +54,16 @@ describe( 'editorial Motion islands', () => {
 	beforeEach( () => {
 		document.body.innerHTML = '';
 		window.matchMedia = jest.fn( () => ( { matches: false } ) );
+		global.TextDecoder = class {
+			decode( value ) {
+				return value ? String( value ) : '';
+			}
+		};
+	} );
+
+	afterEach( () => {
+		global.fetch = originalFetch;
+		global.TextDecoder = originalTextDecoder;
 	} );
 
 	test( 'parses only finite numeric motion values', () => {
@@ -243,4 +256,94 @@ describe( 'editorial Motion islands', () => {
 			siblingText: 'Evidence',
 		} );
 	} );
+
+	test.each( [
+		[ 'a rejected fetch', () => Promise.reject( new Error( 'network failed' ) ) ],
+		[ 'a non-success response', () => Promise.resolve( { ok: false, status: 503, body: {} } ) ],
+		[ 'a response without a body', () => Promise.resolve( { ok: true, body: null } ) ],
+		[
+			'a reader failure',
+			() => Promise.resolve( {
+				ok: true,
+				body: {
+					getReader: () => ( {
+						read: () => Promise.reject( new Error( 'reader failed' ) ),
+					} ),
+				},
+			} ),
+		],
+	] )( 'restores the exact streaming fallback after %s', async ( label, fetchImpl ) => {
+		document.body.innerHTML = '<div id="stream" data-motion-stream="/stream"><strong>Cached fallback</strong></div>';
+		const stream = document.getElementById( 'stream' );
+		const originalHTML = stream.innerHTML;
+		const roots = [];
+		global.fetch = jest.fn( fetchImpl );
+		const previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+		globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+		const consoleError = jest.spyOn( console, 'error' ).mockImplementation( () => {} );
+
+		try {
+			await act( async () => {
+				mountMotionIslands( document, ( node ) => {
+					const root = createReactRoot( node );
+					roots.push( root );
+					return root;
+				} );
+				await Promise.resolve();
+				await Promise.resolve();
+			} );
+
+			expect( stream.innerHTML ).toBe( originalHTML );
+			expect( stream.dataset.motionFailed ).toBe( 'true' );
+			expect( global.fetch ).toHaveBeenCalledTimes( 1 );
+		} finally {
+			consoleError.mockRestore();
+
+			if ( previousActEnvironment === undefined ) {
+				delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+			} else {
+				globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
+			}
+		}
+	} );
+
+	test( 'aborts an in-flight stream when its React island is cleaned up', async () => {
+		document.body.innerHTML = '<div id="stream" data-motion-stream="/stream">Cached fallback</div>';
+		let requestSignal;
+		global.fetch = jest.fn( ( url, options ) => {
+			requestSignal = options.signal;
+			return new Promise( () => {} );
+		} );
+		const previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+		globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+		const root = createReactRoot( document.getElementById( 'stream' ) );
+
+		try {
+			await act( async () => {
+				root.render( <StreamingTextForCleanup /> );
+				await Promise.resolve();
+			} );
+
+			expect( requestSignal ).toBeInstanceOf( AbortSignal );
+			expect( requestSignal.aborted ).toBe( false );
+
+			await act( async () => {
+				root.unmount();
+			} );
+
+			expect( requestSignal.aborted ).toBe( true );
+		} finally {
+			if ( previousActEnvironment === undefined ) {
+				delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+			} else {
+				globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
+			}
+		}
+	} );
 } );
+
+function StreamingTextForCleanup() {
+	const StreamingText = require( '../components/StreamingText' ).default;
+
+	return <StreamingText streamUrl="/stream" />;
+}
