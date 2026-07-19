@@ -1,0 +1,107 @@
+/*
+ * Editorial print entry point.
+ */
+
+@media print {
+
+	@page {
+		margin: 18mm;
+	}
+
+	.site-header,
+	.primary-navigation,
+	.mobile-navigation,
+	.site-header__search,
+	.search-form,
+	.subscribe-link,
+	.home-newsletter,
+	.more-from-topic,
+	.post-navigation,
+	.motion-decoration,
+	[data-motion]::before,
+	[data-motion]::after,
+	.footer-navigation {
+		display: none !important;
+	}
+
+	html,
+	body,
+	.site-main,
+	.single-article,
+	.article-entry,
+	.article-body {
+		background: #fff !important;
+		color: #000 !important;
+	}
+
+	body {
+		font-size: 11pt;
+		line-height: 1.5;
+	}
+
+	.site-main,
+	.single-article,
+	.article-entry {
+		display: block;
+		margin: 0;
+		max-width: none;
+		padding: 0;
+	}
+
+	.article-header,
+	.article-featured-image,
+	.affiliate-disclosure,
+	.article-body blockquote,
+	.article-body figure,
+	.article-body table,
+	.article-body pre {
+		break-inside: avoid;
+	}
+
+	.article-header__title {
+		font-size: 28pt;
+		letter-spacing: normal;
+	}
+
+	.article-featured-image {
+		margin-block: 8mm;
+	}
+
+	.article-featured-image__image {
+		max-height: 120mm;
+		object-fit: contain;
+	}
+
+	.article-body h2,
+	.article-body h3,
+	.article-body h4 {
+		break-after: avoid;
+	}
+
+	.article-body p,
+	.article-body li,
+	.article-body blockquote,
+	.article-body table,
+	.article-body figure {
+		orphans: 3;
+		widows: 3;
+	}
+
+	.article-body a {
+		color: #000 !important;
+		text-decoration: underline;
+	}
+
+	.article-body a[href^="http://"]::after,
+	.article-body a[href^="https://"]::after {
+		content: " (" attr(href) ")";
+		font-size: 0.85em;
+		overflow-wrap: anywhere;
+	}
+
+	.site-footer {
+		border-top: 1px solid #000;
+		margin-top: 12mm;
+		padding-top: 5mm;
+	}
+}

@@ -9,28 +9,123 @@ Text Domain: mumega-motion
 Update URI: https://github.com/Mumega-com/mumega-motion-theme
 */
 
-/*
- * Demo consumption of Figma-synced design tokens (see inc/figma-tokens.php).
- * Every var() has a hardcoded fallback so the page renders identically to
- * before this feature existed when `mcpwp_figma_design_tokens` is missing,
- * empty, or MCPWP isn't installed — the fallback values below ARE that
- * pre-existing look, not placeholders.
- */
-header {
-	background-color: var(--figma-color-brand-primary, #1a1a2e);
-	color: #ffffff;
-	padding: 2rem;
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
 }
 
-header h1 {
-	font-family: var(--figma-typography-heading-h1-font-family, inherit);
-	font-weight: var(--figma-typography-heading-h1-font-weight, 700);
-	font-size: var(--figma-typography-heading-h1-font-size, 2rem);
-	line-height: var(--figma-typography-heading-h1-line-height, 1.2);
-	margin: 0 0 0.25rem;
+html {
+	scroll-behavior: smooth;
 }
 
-header p {
-	color: var(--figma-color-brand-secondary, #cccccc);
+@media (prefers-reduced-motion: reduce) {
+
+	html {
+		scroll-behavior: auto;
+	}
+}
+
+body {
+	background: var(--figma-color-surface, #fff);
+	color: var(--figma-color-text, #151515);
+	font-family: var(--figma-typography-body-font-family, system-ui, sans-serif);
+	line-height: 1.6;
 	margin: 0;
+}
+
+a {
+	color: inherit;
+	text-underline-offset: 0.18em;
+}
+
+img {
+	height: auto;
+	max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+	font: inherit;
+}
+
+.screen-reader-text {
+	clip: rect(1px, 1px, 1px, 1px);
+	clip-path: inset(50%);
+	height: 1px;
+	overflow: hidden;
+	position: absolute;
+	width: 1px;
+	word-wrap: normal !important;
+}
+
+.screen-reader-text:focus {
+	background: #fff;
+	clip: auto !important;
+	clip-path: none;
+	color: #151515;
+	display: block;
+	height: auto;
+	left: 1rem;
+	padding: 0.75rem 1rem;
+	top: 1rem;
+	width: auto;
+	z-index: 100000;
+}
+
+.site-header,
+.site-footer {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem 2rem;
+	justify-content: space-between;
+	margin-inline: auto;
+	max-width: 80rem;
+	padding: 1.25rem;
+}
+
+.site-title,
+.site-footer__title {
+	font-weight: 700;
+	text-decoration: none;
+}
+
+.site-tagline,
+.site-footer__tagline,
+.site-footer__copyright {
+	margin: 0;
+}
+
+.primary-navigation__list,
+.mobile-navigation__list,
+.footer-navigation__list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem 1.25rem;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.mobile-navigation {
+	display: none;
+}
+
+@media (max-width: 48rem) {
+
+	.primary-navigation {
+		display: none;
+	}
+
+	.mobile-navigation {
+		display: block;
+	}
+
+	.mobile-navigation__list {
+		display: grid;
+		padding-block: 0.75rem;
+	}
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { m } from 'motion/react';
 
 /**
@@ -15,31 +15,44 @@ import { m } from 'motion/react';
  * reflow of the element itself and its siblings, not a one-off effect on a
  * single node.
  */
-export default function StreamingText( { streamUrl, text = '', typingSpeed = 30, as = 'div', ...rest } ) {
+export default function StreamingText( { streamUrl, text = '', typingSpeed = 30, as = 'div', onError, ...rest } ) {
 	const [ rendered, setRendered ] = useState( '' );
 	const [ isStreaming, setIsStreaming ] = useState( true );
-	const cancelled = useRef( false );
 
 	useEffect( () => {
-		cancelled.current = false;
+		let cancelled = false;
+		const controller = streamUrl ? new AbortController() : null;
 		setRendered( '' );
 		setIsStreaming( true );
 
 		async function runRealStream() {
 			try {
-				const response = await fetch( streamUrl );
+				const response = await fetch( streamUrl, { signal: controller.signal } );
+
+				if ( ! response.ok ) {
+					throw new Error( `Streaming request failed with HTTP ${ response.status || 'error' }.` );
+				}
+
+				if ( ! response.body || typeof response.body.getReader !== 'function' ) {
+					throw new Error( 'Streaming response body is unavailable.' );
+				}
+
 				const reader = response.body.getReader();
 				const decoder = new TextDecoder();
 				for ( ;; ) {
 					const { done, value } = await reader.read();
-					if ( done || cancelled.current ) {
+					if ( done || cancelled ) {
 						break;
 					}
 					setRendered( ( prev ) => prev + decoder.decode( value, { stream: true } ) );
 				}
-			} finally {
-				if ( ! cancelled.current ) {
+
+				if ( ! cancelled ) {
 					setIsStreaming( false );
+				}
+			} catch ( error ) {
+				if ( ! cancelled && error?.name !== 'AbortError' && typeof onError === 'function' ) {
+					onError( error );
 				}
 			}
 		}
@@ -47,7 +60,7 @@ export default function StreamingText( { streamUrl, text = '', typingSpeed = 30,
 		function runSimulatedTypewriter() {
 			let i = 0;
 			const interval = setInterval( () => {
-				if ( cancelled.current || i >= text.length ) {
+				if ( cancelled || i >= text.length ) {
 					clearInterval( interval );
 					setIsStreaming( false );
 					return;
@@ -61,12 +74,13 @@ export default function StreamingText( { streamUrl, text = '', typingSpeed = 30,
 		if ( streamUrl ) {
 			runRealStream();
 			return () => {
-				cancelled.current = true;
+				cancelled = true;
+				controller.abort();
 			};
 		}
 
 		return runSimulatedTypewriter();
-	}, [ streamUrl, text, typingSpeed ] );
+	}, [ streamUrl, text, typingSpeed, onError ] );
 
 	const Tag = m[ as ] || m.div;
 

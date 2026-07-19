@@ -121,11 +121,14 @@ final class UpdateApiTest extends TestCase {
 
 		$this->assertSame(
 			array( 'status' => 'updated' ),
-			call_user_func( $tools[0]['callback'], array(
-				'force_check' => 'false',
-				'package_url' => 'https://evil.example/theme.zip',
-				'slug'        => 'evil-theme',
-			) )
+			call_user_func(
+				$tools[0]['callback'],
+				array(
+					'force_check' => 'false',
+					'package_url' => 'https://evil.example/theme.zip',
+					'slug'        => 'evil-theme',
+				)
+			)
 		);
 		$this->assertSame( array( false ), $updater->update_calls );
 		$this->assertSame( array( 'status' => 'rolled_back' ), call_user_func( $tools[1]['callback'], array() ) );

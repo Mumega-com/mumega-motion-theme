@@ -19,11 +19,13 @@ This theme instead:
 ## How the React-sharing works
 
 `@wordpress/scripts`' build config includes `@wordpress/dependency-extraction-webpack-plugin`, which
-externalizes `react`/`react-dom` (and anything a dependency like Motion imports internally) to
-WordPress's own global script handles instead of bundling them. Confirmed in `build/index.asset.php`:
+externalizes `react`/`react-dom` to WordPress's own global script handles instead of bundling them.
+Motion 12 also imports `react/jsx-runtime`, whose WordPress script handle was added after WordPress
+6.5. The theme's webpack configuration bundles only that small JSX adapter while leaving the actual
+React and ReactDOM implementations external. Confirmed in `build/index.asset.php`:
 
 ```php
-array('dependencies' => array('react', 'react-dom', 'react-jsx-runtime'), ...)
+array('dependencies' => array('react', 'react-dom'), ...)
 ```
 
 `functions.php` reads that generated dependency list and passes it straight to `wp_enqueue_script()`,
@@ -45,6 +47,76 @@ Wrap any server-rendered block with the attribute and it animates in on load:
 
 For custom Gutenberg blocks or hand-authored components, import `FadeIn` or `StaggerList` directly from
 `src/components/` instead of the attribute-driven auto-mount.
+
+## Reusable editorial system
+
+The Editorial Home is an opt-in, server-rendered page template. Installing or
+updating the theme does not replace the site's current homepage: the theme does
+not ship a `front-page.php` template. To adopt it safely, create a new draft or
+private page, select **Editorial Home** in that page's Template setting, and
+preview it without adding Elementor content. Publish it and select it under
+**Settings → Reading → Homepage** only after review. Restoring the previous
+static page in Reading Settings is the rollback path.
+
+The template gets its identity and public copy from normal WordPress data. An
+assigned Primary menu supplies navigation and, in menu order, the category
+topic rails; custom links and page links remain navigation items but do not
+become rails. When no Primary menu is assigned, navigation falls back to the
+six most-used non-empty categories. Sticky posts deliberately control the lead,
+while the remaining modules use published, non-password-protected posts and do
+not repeat a story.
+
+These slugs are optional conventions rather than installation requirements:
+
+- `test-lab` category: shows the latest research feature when it has content.
+- `field-notes` category: shows the latest dated notes when it has content.
+- `releases` category: excludes product releases from automatic lead/supporting
+  selection unless an editor makes a release sticky.
+- `newsletter` page: adds Subscribe links and renders that published page in the
+  newsletter module. The page owns its copy, consent language, and form block.
+- `affiliate-disclosure` page: supplies the policy link for affiliate-tagged
+  posts; the disclosure remains visible without inventing a dead policy URL.
+
+Sites that use none of these slugs still get the lead desk, available topic
+rails, article/archive/search templates, and footer. Category names, site title,
+tagline, menus, excerpts, media, and page content are never MCPWP-specific theme
+constants.
+
+The block editor includes portable core-block patterns for **Article Brief**,
+**Test Method**, **Evidence Table**, **Affiliate Disclosure**, **Correction
+Note**, and **Newsletter Page**. Patterns provide an editable publishing
+structure; they do not create custom storage or lock content to this theme.
+
+All navigation, editorial content, links, search, and forms exist in the initial
+HTML and remain usable with JavaScript disabled. React and Motion only enhance
+explicit bounded islands, and a failed or disabled enhancement leaves its
+server-rendered fallback intact. The Editorial Home never uses StreamingText.
+
+MCPWP and WPForms are both optional. Human editors can manage the same posts,
+menus, categories, pages, and homepage setting entirely through WordPress.
+MCPWP may provide a separately installed, permission-scoped agent interface,
+but it is not a rendering dependency. WPForms may be embedded as normal block
+content on the optional Newsletter page; the theme does not require WPForms,
+store subscribers, or replace a form provider's validation and consent flow.
+
+### Local verification
+
+From a clean checkout with supported Node and PHP versions:
+
+```bash
+composer install --no-interaction --prefer-dist
+npm ci
+npm run test:js
+npm run build
+vendor/bin/phpunit -c phpunit.xml.dist
+vendor/bin/phpcs --standard=WordPress functions.php index.php header.php footer.php page.php single.php home.php archive.php search.php 404.php inc page-templates template-parts tests
+find functions.php index.php header.php footer.php page.php single.php home.php archive.php search.php 404.php page-templates template-parts inc -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+./scripts/test-package-release.sh
+```
+
+The package regression test builds the runtime twice, verifies identical bytes,
+checks its checksum and manifest, rejects development files, and audits the
+release workflow's immutable tag/release safeguards and pinned actions.
 
 ## Build
 

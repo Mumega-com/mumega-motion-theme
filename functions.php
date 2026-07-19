@@ -10,33 +10,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Enqueue the Motion bundle using the dependency list @wordpress/scripts
- * generated at build time (build/index.asset.php). That list already
- * includes 'react'/'react-dom'/whatever WP-core handles Motion's bundled
- * React imports resolved to — @wordpress/dependency-extraction-webpack-plugin
- * externalizes those automatically, so this script shares WordPress's own
- * React instance instead of loading a second copy.
- */
-function mumega_motion_enqueue_assets() {
-	$asset_file = get_template_directory() . '/build/index.asset.php';
-
-	if ( ! file_exists( $asset_file ) ) {
-		return;
-	}
-
-	$asset = require $asset_file;
-
-	wp_enqueue_script(
-		'mumega-motion',
-		get_template_directory_uri() . '/build/index.js',
-		$asset['dependencies'],
-		$asset['version'],
-		true
-	);
-}
-add_action( 'wp_enqueue_scripts', 'mumega_motion_enqueue_assets' );
-
-/**
  * Enqueue the theme's own stylesheet (style.css). This is what the
  * `var(--figma-color-*, fallback)` / `var(--figma-typography-*, fallback)`
  * declarations in style.css resolve against — see inc/figma-tokens.php for
@@ -56,17 +29,32 @@ add_action( 'wp_enqueue_scripts', 'mumega_motion_enqueue_styles' );
 require get_template_directory() . '/inc/figma-tokens.php';
 
 /**
+ * Pure editorial content and taxonomy helpers.
+ */
+require get_template_directory() . '/inc/editorial-helpers.php';
+
+/**
+ * Deterministic editorial eligibility and category discovery.
+ */
+require get_template_directory() . '/inc/editorial-queries.php';
+
+/**
+ * Editorial theme capabilities and conditional front-end assets.
+ */
+require get_template_directory() . '/inc/editorial-setup.php';
+
+/**
+ * Reusable Gutenberg patterns for editorial content.
+ */
+require get_template_directory() . '/inc/editorial-patterns.php';
+
+/**
+ * Inert allowlisted markup boundary for future editorial React islands.
+ */
+require get_template_directory() . '/inc/editorial-islands.php';
+
+/**
  * Fixed-repository verified update system, with dashboard fallback independent
  * of the optional MCPWP extension hook.
  */
 require get_template_directory() . '/inc/updates/bootstrap.php';
-
-/**
- * Theme supports.
- */
-function mumega_motion_setup() {
-	add_theme_support( 'title-tag' );
-	add_theme_support( 'post-thumbnails' );
-	add_theme_support( 'html5', array( 'search-form', 'comment-form', 'comment-list', 'gallery', 'caption' ) );
-}
-add_action( 'after_setup_theme', 'mumega_motion_setup' );

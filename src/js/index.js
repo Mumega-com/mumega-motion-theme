@@ -1,37 +1,202 @@
+import { Component } from 'react';
 import { createRoot } from 'react-dom/client';
 import { LazyMotion, domAnimation, m, LayoutGroup } from 'motion/react';
-import FadeIn from '../components/FadeIn';
+import FadeIn, { FADE_IN_DEFAULTS } from '../components/FadeIn';
 import StreamingText from '../components/StreamingText';
 
 /**
- * Progressive-enhancement auto-mount: any element already rendered by
- * WordPress (theme template, block, widget — doesn't matter) marked with
- * `data-motion="fade-in"` gets its existing content wrapped in an entrance
- * animation. The HTML underneath is untouched real content — no-JS visitors
- * and search engines see it immediately; Motion only adds the transition.
+ * Parses a finite motion value without accepting partial numeric strings.
  *
- * NOTE on bundle size: domAnimation is imported statically here, so the
- * built bundle is Motion's full ~30-37kb (gzipped), not the ~4.6kb LazyMotion
- * advertises for a true async split. A dynamic `import('motion/react')` for
- * domAnimation does NOT actually code-split under @wordpress/scripts'
- * default webpack config — confirmed by inspecting the build output, it
- * stayed a single chunk regardless. Getting the smaller number needs a
- * custom webpack.config.js overriding wp-scripts' defaults (chunkFilename,
- * splitChunks tuning) — worth doing if a real theme accumulates enough
- * data-motion usage to matter, not done here to keep the setup simple.
+ * @param {string|number|undefined} value    Candidate DOM value.
+ * @param {number}                  fallback Safe fallback.
+ * @return {number} Parsed value or the fallback.
+ */
+export function parseMotionNumber( value, fallback ) {
+	if (
+		value === undefined ||
+		value === null ||
+		String( value ).trim() === ''
+	) {
+		return fallback;
+	}
+
+	const parsed = Number( value );
+
+	return Number.isFinite( parsed ) ? parsed : fallback;
+}
+
+/**
+ * Checks the user's nonessential-motion preference.
+ *
+ * @param {Function|undefined} matchMedia Browser matchMedia implementation.
+ * @return {boolean} Whether motion should be skipped.
+ */
+export function shouldReduceMotion(
+	matchMedia = typeof window !== 'undefined' ? window.matchMedia : undefined
+) {
+	return (
+		typeof matchMedia === 'function' &&
+		matchMedia( '(prefers-reduced-motion: reduce)' ).matches === true
+	);
+}
+
+/**
+ * Catches descendant render failures inside one React island.
+ *
+ * Recovery is deferred until React has completed the current commit stack. A
+ * synchronous unmount from componentDidCatch would otherwise trigger React's
+ * update-during-render warning and could leave the root in an undefined state.
+ */
+class MotionIslandErrorBoundary extends Component {
+	constructor( props ) {
+		super( props );
+		this.state = { failed: false };
+	}
+
+	static getDerivedStateFromError() {
+		return { failed: true };
+	}
+
+	componentDidCatch() {
+		const { onError } = this.props;
+
+		if ( typeof queueMicrotask === 'function' ) {
+			queueMicrotask( onError );
+			return;
+		}
+
+		Promise.resolve().then( onError );
+	}
+
+	render() {
+		return this.state.failed ? null : this.props.children;
+	}
+}
+
+/**
+ * Wraps server-rendered fallback HTML in the bounded FadeIn component.
+ *
+ * @param {Element}  element        Explicit fade-in mount.
+ * @param {Function} createRootImpl React root factory.
+ * @return {boolean} Whether rendering was requested successfully.
+ */
+export function mountFadeInNode( element, createRootImpl = createRoot ) {
+	if ( ! element || ! element.matches( '[data-motion="fade-in"]' ) ) {
+		return false;
+	}
+
+	const originalHTML = element.innerHTML;
+	let reactRoot;
+	const recover = createIslandRecovery(
+		element,
+		originalHTML,
+		() => reactRoot
+	);
+
+	try {
+		reactRoot = createRootImpl( element );
+		reactRoot.render(
+			<MotionIslandErrorBoundary onError={ recover }>
+				<AutoMount
+					html={ originalHTML }
+					delay={ parseMotionNumber(
+						element.dataset.motionDelay,
+						FADE_IN_DEFAULTS.delay
+					) }
+					y={ parseMotionNumber(
+						element.dataset.motionY,
+						FADE_IN_DEFAULTS.y
+					) }
+					duration={ parseMotionNumber(
+						element.dataset.motionDuration,
+						FADE_IN_DEFAULTS.duration
+					) }
+				/>
+			</MotionIslandErrorBoundary>
+		);
+		delete element.dataset.motionFailed;
+		return true;
+	} catch {
+		recover();
+		return false;
+	}
+}
+
+/**
+ * Creates an idempotent fallback restoration for a single island root.
+ *
+ * @param {Element}  element Server-rendered mount node.
+ * @param {string}   html    Original inner HTML.
+ * @param {Function} getRoot Returns the node's React root, when created.
+ * @return {Function} Recovery callback.
+ */
+function createIslandRecovery( element, html, getRoot ) {
+	let recovered = false;
+
+	return () => {
+		if ( recovered ) {
+			return;
+		}
+
+		recovered = true;
+
+		try {
+			const root = getRoot();
+
+			if ( root && typeof root.unmount === 'function' ) {
+				root.unmount();
+			}
+		} catch {
+			// Restoration below remains mandatory even if root cleanup fails.
+		} finally {
+			element.innerHTML = html;
+			element.dataset.motionFailed = 'true';
+		}
+	};
+}
+
+/**
+ * Mounts the explicit Motion selectors within a DOM root.
+ *
+ * Reduced-motion mode deliberately does not create React roots, preserving the
+ * exact server-rendered markup and its normal document flow.
+ *
+ * @param {Document|Element} root           DOM query root.
+ * @param {Function}         createRootImpl React root factory.
+ * @return {number} Number of successful mount requests.
+ */
+export function mountMotionIslands(
+	root = document,
+	createRootImpl = createRoot
+) {
+	if ( ! root || shouldReduceMotion() ) {
+		return 0;
+	}
+
+	let mounted = 0;
+
+	root.querySelectorAll( '[data-motion="fade-in"]' ).forEach( ( element ) => {
+		if ( mountFadeInNode( element, createRootImpl ) ) {
+			mounted += 1;
+		}
+	} );
+
+	root.querySelectorAll( '[data-motion-stream]' ).forEach( ( element ) => {
+		if ( mountStreamingTextNode( element, createRootImpl ) ) {
+			mounted += 1;
+		}
+	} );
+
+	return mounted;
+}
+
+/**
+ * Motion wrapper for a fade-in mount. The HTML is the fallback already
+ * rendered and escaped by WordPress; it is captured before React owns the node.
  */
 function AutoMount( { html, delay, y, duration } ) {
 	return (
 		<LazyMotion features={ domAnimation }>
-			{ /*
-			 * dangerouslySetInnerHTML is safe here specifically: `html` is
-			 * el.innerHTML captured from a node WordPress already rendered
-			 * into the live DOM (theme template / block / widget output,
-			 * already through WP's own server-side escaping) before this
-			 * script ever runs. Nothing untrusted or runtime-supplied is
-			 * being injected — we're re-parenting content the browser
-			 * already rendered once, under React, so Motion can animate it.
-			 */ }
 			<FadeIn
 				delay={ delay }
 				y={ y }
@@ -43,28 +208,28 @@ function AutoMount( { html, delay, y, duration } ) {
 }
 
 /**
- * Motion's layout animation only animates elements that are THEMSELVES
- * motion components with the `layout` prop — a plain sibling <footer>
- * elsewhere on the page does not automatically get pulled into the
- * animation just because something above it changed size. To get a genuinely
- * smooth push-down, the "sibling" has to be part of the same Motion-aware
- * tree. This mounts both the streaming text AND a card below it together,
- * so the card's position is actually under Motion's control and animates
- * as the streaming content grows — confirmed by high-frequency sampling,
- * not assumed.
+ * StreamingText remains available only through data-motion-stream. Merely
+ * loading this bundle or emitting a future island boundary never invokes it.
  */
-function StreamMount( { streamUrl, siblingText } ) {
+function StreamMount( { streamUrl, siblingText, onError } ) {
 	return (
 		<LazyMotion features={ domAnimation }>
 			<LayoutGroup>
-				<m.div layout transition={ { duration: 0.8, ease: 'easeInOut' } }>
-					<StreamingText streamUrl={ streamUrl } />
+				<m.div
+					layout
+					transition={ { duration: 0.8, ease: 'easeInOut' } }
+				>
+					<StreamingText streamUrl={ streamUrl } onError={ onError } />
 					{ siblingText && (
 						<m.div
 							id="stream-demo-sibling"
 							layout
 							transition={ { duration: 0.8, ease: 'easeInOut' } }
-							style={ { marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #ddd' } }
+							style={ {
+								marginTop: '1rem',
+								paddingTop: '1rem',
+								borderTop: '1px solid #ddd',
+							} }
 						>
 							{ siblingText }
 						</m.div>
@@ -75,21 +240,41 @@ function StreamMount( { streamUrl, siblingText } ) {
 	);
 }
 
-document.addEventListener( 'DOMContentLoaded', () => {
-	document.querySelectorAll( '[data-motion="fade-in"]' ).forEach( ( el ) => {
-		const html = el.innerHTML;
-		const delay = parseFloat( el.dataset.motionDelay || '0' );
-		const y = parseFloat( el.dataset.motionY || '24' );
-		const duration = parseFloat( el.dataset.motionDuration || '0.5' );
+/**
+ * Replaces an explicit streaming fallback while isolating mount failures.
+ *
+ * @param {Element}  element        Explicit stream mount.
+ * @param {Function} createRootImpl React root factory.
+ * @return {boolean} Whether rendering was requested successfully.
+ */
+function mountStreamingTextNode( element, createRootImpl ) {
+	const originalHTML = element.innerHTML;
+	let reactRoot;
+	const recover = createIslandRecovery(
+		element,
+		originalHTML,
+		() => reactRoot
+	);
 
-		createRoot( el ).render(
-			<AutoMount html={ html } delay={ delay } y={ y } duration={ duration } />
+	try {
+		reactRoot = createRootImpl( element );
+		reactRoot.render(
+			<MotionIslandErrorBoundary onError={ recover }>
+				<StreamMount
+					streamUrl={ element.dataset.motionStream }
+					siblingText={ element.dataset.motionStreamSibling || '' }
+					onError={ recover }
+				/>
+			</MotionIslandErrorBoundary>
 		);
-	} );
+		delete element.dataset.motionFailed;
+		return true;
+	} catch {
+		recover();
+		return false;
+	}
+}
 
-	document.querySelectorAll( '[data-motion-stream]' ).forEach( ( el ) => {
-		const streamUrl = el.dataset.motionStream;
-		const siblingText = el.dataset.motionStreamSibling || '';
-		createRoot( el ).render( <StreamMount streamUrl={ streamUrl } siblingText={ siblingText } /> );
-	} );
+document.addEventListener( 'DOMContentLoaded', () => {
+	mountMotionIslands();
 } );
