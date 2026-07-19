@@ -137,6 +137,34 @@ final class EditorialShellTest extends TestCase {
 	}
 
 	/**
+	 * Gives publication policy and information pages the native editorial shell.
+	 */
+	public function test_editorial_page_template_renders_native_shell_and_page_content(): void {
+		$post = new WP_Post(
+			array(
+				'ID'           => 72,
+				'post_content' => '<p>Transparent editorial policy.</p>',
+				'post_title'   => 'Editorial standards',
+			)
+		);
+
+		$GLOBALS['mumega_motion_test_page_template']                 = 'page-templates/editorial-page.php';
+		$GLOBALS['mumega_motion_test_elementor_locations']['header'] = true;
+		$GLOBALS['mumega_motion_test_elementor_locations']['footer'] = true;
+		$GLOBALS['mumega_motion_test_loop_posts']                    = array( $post );
+
+		$output = $this->render_theme_file( 'page-templates/editorial-page.php' );
+
+		$this->assertStringContainsString( '<header class="site-header">', $output );
+		$this->assertStringContainsString( '<footer class="site-footer">', $output );
+		$this->assertStringContainsString( '<h1 class="page-entry__title">Editorial standards</h1>', $output );
+		$this->assertStringContainsString( '<p>Transparent editorial policy.</p>', $output );
+		$this->assertStringNotContainsString( '<!-- elementor_header -->', $output );
+		$this->assertStringNotContainsString( '<!-- elementor_footer -->', $output );
+		$this->assertSame( 1, substr_count( $output, '<main id="primary"' ) );
+	}
+
+	/**
 	 * Keeps ordinary pages on Elementor's standard compatibility entrypoints.
 	 */
 	public function test_ordinary_page_shell_loader_uses_standard_entrypoints(): void {
