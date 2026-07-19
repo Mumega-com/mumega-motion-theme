@@ -133,15 +133,30 @@ final class EditorialPatternsTest extends TestCase {
 
 		foreach ( $GLOBALS['mumega_motion_test_patterns'] as $pattern ) {
 			preg_match_all( '/<!--\\s*\\/?([^\\s]+).*?-->/', $pattern['content'], $matches );
-			$this->assertSame(
-				substr_count( $pattern['content'], '<!-- wp:' ),
-				substr_count( $pattern['content'], '<!-- /wp:' )
-			);
+			$this->assertTrue( $this->serialized_block_comments_are_valid( $pattern['content'] ) );
 
 			foreach ( $matches[1] as $block_name ) {
 				$this->assertStringStartsWith( 'wp:', $block_name );
 			}
 		}
+	}
+
+	/**
+	 * Rejects block comments that close a different nested block than they opened.
+	 */
+	public function test_serialized_block_validator_rejects_mismatched_nesting(): void {
+		$content = '<!-- wp:group -->\n<div class="wp-block-group"><!-- wp:paragraph -->\n<p>Text.</p>\n<!-- /wp:group --></div>\n<!-- /wp:paragraph -->';
+
+		$this->assertFalse( $this->serialized_block_comments_are_valid( $content ) );
+	}
+
+	/**
+	 * Accepts self-closing core block comments within a nested block structure.
+	 */
+	public function test_serialized_block_validator_accepts_self_closing_blocks(): void {
+		$content = '<!-- wp:group -->\n<div class="wp-block-group"><!-- wp:spacer {"height":"1px"} /--></div>\n<!-- /wp:group -->';
+
+		$this->assertTrue( $this->serialized_block_comments_are_valid( $content ) );
 	}
 
 	/**
@@ -231,5 +246,46 @@ final class EditorialPatternsTest extends TestCase {
 		$this->assertArrayHasKey( $slug, $GLOBALS['mumega_motion_test_patterns'] );
 
 		return $GLOBALS['mumega_motion_test_patterns'][ $slug ]['content'];
+	}
+
+	/**
+	 * Validates nesting and names in serialized Gutenberg block comments.
+	 *
+	 * @param string $content Serialized block content.
+	 * @return bool
+	 */
+	private function serialized_block_comments_are_valid( string $content ): bool {
+		$stack = array();
+
+		preg_match_all( '/<!--.*?-->/s', $content, $comments );
+
+		foreach ( $comments[0] as $comment ) {
+			if ( false === strpos( $comment, 'wp:' ) ) {
+				continue;
+			}
+
+			if ( 1 !== preg_match( '/^<!--\\s*(\\/?)wp:([a-z0-9-]+)\\s+(.*?)-->$/si', $comment, $block_comment ) ) {
+				return false;
+			}
+
+			$is_closing = '/' === $block_comment[1];
+			$block_name = $block_comment[2];
+			$payload    = trim( $block_comment[3] );
+
+			if ( $is_closing ) {
+				if ( '' !== $payload || empty( $stack ) || end( $stack ) !== $block_name ) {
+					return false;
+				}
+
+				array_pop( $stack );
+				continue;
+			}
+
+			if ( '/' !== substr( $payload, -1 ) ) {
+				$stack[] = $block_name;
+			}
+		}
+
+		return empty( $stack );
 	}
 }
