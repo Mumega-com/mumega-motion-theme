@@ -203,6 +203,7 @@ assert_contains 'grep -Ei' "${WORKFLOW}"
 assert_contains "-iname '*.map'" "${ROOT_DIR}/scripts/package-theme.sh"
 assert_contains "-iname '*.md'" "${ROOT_DIR}/scripts/package-theme.sh"
 assert_contains 'find functions.php index.php header.php footer.php page.php single.php home.php archive.php search.php 404.php page-templates template-parts inc -type f -name' "${WORKFLOW}"
+assert_step_contains 'Run JavaScript behavior tests' 'npm run test:js'
 assert_step_contains 'Verify package layout and manifest' 'expected_top_level_paths='
 assert_step_contains 'Verify package layout and manifest' 'actual_top_level_paths='
 for required in "${required_runtime_files[@]}"; do

@@ -9,6 +9,9 @@ const editorialRoot = postcss.parse(
 		'utf8'
 	)
 );
+const globalRoot = postcss.parse(
+	fs.readFileSync( path.join( themeRoot, 'style.css' ), 'utf8' )
+);
 const printRoot = postcss.parse(
 	fs.readFileSync( path.join( themeRoot, 'assets/css/print.css' ), 'utf8' )
 );
@@ -97,6 +100,16 @@ function contrastRatio( first, second ) {
 }
 
 describe( 'editorial CSS contracts', () => {
+	test( 'disables global smooth scrolling when reduced motion is requested', () => {
+		expect(
+			computedDeclaration(
+				globalRoot,
+				'html',
+				'scroll-behavior',
+				'(prefers-reduced-motion: reduce)'
+			)
+		).toBe( 'auto' );
+	} );
 	test( 'activates the source-ordered 7/5 desk at exactly 800px', () => {
 		const media = '(min-width: 800px)';
 		expect(

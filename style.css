@@ -19,6 +19,12 @@ html {
 	scroll-behavior: smooth;
 }
 
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+}
+
 body {
 	background: var(--figma-color-surface, #ffffff);
 	color: var(--figma-color-text, #151515);
