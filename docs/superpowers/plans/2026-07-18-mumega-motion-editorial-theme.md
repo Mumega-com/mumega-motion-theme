@@ -469,12 +469,12 @@ git commit -m "feat: add Gutenberg editorial patterns"
 
 - [ ] inc/editorial-islands.php may emit only allowlisted island names and JSON-encoded data. It accepts no executable code or arbitrary component name.
 
-- [ ] Run tests/build and prove build/index.asset.php still declares react, react-dom, and react-jsx-runtime as WordPress dependencies.
+- [ ] Run tests/build and prove build/index.asset.php declares only the React and ReactDOM handles available in WordPress 6.5. Motion's small JSX adapter is bundled without bundling a second React implementation.
 
 ~~~bash
 npm run test:js
 npm run build
-php -r '$a=require "build/index.asset.php"; foreach (array("react","react-dom","react-jsx-runtime") as $d) { if (!in_array($d,$a["dependencies"],true)) { exit(1); } }'
+php -r '$a=require "build/index.asset.php"; if (array("react","react-dom") !== $a["dependencies"]) { exit(1); }'
 vendor/bin/phpunit -c phpunit.xml.dist
 git add package.json package-lock.json functions.php inc/editorial-islands.php src/js/index.js src/js/index.test.js src/components/FadeIn.jsx assets/css/editorial.css build/index.js build/index.asset.php
 git commit -m "feat: harden editorial motion islands"

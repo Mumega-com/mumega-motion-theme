@@ -19,11 +19,13 @@ This theme instead:
 ## How the React-sharing works
 
 `@wordpress/scripts`' build config includes `@wordpress/dependency-extraction-webpack-plugin`, which
-externalizes `react`/`react-dom` (and anything a dependency like Motion imports internally) to
-WordPress's own global script handles instead of bundling them. Confirmed in `build/index.asset.php`:
+externalizes `react`/`react-dom` to WordPress's own global script handles instead of bundling them.
+Motion 12 also imports `react/jsx-runtime`, whose WordPress script handle was added after WordPress
+6.5. The theme's webpack configuration bundles only that small JSX adapter while leaving the actual
+React and ReactDOM implementations external. Confirmed in `build/index.asset.php`:
 
 ```php
-array('dependencies' => array('react', 'react-dom', 'react-jsx-runtime'), ...)
+array('dependencies' => array('react', 'react-dom'), ...)
 ```
 
 `functions.php` reads that generated dependency list and passes it straight to `wp_enqueue_script()`,

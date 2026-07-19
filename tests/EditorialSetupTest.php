@@ -147,4 +147,14 @@ final class EditorialSetupTest extends TestCase {
 		$this->assertArrayNotHasKey( 'mumega-motion', $GLOBALS['mumega_motion_test_enqueued_scripts'] );
 		$this->assertFalse( function_exists( 'mumega_motion_declare_legacy_demo_mounts' ) );
 	}
+
+	/**
+	 * Keeps the generated bundle compatible with WordPress 6.5's React handles.
+	 */
+	public function test_motion_bundle_uses_react_dependencies_available_in_wordpress_65(): void {
+		$asset = require dirname( __DIR__ ) . '/build/index.asset.php';
+
+		$this->assertSame( array( 'react', 'react-dom' ), $asset['dependencies'] );
+		$this->assertNotContains( 'react-jsx-runtime', $asset['dependencies'] );
+	}
 }
