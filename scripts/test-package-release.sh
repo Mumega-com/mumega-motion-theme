@@ -104,6 +104,14 @@ required_runtime_files=(
 	template-parts/content-card-compact.php
 	template-parts/content-card.php
 	template-parts/empty-state.php
+	template-parts/home-audiences.php
+	template-parts/home-briefing.php
+	template-parts/home-coverage.php
+	template-parts/home-guides.php
+	template-parts/home-intro.php
+	template-parts/home-knowledge.php
+	template-parts/home-methodology.php
+	template-parts/home-tools.php
 	template-parts/lead-story.php
 	template-parts/newsletter.php
 	template-parts/section-heading.php
