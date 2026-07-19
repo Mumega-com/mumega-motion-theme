@@ -71,7 +71,11 @@ function mumega_motion_render_elementor_location( $location ) {
 	$handled = elementor_theme_do_location( $location );
 	$markup  = (string) ob_get_clean();
 
-	if ( ! $handled || '' === trim( $markup ) ) {
+	$double_quoted_marker = 'data-elementor-type="' . $location . '"';
+	$single_quoted_marker = "data-elementor-type='" . $location . "'";
+	$has_location_markup  = false !== strpos( $markup, $double_quoted_marker ) || false !== strpos( $markup, $single_quoted_marker );
+
+	if ( ! $handled || ! $has_location_markup ) {
 		return false;
 	}
 
