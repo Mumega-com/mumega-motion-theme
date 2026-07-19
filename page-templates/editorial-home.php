@@ -79,6 +79,33 @@ mumega_motion_get_header();
 	);
 	?>
 
+	<?php
+	get_template_part(
+		'template-parts/home-methodology',
+		null,
+		array( 'page' => $methodology_page )
+	);
+	?>
+
+	<?php
+	get_template_part(
+		'template-parts/home-tools',
+		null,
+		array(
+			'posts'             => $tool_posts,
+			'menu_category_ids' => $menu_category_ids,
+		)
+	);
+	?>
+
+	<?php
+	get_template_part(
+		'template-parts/home-knowledge',
+		null,
+		array( 'page' => $knowledge_map_page )
+	);
+	?>
+
 	<?php if ( $newsletter_page instanceof WP_Post ) : ?>
 		<section class="home-newsletter">
 			<?php
