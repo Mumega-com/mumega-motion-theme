@@ -5,3 +5,5 @@ vendor/
 dist/
 *.zip
 manifest.json
+!editorial/generated/
+!editorial/generated/mcpwp-site-context.md
