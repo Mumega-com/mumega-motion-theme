@@ -92,6 +92,7 @@ required_runtime_files=(
 	build/index.asset.php
 	assets/css/editorial.css
 	assets/css/print.css
+	page-templates/editorial-page.php
 	page-templates/editorial-home.php
 	template-parts/article-meta.php
 	template-parts/content-card-compact.php

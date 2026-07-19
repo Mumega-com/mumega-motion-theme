@@ -81,6 +81,7 @@ final class EditorialSetupTest extends TestCase {
 			'page.php',
 			'search.php',
 			'single.php',
+			'page-templates/editorial-page.php',
 			'page-templates/editorial-home.php',
 		);
 
@@ -126,6 +127,9 @@ final class EditorialSetupTest extends TestCase {
 	public function test_editorial_view_excludes_an_ordinary_elementor_page(): void {
 		$this->assertFileExists( dirname( __DIR__ ) . '/inc/editorial-setup.php' );
 		$this->assertFalse( mumega_motion_is_editorial_view() );
+
+		$GLOBALS['mumega_motion_test_page_template'] = 'page-templates/editorial-page.php';
+		$this->assertTrue( mumega_motion_is_editorial_view() );
 
 		$GLOBALS['mumega_motion_test_page_template'] = 'page-templates/editorial-home.php';
 		$this->assertTrue( mumega_motion_is_editorial_view() );

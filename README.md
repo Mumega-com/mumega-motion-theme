@@ -87,6 +87,11 @@ The block editor includes portable core-block patterns for **Article Brief**,
 Note**, and **Newsletter Page**. Patterns provide an editable publishing
 structure; they do not create custom storage or lock content to this theme.
 
+Use the **Editorial Page** template for publication-owned static pages such as
+editorial standards, methodology, disclosure, and corrections. It uses the
+native Mumega Motion shell and Gutenberg content while ordinary pages continue
+through their existing Elementor-compatible shell.
+
 All navigation, editorial content, links, search, and forms exist in the initial
 HTML and remain usable with JavaScript disabled. React and Motion only enhance
 explicit bounded islands, and a failed or disabled enhancement leaves its

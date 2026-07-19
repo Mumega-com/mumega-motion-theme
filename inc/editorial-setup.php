@@ -93,7 +93,8 @@ function mumega_motion_render_elementor_location( $location ) {
  * @return bool
  */
 function mumega_motion_is_editorial_view() {
-	return is_page_template( 'page-templates/editorial-home.php' ) ||
+	return is_page_template( 'page-templates/editorial-page.php' ) ||
+		is_page_template( 'page-templates/editorial-home.php' ) ||
 		is_singular( 'post' ) ||
 		is_home() ||
 		is_archive() ||
