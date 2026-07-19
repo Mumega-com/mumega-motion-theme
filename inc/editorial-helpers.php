@@ -55,35 +55,87 @@ function mumega_motion_trim_words( $text, $limit ) {
  *
  * @param WP_Post $post Post whose content should be rendered.
  * @return string
+ * @throws Throwable When post setup, filtering, or cleanup fails.
  */
 function mumega_motion_render_post_content( $post ) {
 	if ( ! $post instanceof WP_Post ) {
 		return '';
 	}
 
-	$had_previous_post = array_key_exists( 'post', $GLOBALS );
-	$previous_post     = $had_previous_post ? $GLOBALS['post'] : null;
+	$postdata_global_names = array(
+		'post',
+		'id',
+		'authordata',
+		'currentday',
+		'currentmonth',
+		'page',
+		'pages',
+		'multipage',
+		'more',
+		'numpages',
+	);
+	$postdata_snapshot     = array();
 
-	// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- The content filter requires the target as WordPress's current global post.
-	$GLOBALS['post'] = $post;
-	setup_postdata( $post );
+	foreach ( $postdata_global_names as $global_name ) {
+		$present                           = array_key_exists( $global_name, $GLOBALS );
+		$postdata_snapshot[ $global_name ] = array(
+			'present' => $present,
+			'value'   => $present ? $GLOBALS[ $global_name ] : null,
+		);
+	}
+
+	$previous_post       = $postdata_snapshot['post']['value'];
+	$rendered_content    = '';
+	$operation_exception = null;
+	$cleanup_exception   = null;
 
 	try {
-		return (string) apply_filters( 'the_content', $post->post_content );
+		// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- The content filter requires the target as WordPress's current global post.
+		$GLOBALS['post'] = $post;
+		setup_postdata( $post );
+		$rendered_content = (string) apply_filters( 'the_content', $post->post_content );
+	} catch ( Throwable $exception ) {
+		$operation_exception = $exception;
 	} finally {
-		wp_reset_postdata();
+		try {
+			try {
+				wp_reset_postdata();
+			} catch ( Throwable $exception ) {
+				$cleanup_exception = $exception;
+			}
 
-		if ( $previous_post instanceof WP_Post ) {
-			// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Restore the exact prior post after the temporary content context.
-			$GLOBALS['post'] = $previous_post;
-			setup_postdata( $previous_post );
-		} elseif ( $had_previous_post ) {
-			// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Restore the exact non-post value that existed before rendering.
-			$GLOBALS['post'] = $previous_post;
-		} else {
-			unset( $GLOBALS['post'] );
+			if ( $previous_post instanceof WP_Post ) {
+				try {
+					// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Preserve WordPress's previous-post setup behavior before exact restoration.
+					$GLOBALS['post'] = $previous_post;
+					setup_postdata( $previous_post );
+				} catch ( Throwable $exception ) {
+					if ( null === $cleanup_exception ) {
+						$cleanup_exception = $exception;
+					}
+				}
+			}
+		} finally {
+			foreach ( $postdata_snapshot as $global_name => $snapshot ) {
+				if ( $snapshot['present'] ) {
+					// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Restore the exact canonical postdata value captured before rendering.
+					$GLOBALS[ $global_name ] = $snapshot['value'];
+				} else {
+					unset( $GLOBALS[ $global_name ] );
+				}
+			}
 		}
 	}
+
+	if ( $operation_exception instanceof Throwable ) {
+		throw $operation_exception;
+	}
+
+	if ( $cleanup_exception instanceof Throwable ) {
+		throw $cleanup_exception;
+	}
+
+	return $rendered_content;
 }
 
 /**

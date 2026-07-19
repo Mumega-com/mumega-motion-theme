@@ -15,6 +15,20 @@ if ( file_exists( dirname( __DIR__ ) . '/inc/editorial-helpers.php' ) ) {
  * Exercises pure editorial display decisions without a WordPress runtime.
  */
 final class EditorialHelpersTest extends TestCase {
+	/** Canonical globals changed by WP_Query::setup_postdata(). */
+	private const POSTDATA_GLOBAL_NAMES = array(
+		'post',
+		'id',
+		'authordata',
+		'currentday',
+		'currentmonth',
+		'page',
+		'pages',
+		'multipage',
+		'more',
+		'numpages',
+	);
+
 	/**
 	 * Resets configurable WordPress doubles before each helper assertion.
 	 */
@@ -35,7 +49,10 @@ final class EditorialHelpersTest extends TestCase {
 		$GLOBALS['mumega_motion_test_nav_menu_object_requests']   = array();
 		$GLOBALS['mumega_motion_test_current_post']               = null;
 		$GLOBALS['mumega_motion_test_postdata_events']            = array();
-		unset( $GLOBALS['post'] );
+		$GLOBALS['mumega_motion_test_main_query_post']            = null;
+		$GLOBALS['mumega_motion_test_setup_postdata_exceptions']  = array();
+		$GLOBALS['mumega_motion_test_reset_postdata_exception']   = null;
+		$this->clear_postdata_globals();
 	}
 
 	/**
@@ -55,8 +72,10 @@ final class EditorialHelpersTest extends TestCase {
 			)
 		);
 
-		$GLOBALS['post']                            = $previous;
-		$GLOBALS['mumega_motion_test_current_post'] = $previous;
+		$this->seed_unusual_postdata_globals( $previous );
+		$snapshot                                      = $this->snapshot_postdata_globals();
+		$GLOBALS['mumega_motion_test_current_post']    = $previous;
+		$GLOBALS['mumega_motion_test_main_query_post'] = new WP_Post( array( 'ID' => 99 ) );
 		add_filter(
 			'the_content',
 			static function ( $content ) use ( $target ) {
@@ -77,7 +96,7 @@ final class EditorialHelpersTest extends TestCase {
 			'<div class="rendered-blocks"><!-- wp:paragraph --><p>Target content.</p><!-- /wp:paragraph --></div>',
 			$rendered
 		);
-		$this->assertSame( $previous, $GLOBALS['post'] );
+		$this->assert_postdata_globals_same( $snapshot );
 		$this->assertSame( $previous, $GLOBALS['mumega_motion_test_current_post'] );
 		$this->assertSame(
 			array(
@@ -102,8 +121,10 @@ final class EditorialHelpersTest extends TestCase {
 			)
 		);
 
-		$GLOBALS['post']                            = $previous;
-		$GLOBALS['mumega_motion_test_current_post'] = $previous;
+		$this->seed_unusual_postdata_globals( $previous );
+		$snapshot                                      = $this->snapshot_postdata_globals();
+		$GLOBALS['mumega_motion_test_current_post']    = $previous;
+		$GLOBALS['mumega_motion_test_main_query_post'] = new WP_Post( array( 'ID' => 98 ) );
 		add_filter(
 			'the_content',
 			static function () {
@@ -112,7 +133,7 @@ final class EditorialHelpersTest extends TestCase {
 		);
 
 		$this->assertSame( '', mumega_motion_render_post_content( $target ) );
-		$this->assertSame( $previous, $GLOBALS['post'] );
+		$this->assert_postdata_globals_same( $snapshot );
 		$this->assertSame( $previous, $GLOBALS['mumega_motion_test_current_post'] );
 		$this->assertSame(
 			array(
@@ -130,7 +151,8 @@ final class EditorialHelpersTest extends TestCase {
 	public function test_render_post_content_rejects_non_post_without_side_effects(): void {
 		$previous = new WP_Post( array( 'ID' => 12 ) );
 
-		$GLOBALS['post']                            = $previous;
+		$this->seed_unusual_postdata_globals( $previous );
+		$snapshot                                   = $this->snapshot_postdata_globals();
 		$GLOBALS['mumega_motion_test_current_post'] = $previous;
 		add_filter(
 			'the_content',
@@ -142,7 +164,7 @@ final class EditorialHelpersTest extends TestCase {
 		);
 
 		$this->assertSame( '', mumega_motion_render_post_content( (object) array( 'post_content' => 'Invalid.' ) ) );
-		$this->assertSame( $previous, $GLOBALS['post'] );
+		$this->assert_postdata_globals_same( $snapshot );
 		$this->assertSame( $previous, $GLOBALS['mumega_motion_test_current_post'] );
 		$this->assertSame( array(), $GLOBALS['mumega_motion_test_postdata_events'] );
 	}
@@ -151,16 +173,23 @@ final class EditorialHelpersTest extends TestCase {
 	 * Preserves an absent global post instead of inventing one during cleanup.
 	 */
 	public function test_render_post_content_restores_absent_global_post(): void {
-		$target = new WP_Post(
+		$target                                        = new WP_Post(
 			array(
 				'ID'           => 22,
 				'post_content' => 'Target content.',
 			)
 		);
+		$GLOBALS['mumega_motion_test_main_query_post'] = new WP_Post(
+			array(
+				'ID'           => 97,
+				'post_content' => 'Main query content.',
+			)
+		);
+		$snapshot                                      = $this->snapshot_postdata_globals();
 
 		$this->assertArrayNotHasKey( 'post', $GLOBALS );
 		$this->assertSame( 'Target content.', mumega_motion_render_post_content( $target ) );
-		$this->assertArrayNotHasKey( 'post', $GLOBALS );
+		$this->assert_postdata_globals_same( $snapshot );
 		$this->assertSame(
 			array(
 				array( 'setup', 22 ),
@@ -181,10 +210,17 @@ final class EditorialHelpersTest extends TestCase {
 			)
 		);
 
-		$GLOBALS['post'] = false;
+		$this->seed_unusual_postdata_globals( false );
+		$snapshot                                      = $this->snapshot_postdata_globals();
+		$GLOBALS['mumega_motion_test_main_query_post'] = new WP_Post(
+			array(
+				'ID'           => 96,
+				'post_content' => 'Main query content.',
+			)
+		);
 
 		$this->assertSame( 'Target content.', mumega_motion_render_post_content( $target ) );
-		$this->assertFalse( $GLOBALS['post'] );
+		$this->assert_postdata_globals_same( $snapshot );
 	}
 
 	/**
@@ -199,8 +235,10 @@ final class EditorialHelpersTest extends TestCase {
 			)
 		);
 
-		$GLOBALS['post']                            = $previous;
-		$GLOBALS['mumega_motion_test_current_post'] = $previous;
+		$this->seed_unusual_postdata_globals( $previous );
+		$snapshot                                      = $this->snapshot_postdata_globals();
+		$GLOBALS['mumega_motion_test_current_post']    = $previous;
+		$GLOBALS['mumega_motion_test_main_query_post'] = new WP_Post( array( 'ID' => 95 ) );
 		add_filter(
 			'the_content',
 			static function () {
@@ -215,13 +253,169 @@ final class EditorialHelpersTest extends TestCase {
 			$this->assertSame( 'Filter failed.', $exception->getMessage() );
 		}
 
-		$this->assertSame( $previous, $GLOBALS['post'] );
+		$this->assert_postdata_globals_same( $snapshot );
 		$this->assertSame( $previous, $GLOBALS['mumega_motion_test_current_post'] );
 		$this->assertSame(
 			array(
 				array( 'setup', 24 ),
 				array( 'reset' ),
 				array( 'setup', 13 ),
+			),
+			$GLOBALS['mumega_motion_test_postdata_events']
+		);
+	}
+
+	/**
+	 * Restores absent globals after a content filter fails.
+	 */
+	public function test_render_post_content_restores_absent_globals_when_filter_throws(): void {
+		$target          = new WP_Post(
+			array(
+				'ID'           => 25,
+				'post_content' => 'Target content.',
+			)
+		);
+		$main_query_post = new WP_Post( array( 'ID' => 94 ) );
+		$snapshot        = $this->snapshot_postdata_globals();
+
+		$GLOBALS['mumega_motion_test_main_query_post'] = $main_query_post;
+		add_filter(
+			'the_content',
+			static function () {
+				throw new RuntimeException( 'Absent-state filter failed.' );
+			}
+		);
+
+		try {
+			mumega_motion_render_post_content( $target );
+			$this->fail( 'Expected the content filter exception to propagate.' );
+		} catch ( RuntimeException $exception ) {
+			$this->assertSame( 'Absent-state filter failed.', $exception->getMessage() );
+		}
+
+		$this->assert_postdata_globals_same( $snapshot );
+		$this->assertSame( $main_query_post, $GLOBALS['mumega_motion_test_current_post'] );
+		$this->assertNotSame( $target, $GLOBALS['mumega_motion_test_current_post'] );
+	}
+
+	/**
+	 * Restores non-post globals when target setup itself fails.
+	 */
+	public function test_render_post_content_restores_non_post_globals_when_target_setup_throws(): void {
+		$target          = new WP_Post( array( 'ID' => 26 ) );
+		$main_query_post = new WP_Post( array( 'ID' => 93 ) );
+
+		$this->seed_unusual_postdata_globals( 'prior-non-post' );
+		$snapshot                                      = $this->snapshot_postdata_globals();
+		$GLOBALS['mumega_motion_test_main_query_post'] = $main_query_post;
+		$GLOBALS['mumega_motion_test_setup_postdata_exceptions'][26] = new RuntimeException( 'Target setup failed.' );
+
+		try {
+			mumega_motion_render_post_content( $target );
+			$this->fail( 'Expected the target setup exception to propagate.' );
+		} catch ( RuntimeException $exception ) {
+			$this->assertSame( 'Target setup failed.', $exception->getMessage() );
+		}
+
+		$this->assert_postdata_globals_same( $snapshot );
+		$this->assertSame( $main_query_post, $GLOBALS['mumega_motion_test_current_post'] );
+		$this->assertSame(
+			array(
+				array( 'setup', 26 ),
+				array( 'reset' ),
+			),
+			$GLOBALS['mumega_motion_test_postdata_events']
+		);
+	}
+
+	/**
+	 * Restores every snapshot before propagating a reset failure.
+	 */
+	public function test_render_post_content_restores_globals_when_reset_throws(): void {
+		$target          = new WP_Post( array( 'ID' => 27 ) );
+		$main_query_post = new WP_Post( array( 'ID' => 92 ) );
+
+		$this->seed_unusual_postdata_globals( false );
+		$snapshot                                      = $this->snapshot_postdata_globals();
+		$GLOBALS['mumega_motion_test_main_query_post'] = $main_query_post;
+		$GLOBALS['mumega_motion_test_reset_postdata_exception'] = new RuntimeException( 'Reset failed.' );
+
+		try {
+			mumega_motion_render_post_content( $target );
+			$this->fail( 'Expected the reset exception to propagate.' );
+		} catch ( RuntimeException $exception ) {
+			$this->assertSame( 'Reset failed.', $exception->getMessage() );
+		}
+
+		$this->assert_postdata_globals_same( $snapshot );
+		$this->assertSame( $main_query_post, $GLOBALS['mumega_motion_test_current_post'] );
+	}
+
+	/**
+	 * Preserves the original filter failure when cleanup also fails.
+	 */
+	public function test_render_post_content_prefers_original_exception_over_cleanup_failure(): void {
+		$previous = new WP_Post( array( 'ID' => 14 ) );
+		$target   = new WP_Post( array( 'ID' => 28 ) );
+
+		$this->seed_unusual_postdata_globals( $previous );
+		$snapshot                                      = $this->snapshot_postdata_globals();
+		$GLOBALS['mumega_motion_test_current_post']    = $previous;
+		$GLOBALS['mumega_motion_test_main_query_post'] = new WP_Post( array( 'ID' => 91 ) );
+		$GLOBALS['mumega_motion_test_reset_postdata_exception'] = new RuntimeException( 'Cleanup reset failed.' );
+		add_filter(
+			'the_content',
+			static function () {
+				throw new RuntimeException( 'Original filter failed.' );
+			}
+		);
+
+		try {
+			mumega_motion_render_post_content( $target );
+			$this->fail( 'Expected the original filter exception to propagate.' );
+		} catch ( RuntimeException $exception ) {
+			$this->assertSame( 'Original filter failed.', $exception->getMessage() );
+		}
+
+		$this->assert_postdata_globals_same( $snapshot );
+		$this->assertSame( $previous, $GLOBALS['mumega_motion_test_current_post'] );
+		$this->assertSame(
+			array(
+				array( 'setup', 28 ),
+				array( 'reset' ),
+				array( 'setup', 14 ),
+			),
+			$GLOBALS['mumega_motion_test_postdata_events']
+		);
+	}
+
+	/**
+	 * Restores every snapshot when re-establishing the previous post fails.
+	 */
+	public function test_render_post_content_restores_globals_when_previous_setup_throws(): void {
+		$previous = new WP_Post( array( 'ID' => 15 ) );
+		$target   = new WP_Post( array( 'ID' => 29 ) );
+
+		$this->seed_unusual_postdata_globals( $previous );
+		$snapshot                                      = $this->snapshot_postdata_globals();
+		$GLOBALS['mumega_motion_test_current_post']    = $previous;
+		$GLOBALS['mumega_motion_test_main_query_post'] = new WP_Post( array( 'ID' => 90 ) );
+		$GLOBALS['mumega_motion_test_setup_postdata_exceptions'][15] = new RuntimeException( 'Previous setup failed.' );
+
+		try {
+			mumega_motion_render_post_content( $target );
+			$this->fail( 'Expected the previous setup exception to propagate.' );
+		} catch ( RuntimeException $exception ) {
+			$this->assertSame( 'Previous setup failed.', $exception->getMessage() );
+		}
+
+		$this->assert_postdata_globals_same( $snapshot );
+		$this->assertSame( $previous, $GLOBALS['mumega_motion_test_current_post'] );
+		$this->assertSame(
+			array(
+				array( 'setup', 29 ),
+				array( 'reset' ),
+				array( 'setup', 15 ),
 			),
 			$GLOBALS['mumega_motion_test_postdata_events']
 		);
@@ -697,6 +891,68 @@ final class EditorialHelpersTest extends TestCase {
 		$this->assertSame( array(), mumega_motion_audience_menu_items( 3 ) );
 		$this->assertSame( array(), $GLOBALS['mumega_motion_test_nav_menu_object_requests'] );
 		$this->assertSame( array(), $GLOBALS['mumega_motion_test_nav_menu_item_requests'] );
+	}
+
+	/**
+	 * Removes every global that WordPress postdata setup may mutate.
+	 */
+	private function clear_postdata_globals(): void {
+		foreach ( self::POSTDATA_GLOBAL_NAMES as $global_name ) {
+			unset( $GLOBALS[ $global_name ] );
+		}
+	}
+
+	/**
+	 * Captures exact presence and values for every canonical postdata global.
+	 *
+	 * @return array
+	 */
+	private function snapshot_postdata_globals(): array {
+		$snapshot = array();
+
+		foreach ( self::POSTDATA_GLOBAL_NAMES as $global_name ) {
+			$present                  = array_key_exists( $global_name, $GLOBALS );
+			$snapshot[ $global_name ] = array(
+				'present' => $present,
+				'value'   => $present ? $GLOBALS[ $global_name ] : null,
+			);
+		}
+
+		return $snapshot;
+	}
+
+	/**
+	 * Seeds deliberately unusual values so Core-style cleanup cannot mask leaks.
+	 *
+	 * @param mixed $post_value Exact prior global post value.
+	 */
+	private function seed_unusual_postdata_globals( $post_value ): void {
+		$GLOBALS['post']         = $post_value;
+		$GLOBALS['id']           = 'prior-id';
+		$GLOBALS['authordata']   = (object) array( 'marker' => 'prior-author' );
+		$GLOBALS['currentday']   = array( 'prior-day' );
+		$GLOBALS['currentmonth'] = false;
+		$GLOBALS['page']         = -7;
+		$GLOBALS['pages']        = array( 'prior', 'pages' );
+		$GLOBALS['multipage']    = 'prior-multipage';
+		$GLOBALS['more']         = null;
+		$GLOBALS['numpages']     = 3.5;
+	}
+
+	/**
+	 * Asserts exact global presence and identity/value after temporary rendering.
+	 *
+	 * @param array $snapshot Prior canonical postdata snapshot.
+	 */
+	private function assert_postdata_globals_same( $snapshot ): void {
+		foreach ( self::POSTDATA_GLOBAL_NAMES as $global_name ) {
+			if ( $snapshot[ $global_name ]['present'] ) {
+				$this->assertArrayHasKey( $global_name, $GLOBALS );
+				$this->assertSame( $snapshot[ $global_name ]['value'], $GLOBALS[ $global_name ] );
+			} else {
+				$this->assertArrayNotHasKey( $global_name, $GLOBALS );
+			}
+		}
 	}
 
 	/**

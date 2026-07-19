@@ -76,6 +76,9 @@ $GLOBALS['mumega_motion_test_nav_menu_markup']  = '<ul class="menu"><li><a href=
 $GLOBALS['mumega_motion_test_loop_posts']       = array();
 $GLOBALS['mumega_motion_test_loop_index']       = 0;
 $GLOBALS['mumega_motion_test_current_post']     = null;
+$GLOBALS['mumega_motion_test_main_query_post']  = null;
+$GLOBALS['mumega_motion_test_setup_postdata_exceptions'] = array();
+$GLOBALS['mumega_motion_test_reset_postdata_exception']  = null;
 $GLOBALS['mumega_motion_test_elementor_edit_mode'] = '';
 $GLOBALS['mumega_motion_test_elementor_location_output'] = array();
 $GLOBALS['mumega_motion_test_postdata_events']  = array();
@@ -1074,6 +1077,31 @@ function get_template_part( $slug, $name = null, $args = array() ) {
 }
 
 /**
+ * Populates the canonical globals changed by WP_Query::setup_postdata().
+ *
+ * @param WP_Post $post Post value.
+ * @return void
+ */
+function mumega_motion_test_populate_postdata_globals( $post ) {
+	$post_date = (string) $post->post_date;
+	$pages     = false !== strpos( $post->post_content, '<!--nextpage-->' )
+		? explode( '<!--nextpage-->', $post->post_content )
+		: array( $post->post_content );
+
+	$GLOBALS['id']           = (int) $post->ID;
+	$GLOBALS['authordata']   = (object) array( 'ID' => (int) $post->post_author );
+	$GLOBALS['currentday']   = '' !== $post_date && '0000-00-00 00:00:00' !== $post_date
+		? sprintf( '%s.%s.%s', substr( $post_date, 8, 2 ), substr( $post_date, 5, 2 ), substr( $post_date, 2, 2 ) )
+		: false;
+	$GLOBALS['currentmonth'] = '' !== $post_date && '0000-00-00 00:00:00' !== $post_date ? substr( $post_date, 5, 2 ) : false;
+	$GLOBALS['page']         = 1;
+	$GLOBALS['pages']        = $pages;
+	$GLOBALS['multipage']    = count( $pages ) > 1 ? 1 : 0;
+	$GLOBALS['more']         = 0;
+	$GLOBALS['numpages']     = count( $pages );
+}
+
+/**
  * Sets up a post as the current template context and records the transition.
  *
  * @param WP_Post $post Post value.
@@ -1082,6 +1110,11 @@ function get_template_part( $slug, $name = null, $args = array() ) {
 function setup_postdata( $post ) {
 	$GLOBALS['mumega_motion_test_postdata_events'][] = array( 'setup', (int) $post->ID );
 	$GLOBALS['mumega_motion_test_current_post']       = $post;
+	mumega_motion_test_populate_postdata_globals( $post );
+
+	if ( isset( $GLOBALS['mumega_motion_test_setup_postdata_exceptions'][ (int) $post->ID ] ) ) {
+		throw $GLOBALS['mumega_motion_test_setup_postdata_exceptions'][ (int) $post->ID ];
+	}
 
 	return true;
 }
@@ -1093,6 +1126,16 @@ function setup_postdata( $post ) {
  */
 function wp_reset_postdata() {
 	$GLOBALS['mumega_motion_test_postdata_events'][] = array( 'reset' );
+
+	if ( $GLOBALS['mumega_motion_test_main_query_post'] instanceof WP_Post ) {
+		$GLOBALS['post']                            = $GLOBALS['mumega_motion_test_main_query_post'];
+		$GLOBALS['mumega_motion_test_current_post'] = $GLOBALS['mumega_motion_test_main_query_post'];
+		mumega_motion_test_populate_postdata_globals( $GLOBALS['mumega_motion_test_main_query_post'] );
+	}
+
+	if ( $GLOBALS['mumega_motion_test_reset_postdata_exception'] instanceof Throwable ) {
+		throw $GLOBALS['mumega_motion_test_reset_postdata_exception'];
+	}
 }
 
 /**
