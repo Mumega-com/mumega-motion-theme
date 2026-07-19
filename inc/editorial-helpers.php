@@ -134,15 +134,20 @@ function mumega_motion_has_meaningful_modified_date( $post_id ) {
 }
 
 /**
- * Resolves the optional newsletter page convention.
+ * Resolves a published, unprotected page by its canonical slug.
  *
+ * @param string $slug Canonical page slug.
  * @return WP_Post|null
  */
-function mumega_motion_newsletter_page() {
+function mumega_motion_public_page_by_slug( $slug ) {
+	if ( ! is_string( $slug ) || sanitize_title( $slug ) !== $slug || '' === $slug ) {
+		return null;
+	}
+
 	$pages = get_posts(
 		array(
 			'post_type'    => 'page',
-			'name'         => 'newsletter',
+			'name'         => $slug,
 			'post_status'  => 'publish',
 			'has_password' => false,
 			'numberposts'  => 1,
@@ -154,23 +159,105 @@ function mumega_motion_newsletter_page() {
 }
 
 /**
+ * Resolves the optional newsletter page convention.
+ *
+ * @return WP_Post|null
+ */
+function mumega_motion_newsletter_page() {
+	return mumega_motion_public_page_by_slug( 'newsletter' );
+}
+
+/**
  * Resolves the optional affiliate policy page convention.
  *
  * @return WP_Post|null
  */
 function mumega_motion_affiliate_policy_page() {
-	$pages = get_posts(
-		array(
-			'post_type'    => 'page',
-			'name'         => 'affiliate-disclosure',
-			'post_status'  => 'publish',
-			'has_password' => false,
-			'numberposts'  => 1,
-		)
-	);
-	$page  = empty( $pages ) ? null : $pages[0];
+	return mumega_motion_public_page_by_slug( 'affiliate-disclosure' );
+}
 
-	return $page instanceof WP_Post && 'publish' === $page->post_status && '' === $page->post_password ? $page : null;
+/**
+ * Resolves the optional editorial guide page convention.
+ *
+ * @return WP_Post|null
+ */
+function mumega_motion_editorial_guide_page() {
+	return mumega_motion_public_page_by_slug( 'editorial-guide' );
+}
+
+/**
+ * Resolves the optional editorial methodology page convention.
+ *
+ * @return WP_Post|null
+ */
+function mumega_motion_methodology_page() {
+	return mumega_motion_public_page_by_slug( 'editorial-methodology' );
+}
+
+/**
+ * Resolves the optional knowledge map page convention.
+ *
+ * @return WP_Post|null
+ */
+function mumega_motion_knowledge_map_page() {
+	return mumega_motion_public_page_by_slug( 'knowledge-map' );
+}
+
+/**
+ * Returns normalized audience pathways from the assigned menu.
+ *
+ * Values remain unescaped so each rendering context can escape them at output.
+ *
+ * @param int $limit Maximum number of pathways to return, capped at three.
+ * @return array
+ */
+function mumega_motion_audience_menu_items( $limit = 3 ) {
+	$limit = min( 3, max( 0, (int) $limit ) );
+
+	if ( 0 === $limit ) {
+		return array();
+	}
+
+	$locations = get_nav_menu_locations();
+	$menu_id   = is_array( $locations ) && isset( $locations['audiences'] ) ? (int) $locations['audiences'] : 0;
+	$menu      = $menu_id > 0 ? wp_get_nav_menu_object( $menu_id ) : false;
+
+	if ( ! $menu instanceof WP_Term ) {
+		return array();
+	}
+
+	$normalized = array();
+	$items      = wp_get_nav_menu_items( (int) $menu->term_id );
+
+	foreach ( (array) $items as $item ) {
+		if ( count( $normalized ) >= $limit ) {
+			break;
+		}
+
+		if (
+			! is_object( $item ) ||
+			! isset( $item->title, $item->description, $item->url ) ||
+			! is_scalar( $item->title ) ||
+			! is_scalar( $item->description ) ||
+			! is_scalar( $item->url )
+		) {
+			continue;
+		}
+
+		$url = (string) $item->url;
+
+		if ( '' === $url || false === wp_http_validate_url( $url ) ) {
+			continue;
+		}
+
+		$normalized[] = array(
+			'title'       => (string) $item->title,
+			'description' => (string) $item->description,
+			'url'         => $url,
+		);
+	}
+
+	return $normalized;
 }
 
 /**

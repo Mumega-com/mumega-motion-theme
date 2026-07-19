@@ -19,14 +19,20 @@ final class EditorialHelpersTest extends TestCase {
 	 * Resets configurable WordPress doubles before each helper assertion.
 	 */
 	protected function setUp(): void {
-		$GLOBALS['mumega_motion_test_filters']            = array();
-		$GLOBALS['mumega_motion_test_posts']              = array();
-		$GLOBALS['mumega_motion_test_generated_excerpts'] = array();
-		$GLOBALS['mumega_motion_test_post_terms']         = array();
-		$GLOBALS['mumega_motion_test_post_tags']          = array();
-		$GLOBALS['mumega_motion_test_options']            = array();
-		$GLOBALS['mumega_motion_test_post_queries']       = array();
-		$GLOBALS['mumega_motion_test_get_posts_requests'] = array();
+		$GLOBALS['mumega_motion_test_filters']                    = array();
+		$GLOBALS['mumega_motion_test_posts']                      = array();
+		$GLOBALS['mumega_motion_test_generated_excerpts']         = array();
+		$GLOBALS['mumega_motion_test_post_terms']                 = array();
+		$GLOBALS['mumega_motion_test_post_tags']                  = array();
+		$GLOBALS['mumega_motion_test_options']                    = array();
+		$GLOBALS['mumega_motion_test_post_queries']               = array();
+		$GLOBALS['mumega_motion_test_get_posts_requests']         = array();
+		$GLOBALS['mumega_motion_test_nav_menu_items']             = array();
+		$GLOBALS['mumega_motion_test_nav_menu_item_requests']     = array();
+		$GLOBALS['mumega_motion_test_nav_menu_locations']         = array();
+		$GLOBALS['mumega_motion_test_nav_menu_location_requests'] = array();
+		$GLOBALS['mumega_motion_test_nav_menu_objects']           = array();
+		$GLOBALS['mumega_motion_test_nav_menu_object_requests']   = array();
 	}
 
 	/**
@@ -314,6 +320,191 @@ final class EditorialHelpersTest extends TestCase {
 
 		$this->assertNull( mumega_motion_newsletter_page() );
 		$this->assertNull( mumega_motion_affiliate_policy_page() );
+	}
+
+	/**
+	 * Resolves a generic convention only through a constrained public page query.
+	 */
+	public function test_public_page_lookup_requires_a_published_unprotected_page(): void {
+		$page = new WP_Post(
+			array(
+				'ID'            => 42,
+				'post_status'   => 'publish',
+				'post_password' => '',
+			)
+		);
+		$GLOBALS['mumega_motion_test_post_queries'][] = array( $page );
+		$GLOBALS['mumega_motion_test_post_queries'][] = array(
+			new WP_Post(
+				array(
+					'post_status'   => 'draft',
+					'post_password' => '',
+				)
+			),
+		);
+		$GLOBALS['mumega_motion_test_post_queries'][] = array(
+			new WP_Post(
+				array(
+					'post_status'   => 'publish',
+					'post_password' => 'secret',
+				)
+			),
+		);
+
+		$this->assertSame( $page, mumega_motion_public_page_by_slug( 'editorial-guide' ) );
+		$this->assertNull( mumega_motion_public_page_by_slug( 'editorial-guide' ) );
+		$this->assertNull( mumega_motion_public_page_by_slug( 'editorial-guide' ) );
+		$this->assertSame(
+			array(
+				'post_type'    => 'page',
+				'name'         => 'editorial-guide',
+				'post_status'  => 'publish',
+				'has_password' => false,
+				'numberposts'  => 1,
+			),
+			$GLOBALS['mumega_motion_test_get_posts_requests'][0]
+		);
+	}
+
+	/**
+	 * Rejects malformed convention slugs without querying WordPress.
+	 */
+	public function test_public_page_lookup_rejects_invalid_slugs_before_querying(): void {
+		foreach ( array( '', null, 12, array( 'editorial-guide' ), 'Editorial Guide', '../editorial-guide' ) as $slug ) {
+			$this->assertNull( mumega_motion_public_page_by_slug( $slug ) );
+		}
+
+		$this->assertSame( array(), $GLOBALS['mumega_motion_test_get_posts_requests'] );
+	}
+
+	/**
+	 * Maps the three reusable editorial page conventions to their fixed slugs.
+	 */
+	public function test_editorial_page_wrappers_resolve_their_convention_slugs(): void {
+		$guide       = new WP_Post( array( 'ID' => 43 ) );
+		$methodology = new WP_Post( array( 'ID' => 44 ) );
+		$knowledge   = new WP_Post( array( 'ID' => 45 ) );
+
+		$GLOBALS['mumega_motion_test_post_queries'] = array(
+			array( $guide ),
+			array( $methodology ),
+			array( $knowledge ),
+		);
+
+		$this->assertSame( $guide, mumega_motion_editorial_guide_page() );
+		$this->assertSame( $methodology, mumega_motion_methodology_page() );
+		$this->assertSame( $knowledge, mumega_motion_knowledge_map_page() );
+		$this->assertSame(
+			array( 'editorial-guide', 'editorial-methodology', 'knowledge-map' ),
+			array_column( $GLOBALS['mumega_motion_test_get_posts_requests'], 'name' )
+		);
+	}
+
+	/**
+	 * Preserves assigned audience order while exposing only raw display values.
+	 */
+	public function test_audience_menu_items_preserve_order_normalize_values_and_limit_to_three(): void {
+		$GLOBALS['mumega_motion_test_nav_menu_locations']['audiences'] = 31;
+		$GLOBALS['mumega_motion_test_nav_menu_objects'][31]            = new WP_Term( array( 'term_id' => 31 ) );
+		$GLOBALS['mumega_motion_test_nav_menu_items'][31]              = array(
+			(object) array(
+				'ID'          => 101,
+				'title'       => 'Site owners & operators',
+				'description' => 'Plan & govern',
+				'url'         => 'https://example.test/site-owners/?from=home&kind=audience',
+				'classes'     => array( 'untrusted-class' ),
+			),
+			(object) array(
+				'title'       => 'Agencies',
+				'description' => 'Deliver client systems',
+				'url'         => 'https://example.test/agencies/',
+			),
+			(object) array(
+				'title'       => 'Builders',
+				'description' => 'Ship integrations',
+				'url'         => 'https://example.test/builders/',
+			),
+			(object) array(
+				'title'       => 'Content teams',
+				'description' => 'Publish reliably',
+				'url'         => 'https://example.test/content-teams/',
+			),
+		);
+
+		$this->assertSame(
+			array(
+				array(
+					'title'       => 'Site owners & operators',
+					'description' => 'Plan & govern',
+					'url'         => 'https://example.test/site-owners/?from=home&kind=audience',
+				),
+				array(
+					'title'       => 'Agencies',
+					'description' => 'Deliver client systems',
+					'url'         => 'https://example.test/agencies/',
+				),
+				array(
+					'title'       => 'Builders',
+					'description' => 'Ship integrations',
+					'url'         => 'https://example.test/builders/',
+				),
+			),
+			mumega_motion_audience_menu_items( 3 )
+		);
+		$this->assertSame( array( true ), $GLOBALS['mumega_motion_test_nav_menu_location_requests'] );
+		$this->assertSame( array( 31 ), $GLOBALS['mumega_motion_test_nav_menu_object_requests'] );
+		$this->assertSame( array( 31 ), $GLOBALS['mumega_motion_test_nav_menu_item_requests'] );
+	}
+
+	/**
+	 * Ignores malformed audience entries and unsafe destinations.
+	 */
+	public function test_audience_menu_items_reject_malformed_entries_and_urls(): void {
+		$GLOBALS['mumega_motion_test_nav_menu_locations']['audiences'] = 32;
+		$GLOBALS['mumega_motion_test_nav_menu_objects'][32]            = new WP_Term( array( 'term_id' => 32 ) );
+		$GLOBALS['mumega_motion_test_nav_menu_items'][32]              = array(
+			'not-an-object',
+			(object) array(
+				'title'       => array( 'Malformed' ),
+				'description' => 'Not scalar',
+				'url'         => 'https://example.test/malformed/',
+			),
+			(object) array(
+				'title'       => 'Empty URL',
+				'description' => 'Missing destination',
+				'url'         => '',
+			),
+			(object) array(
+				'title'       => 'Unsafe URL',
+				'description' => 'Invalid destination',
+				'url'         => 'javascript:alert(1)',
+			),
+			(object) array(
+				'title'       => 'Valid item',
+				'description' => 'A valid destination',
+				'url'         => 'https://example.test/valid/',
+			),
+		);
+
+		$this->assertSame(
+			array(
+				array(
+					'title'       => 'Valid item',
+					'description' => 'A valid destination',
+					'url'         => 'https://example.test/valid/',
+				),
+			),
+			mumega_motion_audience_menu_items( 3 )
+		);
+	}
+
+	/**
+	 * Omits audience pathways when the menu location is not assigned.
+	 */
+	public function test_audience_menu_items_return_an_empty_array_when_unassigned(): void {
+		$this->assertSame( array(), mumega_motion_audience_menu_items( 3 ) );
+		$this->assertSame( array(), $GLOBALS['mumega_motion_test_nav_menu_object_requests'] );
+		$this->assertSame( array(), $GLOBALS['mumega_motion_test_nav_menu_item_requests'] );
 	}
 
 	/**

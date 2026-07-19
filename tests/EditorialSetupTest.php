@@ -112,8 +112,9 @@ final class EditorialSetupTest extends TestCase {
 
 		$this->assertSame(
 			array(
-				'primary' => 'Primary Navigation',
-				'footer'  => 'Footer Navigation',
+				'primary'   => 'Primary Navigation',
+				'footer'    => 'Footer Navigation',
+				'audiences' => 'Audience Pathways',
 			),
 			$GLOBALS['mumega_motion_test_menu_locations']
 		);

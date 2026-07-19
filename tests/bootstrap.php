@@ -486,6 +486,36 @@ function sanitize_key( $key ) {
 }
 
 /**
+ * Normalizes a title using the subset needed by page-slug fixtures.
+ *
+ * @param string $title Raw title.
+ * @return string
+ */
+function sanitize_title( $title ) {
+	$title = strtolower( trim( (string) $title ) );
+	$title = preg_replace( '/[^a-z0-9\s\-]/', '', $title );
+	$title = preg_replace( '/[\s\-]+/', '-', $title );
+
+	return trim( $title, '-' );
+}
+
+/**
+ * Validates an absolute HTTP(S) URL for audience-menu fixtures.
+ *
+ * @param string $url Candidate URL.
+ * @return string|false
+ */
+function wp_http_validate_url( $url ) {
+	if ( ! is_string( $url ) || false === filter_var( $url, FILTER_VALIDATE_URL ) ) {
+		return false;
+	}
+
+	$scheme = parse_url( $url, PHP_URL_SCHEME );
+
+	return in_array( strtolower( (string) $scheme ), array( 'http', 'https' ), true ) ? $url : false;
+}
+
+/**
  * Prints a translated attribute string unchanged in tests.
  *
  * @param string $text   Text to translate.
