@@ -91,6 +91,41 @@ test('content brief accepts the complete controlled contract', async () => {
   assert.equal(result.valid, true, result.errors.join('\n'));
 });
 
+test('all artifact schemas reject non-canonical slug syntax', async () => {
+  const artifacts = {
+    'content-brief': validBrief,
+    'research-packet': validResearchPacket,
+    'validation-report': validValidationReport
+  };
+  const invalidSlugs = [
+    'ai agents',
+    'https://example.com/ai-agents',
+    'AI-agents',
+    'ai--agents'
+  ];
+  const outcomes = [];
+
+  for (const [schemaName, artifact] of Object.entries(artifacts)) {
+    for (const canonicalSlug of invalidSlugs) {
+      const result = await validateArtifact(root, schemaName, {
+        ...artifact,
+        canonical_slug: canonicalSlug
+      });
+      outcomes.push({ schemaName, canonicalSlug, result });
+    }
+  }
+
+  assert.deepEqual(
+    outcomes.filter(({ result }) => result.valid).map(
+      ({ schemaName, canonicalSlug }) => `${schemaName}: ${canonicalSlug}`
+    ),
+    []
+  );
+  for (const { result } of outcomes) {
+    assert.match(result.errors.join('\n'), /canonical_slug.*pattern/);
+  }
+});
+
 test('content brief rejects unknown format, missing reviewer, duplicate sources, and extra fields', async () => {
   const invalidBrief = {
     ...validBrief,
@@ -102,7 +137,11 @@ test('content brief rejects unknown format, missing reviewer, duplicate sources,
 
   const result = await validateArtifact(root, 'content-brief', invalidBrief);
   assert.equal(result.valid, false);
-  assert.match(result.errors.join('\n'), /content_format|human_reviewer_role|primary_sources|additionalProperties/);
+  const errors = result.errors.join('\n');
+  assert.match(errors, /content_format/);
+  assert.match(errors, /human_reviewer_role/);
+  assert.match(errors, /primary_sources/);
+  assert.match(errors, /additionalProperties/);
 });
 
 test('content brief requires versions and date when testing is required', async () => {
@@ -130,6 +169,15 @@ test('research packet rejects a claim without a source or evidence reference', a
   assert.match(result.errors.join('\n'), /claims\/0.*anyOf/);
 });
 
+test('research packet accepts claims backed by an evidence reference', async () => {
+  const packet = structuredClone(validResearchPacket);
+  packet.claims[0].source_url = null;
+  packet.claims[0].evidence_reference = 'test-artifacts/wordpress-draft-run.json';
+
+  const result = await validateArtifact(root, 'research-packet', packet);
+  assert.equal(result.valid, true, result.errors.join('\n'));
+});
+
 test('validation report accepts controlled fields and lowercase SHA-256 hashes', async () => {
   const result = await validateArtifact(root, 'validation-report', validValidationReport);
   assert.equal(result.valid, true, result.errors.join('\n'));
@@ -143,6 +191,44 @@ test('validation report cannot pass when any gate fails', async () => {
   const result = await validateArtifact(root, 'validation-report', invalidReport);
   assert.equal(result.valid, false);
   assert.match(result.errors.join('\n'), /overall_status.*const/);
+});
+
+test('validation report rejects an invalid role', async () => {
+  const result = await validateArtifact(root, 'validation-report', {
+    ...validValidationReport,
+    role: 'publisher'
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /role.*enum/);
+});
+
+test('validation report rejects an invalid artifact hash', async () => {
+  const report = structuredClone(validValidationReport);
+  report.artifact_hashes['content-brief.json'] = 'ABC123';
+
+  const result = await validateArtifact(root, 'validation-report', report);
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /artifact_hashes\/content-brief\.json.*pattern/);
+});
+
+test('validation report rejects an invalid timestamp', async () => {
+  const result = await validateArtifact(root, 'validation-report', {
+    ...validValidationReport,
+    timestamp: '2026-07-19'
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /timestamp.*format/);
+});
+
+test('validation report rejects unknown nested fields', async () => {
+  const report = structuredClone(validValidationReport);
+  report.state_transition.actor = 'technical-verifier';
+
+  const result = await validateArtifact(root, 'validation-report', report);
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /state_transition.*additionalProperties/);
 });
 
 test('validation report permits scout creation with a null from state', async () => {
