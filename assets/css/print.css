@@ -3,6 +3,10 @@
  */
 
 @media print {
+	@page {
+		margin: 18mm;
+	}
+
 	.site-header,
 	.primary-navigation,
 	.mobile-navigation,
@@ -21,6 +25,7 @@
 
 	html,
 	body,
+	.site-main,
 	.single-article,
 	.article-entry,
 	.article-body {
@@ -28,9 +33,56 @@
 		color: #000 !important;
 	}
 
-	.single-article {
-		background: #fff;
-		color: #000;
+	body {
+		font-size: 11pt;
+		line-height: 1.5;
+	}
+
+	.site-main,
+	.single-article,
+	.article-entry {
+		display: block;
+		margin: 0;
+		max-width: none;
+		padding: 0;
+	}
+
+	.article-header,
+	.article-featured-image,
+	.article-body,
+	.article-author-bio,
+	.article-entities,
+	.affiliate-disclosure {
+		break-inside: avoid;
+	}
+
+	.article-header__title {
+		font-size: 28pt;
+		letter-spacing: normal;
+	}
+
+	.article-featured-image {
+		margin-block: 8mm;
+	}
+
+	.article-featured-image__image {
+		max-height: 120mm;
+		object-fit: contain;
+	}
+
+	.article-body h2,
+	.article-body h3,
+	.article-body h4 {
+		break-after: avoid;
+	}
+
+	.article-body p,
+	.article-body li,
+	.article-body blockquote,
+	.article-body table,
+	.article-body figure {
+		orphans: 3;
+		widows: 3;
 	}
 
 	.article-body a {
@@ -43,5 +95,11 @@
 		content: " (" attr(href) ")";
 		font-size: 0.85em;
 		overflow-wrap: anywhere;
+	}
+
+	.site-footer {
+		border-top: 1px solid #000;
+		margin-top: 12mm;
+		padding-top: 5mm;
 	}
 }
