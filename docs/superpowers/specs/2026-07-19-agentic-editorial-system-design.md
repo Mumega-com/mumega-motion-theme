@@ -1,11 +1,11 @@
 # Mumega Motion Agentic Editorial System
 
-**Date:** 2026-07-19  
-**Status:** Approved design; written contract pending owner review  
-**Repository:** `Mumega-com/mumega-motion-theme`  
-**First site profile:** `https://mcpwp.net`  
-**Initial editorial contract:** `1.0.0`  
-**Target theme release:** Mumega Motion `0.2.0`  
+**Date:** 2026-07-19
+**Status:** Approved design; written contract pending owner review
+**Repository:** `Mumega-com/mumega-motion-theme`
+**First site profile:** `https://mcpwp.net`
+**Initial editorial contract:** `1.0.0`
+**Target theme release:** Mumega Motion `0.2.0`
 **Target MCPWP profile:** `1.0.0`
 
 ## Objective
@@ -364,64 +364,64 @@ Required sections:
 
 ### Scout
 
-Inputs: published corpus, active briefs, primary topic map and current platform changes.  
-Output: gap proposal or update proposal.  
-May: identify overlap, stale content and emerging primary sources.  
+Inputs: published corpus, active briefs, primary topic map and current platform changes.
+Output: gap proposal or update proposal.
+May: identify overlap, stale content and emerging primary sources.
 May not: create or update a WordPress post.
 Allowed transition: create a new `idea` record from an accepted gap or update proposal; it may not advance that record beyond `idea`.
 
 ### Brief creator
 
-Inputs: accepted gap proposal.  
-Output: schema-valid content brief.  
-May: define intent, audience, format and evidence requirements.  
+Inputs: accepted gap proposal.
+Output: schema-valid content brief.
+May: define intent, audience, format and evidence requirements.
 May not: mark its own brief accepted.
 Allowed transition: `idea` to `brief_ready`.
 
 ### Researcher
 
-Inputs: accepted brief.  
-Output: research packet with claim-level evidence.  
-May: browse current primary sources and record uncertainty.  
+Inputs: accepted brief.
+Output: research packet with claim-level evidence.
+May: browse current primary sources and record uncertainty.
 May not: draft the publishable article or silently broaden scope.
 Allowed transition: `brief_accepted` to `research_ready`.
 
 ### Writer
 
-Inputs: accepted brief, accepted research packet and selected template.  
-Output: WordPress draft and validation artifact.  
-May: synthesize, organize and explain supported material.  
+Inputs: accepted brief, accepted research packet and selected template.
+Output: WordPress draft and validation artifact.
+May: synthesize, organize and explain supported material.
 May not: introduce unsupported material claims, publish, change canonical URLs or create redirects.
 Allowed transition: `research_accepted` to `drafting`.
 
 ### Technical verifier
 
-Inputs: draft, brief, research packet and test artifacts.  
-Output: pass/fail report with corrections.  
-May: reproduce supported procedures, inspect permissions, check versions and validate rollback claims.  
+Inputs: draft, brief, research packet and test artifacts.
+Output: pass/fail report with corrections.
+May: reproduce supported procedures, inspect permissions, check versions and validate rollback claims.
 May not: rewrite conclusions to hide failed verification.
 Allowed transition: `drafting` to `technical_verification`.
 
 ### Discovery reviewer
 
-Inputs: technically verified draft and corpus map.  
-Output: SEO/GEO and knowledge-structure report.  
-May: flag unclear intent, duplicate coverage, poor headings, missing internal links, crawl barriers, mismatched metadata and inconsistent entities.  
+Inputs: technically verified draft and corpus map.
+Output: SEO/GEO and knowledge-structure report.
+May: flag unclear intent, duplicate coverage, poor headings, missing internal links, crawl barriers, mismatched metadata and inconsistent entities.
 May not: add keyword variants or unsupported FAQ content solely for ranking.
 Allowed transition: `technical_verification` to `discovery_review`.
 
 ### Editor handoff
 
-Inputs: all artifacts and a draft that passed machine gates.  
-Output: concise human decision packet.  
-May: summarize remaining risks and required choices.  
+Inputs: all artifacts and a draft that passed machine gates.
+Output: concise human decision packet.
+May: summarize remaining risks and required choices.
 May not: publish or impersonate the human reviewer.
 Allowed transition: `discovery_review` to `human_review`.
 
 ### Human editor
 
-Inputs: complete handoff.  
-Output: approve, return, reject, publish or schedule.  
+Inputs: complete handoff.
+Output: approve, return, reject, publish or schedule.
 Only the human editor may approve exceptions, public authorship, publication, redirects, deletions and commercial conclusions.
 
 Human-only transitions are `brief_ready` to `brief_accepted`, `research_ready` to `research_accepted`, `human_review` to `approved`, `approved` to `published`, and the post-publication transitions from `published` to `update_due`, `corrected`, or `retired`. `editorial/workflow.json` is the machine-readable authority for these assignments; role files and GitHub labels must agree with it.

@@ -1,11 +1,11 @@
 # MCPWP editorial homepage V2
 
-**Date:** 2026-07-19  
-**Status:** Approved visual direction; implementation pending owner review of this contract  
-**Repository:** `Mumega-com/mumega-motion-theme`  
-**Site:** `https://mcpwp.net`  
-**Current production theme:** Mumega Motion 0.1.19  
-**Current safe preview:** WordPress page 1130 using `page-templates/editorial-home.php`  
+**Date:** 2026-07-19
+**Status:** Approved visual direction; implementation pending owner review of this contract
+**Repository:** `Mumega-com/mumega-motion-theme`
+**Site:** `https://mcpwp.net`
+**Current production theme:** Mumega Motion 0.1.19
+**Current safe preview:** WordPress page 1130 using `page-templates/editorial-home.php`
 
 ## Objective
 
@@ -210,7 +210,7 @@ The module includes a short AI-assistance and human-review disclosure. It must c
 
 ### 2. Two-column hero
 
-Left: page-owned promise, deck, actions, and audience trust line.  
+Left: page-owned promise, deck, actions, and audience trust line.
 Right: the current briefing, ASTER identity when configured, lead headline, two related links when available, and disclosure.
 
 The desktop ratio is approximately 58/42. On narrow screens, the audience promise renders first and the briefing follows. No decorative center panel is permitted.
