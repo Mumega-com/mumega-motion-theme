@@ -68,6 +68,7 @@ $GLOBALS['mumega_motion_test_loop_posts']       = array();
 $GLOBALS['mumega_motion_test_loop_index']       = 0;
 $GLOBALS['mumega_motion_test_current_post']     = null;
 $GLOBALS['mumega_motion_test_elementor_edit_mode'] = '';
+$GLOBALS['mumega_motion_test_postdata_events']  = array();
 
 /**
  * Minimal post value used by editorial helper tests.
@@ -794,12 +795,38 @@ function get_footer() {
  * @param string $name Optional specialized name.
  * @return void
  */
-function get_template_part( $slug, $name = null ) {
+function get_template_part( $slug, $name = null, $args = array() ) {
 	$path = get_template_directory() . '/' . $slug . ( null === $name ? '' : '-' . $name ) . '.php';
 
 	if ( file_exists( $path ) ) {
+		if ( is_array( $args ) ) {
+			extract( $args, EXTR_SKIP ); // phpcs:ignore WordPress.PHP.DontExtract.extract_extract -- Mirrors the native template-part argument contract.
+		}
+
 		require $path;
 	}
+}
+
+/**
+ * Sets up a post as the current template context and records the transition.
+ *
+ * @param WP_Post $post Post value.
+ * @return true
+ */
+function setup_postdata( $post ) {
+	$GLOBALS['mumega_motion_test_postdata_events'][] = array( 'setup', (int) $post->ID );
+	$GLOBALS['mumega_motion_test_current_post']       = $post;
+
+	return true;
+}
+
+/**
+ * Records WordPress's restoration of the main query post.
+ *
+ * @return void
+ */
+function wp_reset_postdata() {
+	$GLOBALS['mumega_motion_test_postdata_events'][] = array( 'reset' );
 }
 
 /**
