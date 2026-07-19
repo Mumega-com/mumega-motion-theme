@@ -88,8 +88,8 @@ final class EditorialSetupTest extends TestCase {
 			$contents = file_get_contents( dirname( __DIR__ ) . '/' . $template ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Tests inspect local theme templates.
 
 			$this->assertIsString( $contents, $template );
-			$this->assertStringContainsString( 'get_header();', $contents, $template );
-			$this->assertStringContainsString( 'get_footer();', $contents, $template );
+			$this->assertStringContainsString( 'mumega_motion_get_header();', $contents, $template );
+			$this->assertStringContainsString( 'mumega_motion_get_footer();', $contents, $template );
 		}
 	}
 

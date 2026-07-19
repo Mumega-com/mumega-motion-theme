@@ -5,7 +5,7 @@
  * @package Mumega_Motion
  */
 
-get_header();
+mumega_motion_get_header();
 $archive_description = get_the_archive_description();
 $menu_category_ids   = mumega_motion_menu_category_ids();
 ?>
@@ -42,4 +42,4 @@ $menu_category_ids   = mumega_motion_menu_category_ids();
 </main>
 
 <?php
-get_footer();
+mumega_motion_get_footer();

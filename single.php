@@ -5,7 +5,7 @@
  * @package Mumega_Motion
  */
 
-get_header();
+mumega_motion_get_header();
 ?>
 
 <main id="primary" class="site-main single-article">
@@ -134,4 +134,4 @@ get_header();
 </main>
 
 <?php
-get_footer();
+mumega_motion_get_footer();
