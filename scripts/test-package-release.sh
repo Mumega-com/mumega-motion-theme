@@ -294,6 +294,154 @@ assert_step_contains() {
 	' "${WORKFLOW}" || fail "Workflow step ${step_name} is missing: ${needle}"
 }
 
+workflow_job_step_contains() {
+	local workflow_file="$1"
+	local job_name="$2"
+	local step_name="$3"
+	local needle="$4"
+
+	awk -v job_name="${job_name}" -v step_name="${step_name}" -v needle="${needle}" '
+		$0 == "  " job_name ":" {
+			in_job = 1
+			job_found = 1
+			next
+		}
+		in_job && /^  [[:alnum:]_-]+:$/ {
+			exit
+		}
+		in_job && $0 == "      - name: " step_name {
+			step_count++
+			in_step = 1
+			next
+		}
+		in_job && /^      - / {
+			in_step = 0
+		}
+		in_step && $0 == "        run: " needle {
+			found = 1
+		}
+		END {
+			exit job_found && step_count == 1 && found ? 0 : 1
+		}
+	' "${workflow_file}"
+}
+
+assert_job_step_contains() {
+	local job_name="$1"
+	local step_name="$2"
+	local needle="$3"
+
+	workflow_job_step_contains "${WORKFLOW}" "${job_name}" "${step_name}" "${needle}" ||
+		fail "Workflow job ${job_name} step ${step_name} is missing: ${needle}"
+}
+
+workflow_job_steps_in_order() {
+	local workflow_file="$1"
+	local job_name="$2"
+	local first_step="$3"
+	local second_step="$4"
+	local third_step="$5"
+
+	awk -v job_name="${job_name}" -v first_step="${first_step}" -v second_step="${second_step}" -v third_step="${third_step}" '
+		$0 == "  " job_name ":" {
+			in_job = 1
+			job_found = 1
+			next
+		}
+		in_job && /^  [[:alnum:]_-]+:$/ {
+			exit
+		}
+		in_job && $0 == "      - name: " first_step {
+			first_count++
+			first_line = NR
+		}
+		in_job && $0 == "      - name: " second_step {
+			second_count++
+			second_line = NR
+		}
+		in_job && $0 == "      - name: " third_step {
+			third_count++
+			third_line = NR
+		}
+		END {
+			exit job_found && first_count == 1 && second_count == 1 && third_count == 1 && first_line < second_line && second_line < third_line ? 0 : 1
+		}
+	' "${workflow_file}"
+}
+
+assert_job_steps_in_order() {
+	local job_name="$1"
+	local first_step="$2"
+	local second_step="$3"
+	local third_step="$4"
+
+	workflow_job_steps_in_order "${WORKFLOW}" "${job_name}" "${first_step}" "${second_step}" "${third_step}" ||
+		fail "Workflow job ${job_name} steps are not ordered: ${first_step} -> ${second_step} -> ${third_step}"
+}
+
+workflow_with_contract_gates_only_in_verify() {
+	awk '
+		function print_contract_steps() {
+			print "      - name: Validate Editorial Contract"
+			print "        run: npm run validate:editorial-contract"
+			print ""
+			print "      - name: Run Editorial Contract tests"
+			print "        run: npm run test:editorial-contract"
+			print ""
+		}
+		$0 == "  verify:" {
+			job = "verify"
+		}
+		$0 == "  release:" {
+			job = "release"
+		}
+		skipping_release_gate {
+			if ($0 !~ /^      - /) {
+				next
+			}
+			skipping_release_gate = 0
+		}
+		job == "release" && ($0 == "      - name: Validate Editorial Contract" || $0 == "      - name: Run Editorial Contract tests") {
+			skipping_release_gate = 1
+			next
+		}
+		job == "verify" && $0 == "      - name: Run JavaScript behavior tests" {
+			print_contract_steps()
+		}
+		{ print }
+	' "${WORKFLOW}"
+}
+
+workflow_with_release_contract_gates_after_package() {
+	awk '
+		function print_contract_steps() {
+			print "      - name: Validate Editorial Contract"
+			print "        run: npm run validate:editorial-contract"
+			print ""
+			print "      - name: Run Editorial Contract tests"
+			print "        run: npm run test:editorial-contract"
+			print ""
+		}
+		$0 == "  release:" {
+			in_release = 1
+		}
+		skipping_release_gate {
+			if ($0 !~ /^      - /) {
+				next
+			}
+			skipping_release_gate = 0
+		}
+		in_release && ($0 == "      - name: Validate Editorial Contract" || $0 == "      - name: Run Editorial Contract tests") {
+			skipping_release_gate = 1
+			next
+		}
+		in_release && $0 == "      - name: Verify package layout and manifest" {
+			print_contract_steps()
+		}
+		{ print }
+	' "${WORKFLOW}"
+}
+
 # Each authenticated remote peeled-tag check must use the same ephemeral
 # credential helper as the tag push; checkout never persists credentials.
 for verification_step in \
@@ -322,16 +470,49 @@ assert_contains "-iname '*.map'" "${ROOT_DIR}/scripts/package-theme.sh"
 assert_contains "-iname '*.md'" "${ROOT_DIR}/scripts/package-theme.sh"
 assert_not_contains 'editorial/' "${ROOT_DIR}/scripts/package-theme.sh"
 assert_contains 'find functions.php index.php header.php footer.php page.php single.php home.php archive.php search.php 404.php page-templates template-parts inc -type f -name' "${WORKFLOW}"
-assert_step_contains 'Validate Editorial Contract' 'npm run validate:editorial-contract'
-assert_step_contains 'Run Editorial Contract tests' 'npm run test:editorial-contract'
-validation_step_count="$(grep -Fc -- '- name: Validate Editorial Contract' "${WORKFLOW}" || true)"
-test_step_count="$(grep -Fc -- '- name: Run Editorial Contract tests' "${WORKFLOW}" || true)"
-validation_command_count="$(grep -Fc -- 'run: npm run validate:editorial-contract' "${WORKFLOW}" || true)"
-test_command_count="$(grep -Fc -- 'run: npm run test:editorial-contract' "${WORKFLOW}" || true)"
-test "${validation_step_count}" -eq 2 || fail 'Verify and release jobs must each validate the editorial contract.'
-test "${test_step_count}" -eq 2 || fail 'Verify and release jobs must each run the editorial contract tests.'
-test "${validation_command_count}" -eq 2 || fail 'Editorial contract validation command must run exactly once in each job.'
-test "${test_command_count}" -eq 2 || fail 'Editorial contract test command must run exactly once in each job.'
+for workflow_job in verify release; do
+	assert_job_step_contains "${workflow_job}" 'Validate Editorial Contract' 'npm run validate:editorial-contract'
+	assert_job_step_contains "${workflow_job}" 'Run Editorial Contract tests' 'npm run test:editorial-contract'
+done
+assert_job_steps_in_order \
+	release \
+	'Validate Editorial Contract' \
+	'Run Editorial Contract tests' \
+	'Package the verified runtime allowlist'
+
+# These in-memory mutations reproduce layouts that the former global command
+# counts accepted. The job-scoped checker must reject missing release gates,
+# while the order checker must reject release gates moved after packaging.
+verify_only_workflow="$(workflow_with_contract_gates_only_in_verify)"
+if workflow_job_step_contains \
+	<(printf '%s\n' "${verify_only_workflow}") \
+	release \
+	'Validate Editorial Contract' \
+	'npm run validate:editorial-contract'; then
+	fail 'Job-scoped checker accepted editorial contract gates confined to the verify job.'
+fi
+
+after_package_workflow="$(workflow_with_release_contract_gates_after_package)"
+for contract_step in \
+	'Validate Editorial Contract|npm run validate:editorial-contract' \
+	'Run Editorial Contract tests|npm run test:editorial-contract'; do
+	step_name="${contract_step%%|*}"
+	step_command="${contract_step#*|}"
+	workflow_job_step_contains \
+		<(printf '%s\n' "${after_package_workflow}") \
+		release \
+		"${step_name}" \
+		"${step_command}" || fail 'After-package fixture did not preserve the release contract step binding.'
+done
+if workflow_job_steps_in_order \
+	<(printf '%s\n' "${after_package_workflow}") \
+	release \
+	'Validate Editorial Contract' \
+	'Run Editorial Contract tests' \
+	'Package the verified runtime allowlist'; then
+	fail 'Order checker accepted editorial contract gates after packaging.'
+fi
+printf 'Job-scoped workflow fixture checks passed.\n'
 assert_step_contains 'Run JavaScript behavior tests' 'npm run test:js'
 assert_step_contains 'Run PHPUnit and lint shipped PHP' 'vendor/bin/phpunit -c phpunit.xml.dist'
 assert_step_contains 'Verify package layout and manifest' 'expected_top_level_paths='
