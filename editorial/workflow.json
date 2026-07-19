@@ -1,0 +1,34 @@
+{
+  "states": [
+    "idea",
+    "brief_ready",
+    "brief_accepted",
+    "research_ready",
+    "research_accepted",
+    "drafting",
+    "technical_verification",
+    "discovery_review",
+    "human_review",
+    "approved",
+    "published",
+    "update_due",
+    "corrected",
+    "retired"
+  ],
+  "transitions": [
+    { "from": null, "to": "idea", "actor": "scout", "human_only": false },
+    { "from": "idea", "to": "brief_ready", "actor": "brief-creator", "human_only": false },
+    { "from": "brief_ready", "to": "brief_accepted", "actor": "human-editor", "human_only": true },
+    { "from": "brief_accepted", "to": "research_ready", "actor": "researcher", "human_only": false },
+    { "from": "research_ready", "to": "research_accepted", "actor": "human-editor", "human_only": true },
+    { "from": "research_accepted", "to": "drafting", "actor": "writer", "human_only": false },
+    { "from": "drafting", "to": "technical_verification", "actor": "technical-verifier", "human_only": false },
+    { "from": "technical_verification", "to": "discovery_review", "actor": "discovery-reviewer", "human_only": false },
+    { "from": "discovery_review", "to": "human_review", "actor": "editor-handoff", "human_only": false },
+    { "from": "human_review", "to": "approved", "actor": "human-editor", "human_only": true },
+    { "from": "approved", "to": "published", "actor": "human-editor", "human_only": true },
+    { "from": "published", "to": "update_due", "actor": "human-editor", "human_only": true },
+    { "from": "published", "to": "corrected", "actor": "human-editor", "human_only": true },
+    { "from": "published", "to": "retired", "actor": "human-editor", "human_only": true }
+  ]
+}
