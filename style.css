@@ -20,13 +20,14 @@ html {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
 	html {
 		scroll-behavior: auto;
 	}
 }
 
 body {
-	background: var(--figma-color-surface, #ffffff);
+	background: var(--figma-color-surface, #fff);
 	color: var(--figma-color-text, #151515);
 	font-family: var(--figma-typography-body-font-family, system-ui, sans-serif);
 	line-height: 1.6;
@@ -61,7 +62,7 @@ textarea {
 }
 
 .screen-reader-text:focus {
-	background: #ffffff;
+	background: #fff;
 	clip: auto !important;
 	clip-path: none;
 	color: #151515;
@@ -114,6 +115,7 @@ textarea {
 }
 
 @media (max-width: 48rem) {
+
 	.primary-navigation {
 		display: none;
 	}
