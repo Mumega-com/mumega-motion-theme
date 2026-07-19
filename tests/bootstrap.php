@@ -75,6 +75,7 @@ $GLOBALS['mumega_motion_test_loop_posts']       = array();
 $GLOBALS['mumega_motion_test_loop_index']       = 0;
 $GLOBALS['mumega_motion_test_current_post']     = null;
 $GLOBALS['mumega_motion_test_elementor_edit_mode'] = '';
+$GLOBALS['mumega_motion_test_elementor_location_output'] = array();
 $GLOBALS['mumega_motion_test_postdata_events']  = array();
 
 /**
@@ -1009,7 +1010,10 @@ function elementor_theme_do_location( $location ) {
 
 	if ( $rendered ) {
 		$GLOBALS['mumega_motion_test_elementor_shell_calls'][] = $location;
-		echo '<!-- elementor_' . esc_attr( $location ) . ' -->';
+		$output = array_key_exists( $location, $GLOBALS['mumega_motion_test_elementor_location_output'] )
+			? $GLOBALS['mumega_motion_test_elementor_location_output'][ $location ]
+			: '<!-- elementor_' . esc_attr( $location ) . ' -->';
+		echo $output; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Deterministic test fixture.
 	}
 
 	return $rendered;

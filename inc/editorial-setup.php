@@ -53,6 +53,34 @@ function mumega_motion_register_elementor_locations( $manager ) {
 add_action( 'elementor/theme/register_locations', 'mumega_motion_register_elementor_locations' );
 
 /**
+ * Renders an Elementor Theme Builder location only when it emits real markup.
+ *
+ * Elementor may report a registered location as handled even when display
+ * conditions exclude every template. Buffering the call prevents that empty
+ * success response from suppressing the native theme fallback.
+ *
+ * @param string $location Theme Builder location name.
+ * @return bool Whether non-empty Elementor markup was rendered.
+ */
+function mumega_motion_render_elementor_location( $location ) {
+	if ( ! function_exists( 'elementor_theme_do_location' ) ) {
+		return false;
+	}
+
+	ob_start();
+	$handled = elementor_theme_do_location( $location );
+	$markup  = (string) ob_get_clean();
+
+	if ( ! $handled || '' === trim( $markup ) ) {
+		return false;
+	}
+
+	echo $markup; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Elementor owns and escapes its rendered template markup.
+
+	return true;
+}
+
+/**
  * Determines whether the request uses an editorial theme template.
  *
  * Legacy Elementor pages are deliberately excluded, so the editorial CSS and
