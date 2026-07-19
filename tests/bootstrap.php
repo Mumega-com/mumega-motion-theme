@@ -20,6 +20,8 @@ if ( ! defined( 'DAY_IN_SECONDS' ) ) {
 
 $GLOBALS['mumega_motion_test_filters']          = array();
 $GLOBALS['mumega_motion_test_actions']          = array();
+$GLOBALS['mumega_motion_test_pattern_categories'] = array();
+$GLOBALS['mumega_motion_test_patterns']         = array();
 $GLOBALS['mumega_motion_test_routes']           = array();
 $GLOBALS['mumega_motion_test_tools']            = array();
 $GLOBALS['mumega_motion_test_site_transients']  = array();
@@ -1376,6 +1378,32 @@ function do_action( $hook_name, ...$args ) {
 			);
 		}
 	}
+}
+
+/**
+ * Records a registered block-pattern category for assertions.
+ *
+ * @param string $category_name Pattern category slug.
+ * @param array  $category_properties Pattern category properties.
+ * @return bool
+ */
+function register_block_pattern_category( $category_name, $category_properties = array() ) {
+	$GLOBALS['mumega_motion_test_pattern_categories'][ $category_name ] = $category_properties;
+
+	return true;
+}
+
+/**
+ * Records a registered block pattern for assertions.
+ *
+ * @param string $pattern_name Pattern slug.
+ * @param array  $pattern_properties Pattern properties.
+ * @return bool
+ */
+function register_block_pattern( $pattern_name, $pattern_properties = array() ) {
+	$GLOBALS['mumega_motion_test_patterns'][ $pattern_name ] = $pattern_properties;
+
+	return true;
 }
 
 /**

@@ -44,6 +44,11 @@ require get_template_directory() . '/inc/editorial-queries.php';
 require get_template_directory() . '/inc/editorial-setup.php';
 
 /**
+ * Reusable Gutenberg patterns for editorial content.
+ */
+require get_template_directory() . '/inc/editorial-patterns.php';
+
+/**
  * Fixed-repository verified update system, with dashboard fallback independent
  * of the optional MCPWP extension hook.
  */
