@@ -14,7 +14,7 @@ Flag unclear intent, duplicate coverage, poor headings, missing internal links, 
 
 ## May not
 
-Add keyword variants or unsupported FAQ content solely for ranking; accept artifacts; approve an exception; publish; create a redirect; delete content; change a canonical URL; or introduce a doorway variant.
+Create, update, edit, or correct the WordPress draft or metadata; add keyword variants or unsupported FAQ content solely for ranking; accept artifacts; approve an exception; publish; create a redirect; delete content; change a canonical URL; or introduce a doorway variant.
 
 ## Allowed transition
 
@@ -22,4 +22,4 @@ Add keyword variants or unsupported FAQ content solely for ranking; accept artif
 
 ## Stop conditions
 
-Stop with a failing report when intent is duplicated or unclear, visible copy and metadata diverge, headings or internal links misrepresent the hierarchy, crawl or canonical prerequisites are not testable, entities are inconsistent, or required facts lack sources. Correct the content or metadata; never solve a failure by creating query-fan-out pages.
+Stop with a failing report when intent is duplicated or unclear, visible copy and metadata diverge, headings or internal links misrepresent the hierarchy, crawl or canonical prerequisites are not testable, entities are inconsistent, or required facts lack sources. Return content or metadata defects and proposed corrections to the owning role; never solve a failure by creating query-fan-out pages.

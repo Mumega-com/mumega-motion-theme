@@ -64,6 +64,8 @@ const loadManifest = async () => JSON.parse(
   await readFile(new URL('editorial/manifest.json', root), 'utf8')
 );
 
+const loadRole = (name) => readFile(new URL(`editorial/agents/${name}.md`, root), 'utf8');
+
 const collectMissing = async (directory, names) => {
   const existing = new Set(await readdir(new URL(directory, root)).catch(() => []));
   return names.filter((name) => !existing.has(name));
@@ -137,4 +139,40 @@ test('documentation inventory and workflow match the editorial manifest', async 
 
   const workflow = JSON.parse(await readFile(new URL('editorial/workflow.json', root), 'utf8'));
   assert.deepEqual(workflow, { states, transitions });
+});
+
+test('writer is the only non-human role allowed to mutate a WordPress draft', async () => {
+  const manifest = await loadManifest();
+  const roles = await Promise.all(
+    manifest.roles.map(async (name) => ({ name, content: await loadRole(name) }))
+  );
+  const draftMutators = roles
+    .filter(({ content }) => (
+      /\b(?:create|update|edit|correct)\b[\s\S]*\bWordPress draft\b/i.test(
+        section(content, '## May', '## May not')
+      )
+    ))
+    .map(({ name }) => name);
+
+  assert.deepEqual(draftMutators, ['writer']);
+
+  const technicalVerifier = roles.find(({ name }) => name === 'technical-verifier').content;
+  assert.match(
+    section(technicalVerifier, '## May not', '## Allowed transition'),
+    /create, update, edit, or correct the WordPress draft/i
+  );
+  assert.match(
+    section(technicalVerifier, '## Stop conditions'),
+    /corrections? (?:in|to) (?:the|its) report[\s\S]*return[\s\S]*owning role/i
+  );
+
+  const discoveryReviewer = roles.find(({ name }) => name === 'discovery-reviewer').content;
+  assert.match(
+    section(discoveryReviewer, '## May not', '## Allowed transition'),
+    /create, update, edit, or correct (?:the )?(?:WordPress )?draft or metadata/i
+  );
+  assert.match(
+    section(discoveryReviewer, '## Stop conditions'),
+    /return[\s\S]*(?:content|metadata)[\s\S]*(?:defects?|corrections?)[\s\S]*owning role/i
+  );
 });
