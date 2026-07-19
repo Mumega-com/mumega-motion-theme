@@ -1,0 +1,12 @@
+{
+  "kind": "workflow-attempt",
+  "actor": "writer",
+  "from_state": "approved",
+  "to_state": "published",
+  "wordpress_operation": "none",
+  "validation_report_ref": {
+    "path": "editorial/examples/valid/validation-report.json",
+    "sha256": "d8a6803c20d607456c70df2be553d86cc970a769263726fdf6eafd5ff12085af"
+  },
+  "_expected_errors": ["workflow attempts cannot represent human-only transitions"]
+}

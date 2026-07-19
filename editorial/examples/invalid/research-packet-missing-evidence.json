@@ -1,0 +1,25 @@
+{
+  "contract_version": "1.0.0",
+  "canonical_slug": "claim-without-evidence",
+  "claims": [
+    {
+      "claim": "WordPress always permits an agent to create a draft.",
+      "claim_type": "sourced-fact",
+      "source_url": null,
+      "evidence_reference": null,
+      "publisher": "Unknown",
+      "published_at": null,
+      "accessed_at": "2026-07-19",
+      "version_environment": "WordPress 6.8",
+      "confidence": "low",
+      "uncertainty": "Site authorization is unknown.",
+      "stale_trigger": "Authorization behavior changes.",
+      "target_section": "Prerequisites"
+    }
+  ],
+  "counterevidence": [],
+  "normalized_entities": ["WordPress"],
+  "forbidden_claims": [],
+  "artifacts": [],
+  "_expected_errors": ["material claim requires a source URL or evidence reference"]
+}

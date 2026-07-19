@@ -1,0 +1,16 @@
+{
+  "kind": "workflow-attempt",
+  "actor": "researcher",
+  "from_state": "brief_accepted",
+  "to_state": "research_ready",
+  "wordpress_operation": "create-draft",
+  "wordpress_target": {
+    "canonical_slug": "prepare-safe-wordpress-draft",
+    "authorized_fields": ["content"]
+  },
+  "validation_report_ref": {
+    "path": "editorial/examples/valid/validation-report.json",
+    "sha256": "d8a6803c20d607456c70df2be553d86cc970a769263726fdf6eafd5ff12085af"
+  },
+  "_expected_errors": ["only writer may perform a WordPress draft operation"]
+}

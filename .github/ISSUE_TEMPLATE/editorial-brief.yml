@@ -1,0 +1,228 @@
+name: Editorial brief
+description: Propose a schema-aligned editorial content brief for human review.
+title: "[Editorial brief]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for human-readable intake. The schema-valid machine-readable content brief is authoritative; this issue does not replace it.
+
+  - type: input
+    id: contract_version
+    attributes:
+      label: Contract version
+      description: Must match the active editorial contract version.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: working_title
+    attributes:
+      label: Working title
+    validations:
+      required: true
+
+  - type: input
+    id: canonical_slug
+    attributes:
+      label: Canonical slug
+      description: Use lowercase letters, numbers, and hyphens only.
+      placeholder: bounded-editorial-agents
+    validations:
+      required: true
+
+  - type: dropdown
+    id: content_format
+    attributes:
+      label: Content format
+      options:
+        - explainer
+        - practical-guide
+        - test-report
+        - comparison-review
+        - news-briefing
+        - analysis-opinion
+    validations:
+      required: true
+
+  - type: dropdown
+    id: primary_topic
+    attributes:
+      label: Primary topic
+      options:
+        - understand
+        - build
+        - govern
+        - grow
+        - test
+    validations:
+      required: true
+
+  - type: dropdown
+    id: primary_audience
+    attributes:
+      label: Primary audience
+      options:
+        - site-owner
+        - agency
+        - builder
+        - content-team
+    validations:
+      required: true
+
+  - type: textarea
+    id: user_question
+    attributes:
+      label: User question
+      description: State the single question this article must answer.
+    validations:
+      required: true
+
+  - type: textarea
+    id: direct_answer
+    attributes:
+      label: Direct answer
+      description: Give the concise answer the proposed article will support.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: search_intent
+    attributes:
+      label: Search intent
+      options:
+        - informational
+        - procedural
+        - comparative
+        - evaluative
+        - navigational
+    validations:
+      required: true
+
+  - type: dropdown
+    id: unique_value_type
+    attributes:
+      label: Unique value type
+      options:
+        - original-test
+        - primary-source-synthesis
+        - implementation-procedure
+        - evidence-led-analysis
+    validations:
+      required: true
+
+  - type: textarea
+    id: unique_value
+    attributes:
+      label: Unique value
+      description: Explain what this article adds beyond existing coverage.
+    validations:
+      required: true
+
+  - type: textarea
+    id: public_entities
+    attributes:
+      label: Public entities
+      description: List one public entity per line; enter `[]` when there are none.
+    validations:
+      required: true
+
+  - type: input
+    id: canonical_page_supported
+    attributes:
+      label: Canonical page supported
+      description: Enter the internal path this article supports, or `null`.
+      placeholder: /wordpress-ai/
+    validations:
+      required: true
+
+  - type: textarea
+    id: required_evidence
+    attributes:
+      label: Required evidence
+      description: List one evidence requirement per line; enter `[]` when none is required.
+    validations:
+      required: true
+
+  - type: textarea
+    id: primary_sources
+    attributes:
+      label: Primary sources
+      description: List one absolute source URL per line; enter `[]` when there are none.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: test_required
+    attributes:
+      label: Test required
+      options:
+        - "false"
+        - "true"
+    validations:
+      required: true
+
+  - type: input
+    id: versions_and_date
+    attributes:
+      label: Versions and date
+      description: Required when testing is required; otherwise enter `null`.
+      placeholder: WordPress 6.8 and MCPWP 3.6.1, tested 2026-07-19
+    validations:
+      required: true
+
+  - type: textarea
+    id: required_internal_links
+    attributes:
+      label: Required internal links
+      description: List one internal path per line; enter `[]` when there are none.
+    validations:
+      required: true
+
+  - type: input
+    id: human_reviewer_role
+    attributes:
+      label: Human reviewer role
+      placeholder: editor
+    validations:
+      required: true
+
+  - type: textarea
+    id: ai_disclosure
+    attributes:
+      label: AI disclosure
+      description: State how AI assistance will be disclosed.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: freshness_class
+    attributes:
+      label: Freshness class
+      options:
+        - evergreen
+        - version-sensitive
+        - news
+    validations:
+      required: true
+
+  - type: textarea
+    id: update_trigger
+    attributes:
+      label: Update trigger
+      description: Describe the event or evidence change that requires review.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: commercial_relationship
+    attributes:
+      label: Commercial relationship
+      options:
+        - none
+        - affiliate
+        - vendor-access
+        - sponsored
+    validations:
+      required: true

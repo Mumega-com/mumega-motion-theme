@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mumega.com/editorial/schemas/content-brief.schema.json",
+  "title": "Editorial content brief",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "working_title",
+    "canonical_slug",
+    "content_format",
+    "primary_topic",
+    "primary_audience",
+    "user_question",
+    "direct_answer",
+    "search_intent",
+    "unique_value_type",
+    "unique_value",
+    "public_entities",
+    "canonical_page_supported",
+    "required_evidence",
+    "primary_sources",
+    "test_required",
+    "versions_and_date",
+    "required_internal_links",
+    "human_reviewer_role",
+    "ai_disclosure",
+    "freshness_class",
+    "update_trigger",
+    "commercial_relationship"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "working_title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "canonical_slug": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "content_format": {
+      "enum": [
+        "explainer",
+        "practical-guide",
+        "test-report",
+        "comparison-review",
+        "news-briefing",
+        "analysis-opinion"
+      ]
+    },
+    "primary_topic": {
+      "enum": ["understand", "build", "govern", "grow", "test"]
+    },
+    "primary_audience": {
+      "enum": ["site-owner", "agency", "builder", "content-team"]
+    },
+    "user_question": {
+      "type": "string",
+      "minLength": 1
+    },
+    "direct_answer": {
+      "type": "string",
+      "minLength": 1
+    },
+    "search_intent": {
+      "enum": ["informational", "procedural", "comparative", "evaluative", "navigational"]
+    },
+    "unique_value_type": {
+      "enum": ["original-test", "primary-source-synthesis", "implementation-procedure", "evidence-led-analysis"]
+    },
+    "unique_value": {
+      "type": "string",
+      "minLength": 1
+    },
+    "public_entities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "canonical_page_supported": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required_evidence": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "primary_sources": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "format": "uri"
+      }
+    },
+    "test_required": {
+      "type": "boolean"
+    },
+    "versions_and_date": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required_internal_links": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "human_reviewer_role": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ai_disclosure": {
+      "type": "string",
+      "minLength": 1
+    },
+    "freshness_class": {
+      "enum": ["evergreen", "version-sensitive", "news"]
+    },
+    "update_trigger": {
+      "type": "string",
+      "minLength": 1
+    },
+    "commercial_relationship": {
+      "enum": ["none", "affiliate", "vendor-access", "sponsored"]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "test_required": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "required": ["versions_and_date"],
+        "properties": {
+          "versions_and_date": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ]
+}

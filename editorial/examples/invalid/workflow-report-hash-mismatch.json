@@ -1,0 +1,16 @@
+{
+  "kind": "workflow-attempt",
+  "actor": "writer",
+  "from_state": "research_accepted",
+  "to_state": "drafting",
+  "wordpress_operation": "create-draft",
+  "wordpress_target": {
+    "canonical_slug": "prepare-safe-wordpress-draft",
+    "authorized_fields": ["title", "content", "excerpt"]
+  },
+  "validation_report_ref": {
+    "path": "editorial/examples/valid/validation-report.json",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "_expected_errors": ["validation report SHA-256 does not match exact file bytes"]
+}

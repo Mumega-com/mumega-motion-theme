@@ -8,12 +8,17 @@
     "start": "wp-scripts start src/js/index.js --output-path=build",
     "test": "npm run test:js && npm run build",
     "test:js": "wp-scripts test-unit-js --runInBand",
+    "test:editorial-contract": "node --test editorial/tests/*.test.mjs",
+    "validate:editorial-contract": "node editorial/scripts/validate-contract.mjs",
+    "generate:editorial-context": "node editorial/scripts/generate-site-context.mjs",
     "package": "npm run build && ./scripts/package-theme.sh"
   },
   "dependencies": {
     "motion": "^12.42.2"
   },
   "devDependencies": {
-    "@wordpress/scripts": "^30.0.0"
+    "@wordpress/scripts": "^30.0.0",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
   }
 }

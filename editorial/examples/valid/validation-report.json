@@ -1,0 +1,39 @@
+{
+  "contract_version": "1.0.0",
+  "canonical_slug": "prepare-safe-wordpress-draft",
+  "role": "writer",
+  "state_transition": {
+    "from": "research_accepted",
+    "to": "drafting"
+  },
+  "timestamp": "2026-07-19T16:30:00Z",
+  "artifact_hashes": {
+    "content-brief.json": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "research-packet.json": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "gate_results": [
+    {
+      "gate": "schema",
+      "status": "pass",
+      "details": "All preflight artifacts match editorial contract 1.0.0."
+    },
+    {
+      "gate": "scope-duplication",
+      "status": "pass",
+      "details": "The accepted canonical intent is unique in the current corpus."
+    },
+    {
+      "gate": "evidence",
+      "status": "pass",
+      "details": "Every material claim has a source URL or evidence reference."
+    },
+    {
+      "gate": "template",
+      "status": "pass",
+      "details": "The selected format contract can be satisfied before draft creation."
+    }
+  ],
+  "unresolved_risks": [],
+  "next_allowed_role": "technical-verifier",
+  "overall_status": "pass"
+}
