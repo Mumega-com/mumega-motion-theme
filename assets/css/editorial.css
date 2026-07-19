@@ -453,3 +453,18 @@
 		padding-inline: 0;
 	}
 }
+
+/* Motion targets remain visible and in normal flow before JavaScript mounts. */
+@media (prefers-reduced-motion: reduce) {
+	[data-motion],
+	[data-motion] *,
+	[data-motion-stream],
+	[data-motion-stream] *,
+	[data-motion-island],
+	[data-motion-island] * {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-delay: 0ms !important;
+		transition-duration: 0.01ms !important;
+	}
+}

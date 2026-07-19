@@ -49,6 +49,11 @@ require get_template_directory() . '/inc/editorial-setup.php';
 require get_template_directory() . '/inc/editorial-patterns.php';
 
 /**
+ * Inert allowlisted markup boundary for future editorial React islands.
+ */
+require get_template_directory() . '/inc/editorial-islands.php';
+
+/**
  * Fixed-repository verified update system, with dashboard fallback independent
  * of the optional MCPWP extension hook.
  */
