@@ -1,13 +1,10 @@
 <?php
 /**
- * The current fallback template contains demonstration Motion mounts. This
- * declaration must precede wp_head() so the asset hook can enqueue Motion.
- * Task 5 removes this opt-in when it replaces the demo mounts.
+ * Theme fallback template.
  *
  * @package Mumega_Motion
  */
 
-add_filter( 'mumega_motion_enqueue_motion', '__return_true' );
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
