@@ -93,6 +93,10 @@ add_action( 'wp_enqueue_scripts', 'mumega_motion_enqueue_editorial_styles' );
  * @return void
  */
 function mumega_motion_enqueue_motion_assets() {
+	if ( is_page_template( 'elementor_header_footer' ) ) {
+		return;
+	}
+
 	$enqueue = apply_filters( 'mumega_motion_enqueue_motion', mumega_motion_page_has_motion_mounts() );
 
 	if ( ! $enqueue ) {

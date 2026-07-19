@@ -110,7 +110,7 @@ final class EditorialShellTest extends TestCase {
 		$post                                        = new WP_Post(
 			array(
 				'ID'           => 71,
-				'post_content' => '<section id="legacy-elementor-content">Legacy builder content</section>',
+				'post_content' => '<section id="legacy-elementor-content" data-motion="fade-in">Legacy builder content</section>',
 				'post_title'   => 'Legacy page',
 			)
 		);
@@ -119,6 +119,15 @@ final class EditorialShellTest extends TestCase {
 		$GLOBALS['mumega_motion_test_loop_posts']          = array( $post );
 		$GLOBALS['mumega_motion_test_queried_object_id']   = 71;
 		$GLOBALS['mumega_motion_test_posts'][71]           = $post;
+		$motion_filter_called                              = false;
+		add_filter(
+			'mumega_motion_enqueue_motion',
+			static function () use ( &$motion_filter_called ) {
+				$motion_filter_called = true;
+
+				return true;
+			}
+		);
 
 		$output = $this->render_theme_file( 'page.php' );
 		mumega_motion_enqueue_editorial_styles();
@@ -126,8 +135,10 @@ final class EditorialShellTest extends TestCase {
 
 		$this->assertSame( 'builder', get_post_meta( 71, '_elementor_edit_mode', true ) );
 		$this->assertStringContainsString( 'legacy-elementor-content', $output );
+		$this->assertStringContainsString( 'data-motion="fade-in"', $output );
 		$this->assertArrayNotHasKey( 'mumega-motion-editorial', $GLOBALS['mumega_motion_test_enqueued_styles'] );
 		$this->assertArrayNotHasKey( 'mumega-motion', $GLOBALS['mumega_motion_test_enqueued_scripts'] );
+		$this->assertFalse( $motion_filter_called );
 	}
 
 	/**
