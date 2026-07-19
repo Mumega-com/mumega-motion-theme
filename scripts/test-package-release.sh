@@ -5,7 +5,7 @@
 set -euo pipefail
 
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-readonly VERSION='0.1.987'
+readonly VERSION='0.2.0'
 readonly ARCHIVE="mumega-motion-theme-${VERSION}.zip"
 readonly DIST_DIR="${ROOT_DIR}/dist"
 readonly WORKFLOW="${ROOT_DIR}/.github/workflows/edge-release.yml"
@@ -140,9 +140,38 @@ if ./scripts/package-theme.sh "${VERSION}"; then
 fi
 rm -f "${ROOT_DIR}/inc/DEVELOPMENT.MD"
 
+# The producer and consumer share canonical SemVer. Reject values that could
+# create an immutable release the installed client cannot discover, plus input
+# shapes that must never be interpreted as shell source.
+readonly PAYLOAD_MARKER="${TMPDIR:-/tmp}/mumega-motion-release-payload"
+rm -f "${PAYLOAD_MARKER}"
+invalid_versions=(
+	''
+	'v0.2.0'
+	'0.2'
+	'0.2.0-beta'
+	'01.2.0'
+	' 0.2.0'
+	'0.2.0 '
+	$'0.2.0\n'
+	"0.2.0; touch ${PAYLOAD_MARKER}"
+	'$(touch /tmp/mumega-motion-release-payload)'
+)
+for invalid_version in "${invalid_versions[@]}"; do
+	set +e
+	./scripts/package-theme.sh "${invalid_version}" >/dev/null 2>&1
+	status=$?
+	set -e
+	test "${status}" -eq 64 || fail "Packager accepted noncanonical version: $(printf '%q' "${invalid_version}")"
+done
+test ! -e "${PAYLOAD_MARKER}" || fail 'A shell-payload-shaped version was executed.'
+
 # Release workflow invariants: immutable, verified tag and release bindings.
-awk '
-	$0 == "  pull_request:" {
+assert_verification_trigger_targets_master() {
+	local event_name="$1"
+
+	awk -v event_name="${event_name}" '
+	$0 == "  " event_name ":" {
 		in_trigger = 1
 		next
 	}
@@ -158,7 +187,37 @@ awk '
 	END {
 		exit branches && master ? 0 : 1
 	}
-' "${WORKFLOW}" || fail 'Pull requests to master must run the verification job.'
+	' "${WORKFLOW}" || fail "${event_name} events to master must run the verification job."
+}
+
+assert_verification_trigger_targets_master 'pull_request'
+assert_verification_trigger_targets_master 'push'
+
+awk '
+	$0 == "  workflow_dispatch:" {
+		in_dispatch = 1
+		next
+	}
+	in_dispatch && /^  [[:alnum:]_-]+:$/ {
+		exit
+	}
+	in_dispatch && $0 == "    inputs:" {
+		inputs = 1
+	}
+	in_dispatch && $0 == "      version:" {
+		version = 1
+	}
+	in_dispatch && version && $0 == "        required: true" {
+		required = 1
+	}
+	in_dispatch && version && $0 == "        type: string" {
+		string_type = 1
+	}
+	END {
+		exit inputs && version && required && string_type ? 0 : 1
+	}
+' "${WORKFLOW}" || fail 'Manual dispatch must require a string version input.'
+
 awk '
 	$0 == "  release:" {
 		in_release = 1
@@ -167,13 +226,14 @@ awk '
 	in_release && /^  [[:alnum:]_-]+:$/ {
 		exit
 	}
-	in_release && $0 == "    if: github.event_name == '\''push'\'' && github.ref == '\''refs/heads/master'\''" {
+	in_release && $0 == "    if: github.event_name == '\''workflow_dispatch'\'' && github.ref == '\''refs/heads/master'\''" {
 		guarded = 1
 	}
 	END {
 		exit guarded ? 0 : 1
 	}
-' "${WORKFLOW}" || fail 'The release job must publish only for pushes to master.'
+	' "${WORKFLOW}" || fail 'The release job must publish only for a manual dispatch from master.'
+assert_not_contains "github.event_name == 'push'" "${WORKFLOW}"
 while IFS= read -r action; do
 	[[ "${action}" =~ @[0-9a-f]{40}(\ #.*)?$ ]] || fail "Action is not pinned to a full commit SHA: ${action}"
 done < <(grep -E '^ +uses: ' "${WORKFLOW}")
@@ -185,14 +245,23 @@ assert_contains 'git tag -a "${TAG}" "${GITHUB_SHA}"' "${WORKFLOW}"
 assert_contains 'git config --local user.name "github-actions[bot]"' "${WORKFLOW}"
 assert_contains 'git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"' "${WORKFLOW}"
 assert_contains 'push --porcelain origin "refs/tags/${TAG}:refs/tags/${TAG}"' "${WORKFLOW}"
-assert_contains 'echo "VERSION=0.1.${GITHUB_RUN_NUMBER}"' "${WORKFLOW}"
-assert_contains 'echo "TAG=edge-v0.1.${GITHUB_RUN_NUMBER}"' "${WORKFLOW}"
+assert_contains 'INPUT_VERSION: ${{ inputs.version }}' "${WORKFLOW}"
+inputs_version_reference_count="$(grep -Fc '${{ inputs.version }}' "${WORKFLOW}" || true)"
+test "${inputs_version_reference_count}" -eq 1 || fail 'The manual input must appear only in the step environment mapping, never in shell source.'
+assert_contains 'if [[ ! "$INPUT_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then' "${WORKFLOW}"
+assert_contains 'VERSION="${INPUT_VERSION}"' "${WORKFLOW}"
+assert_contains 'TAG="edge-v${VERSION}"' "${WORKFLOW}"
+assert_contains 'echo "VERSION=${VERSION}"' "${WORKFLOW}"
+assert_contains 'echo "TAG=${TAG}"' "${WORKFLOW}"
+assert_not_contains 'GITHUB_RUN_NUMBER' "${WORKFLOW}"
 assert_contains '} >> "$GITHUB_ENV"' "${WORKFLOW}"
 manifest_timestamp_derivation_count="$(grep -Fc 'git show -s --format=%cI "${GITHUB_SHA}"' "${WORKFLOW}" || true)"
 test "${manifest_timestamp_derivation_count}" -eq 2 || fail 'Verify and release jobs must derive the manifest timestamp from the triggering commit.'
 manifest_timestamp_export_count="$(grep -Fc 'echo "MUMEGA_MOTION_MANIFEST_PUBLISHED_AT=${published_at}"' "${WORKFLOW}" || true)"
 test "${manifest_timestamp_export_count}" -eq 2 || fail 'Verify and release jobs must pass the manifest timestamp through the environment.'
 assert_contains 'git rev-parse "refs/tags/${TAG}^{}"' "${WORKFLOW}"
+assert_contains 'git ls-remote --exit-code --tags origin "refs/tags/${TAG}"' "${WORKFLOW}"
+assert_contains 'grep -Eq '\''^\*.*\[new tag\]$'\''' "${WORKFLOW}"
 assert_contains 'credential.helper=!f() {' "${WORKFLOW}"
 assert_contains 'GITHUB_TOKEN: ${{ github.token }}' "${WORKFLOW}"
 assert_contains 'awk -v peeled_ref="refs/tags/${TAG}^{}"' "${WORKFLOW}"
@@ -259,7 +328,7 @@ assert_not_contains 'stream-demo.php' "${WORKFLOW}"
 
 # Exercise the exact peeled-ref selection used by the workflow: a matching
 # tag object SHA must not be mistaken for the dereferenced commit SHA.
-test_tag='edge-v0.1.987'
+test_tag='edge-v0.2.0'
 expected_sha='0123456789abcdef0123456789abcdef01234567'
 remote_sha="$({
 	printf '%s %s\n' 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' "refs/tags/${test_tag}"

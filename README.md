@@ -134,11 +134,35 @@ npm run package -- 0.1.123 # build and create dist/mumega-motion-theme-0.1.123.z
 
 ## Edge update packages
 
-Every successful `master` build can produce a GitHub edge prerelease. Its edge
-version is `0.1.<GitHub run number>` and its tag is
-`edge-v0.1.<GitHub run number>`. The release contains only the WordPress theme
-runtime files, its SHA-256 checksum, and `manifest.json`; it never changes the
-checked-in `style.css` version.
+Pull requests and pushes to `master` run verification only. They cannot publish
+a tag, package, or release. Publishing requires an explicit manual dispatch of
+the **Edge theme release** workflow from `master` with a canonical
+`MAJOR.MINOR.PATCH` version. Values with prefixes, suffixes, whitespace, or
+leading-zero numeric components are rejected. The release tag is exactly
+`edge-v<version>`; GitHub run numbers do not participate in release identity.
+
+Before dispatching `0.2.0`, verify the intended `origin/master` commit, confirm
+the tag and release do not already exist, and confirm Immutable Releases is
+enabled. Then dispatch that exact version from `master` and retain the run ID
+and its `headSha` as release evidence:
+
+```bash
+git fetch origin master --tags
+git rev-parse origin/master
+gh api repos/Mumega-com/mumega-motion-theme/releases/tags/edge-v0.2.0
+gh api repos/Mumega-com/mumega-motion-theme/git/ref/tags/edge-v0.2.0
+gh api repos/Mumega-com/mumega-motion-theme/immutable-releases --jq '.enabled'
+gh workflow run edge-release.yml \
+  --repo Mumega-com/mumega-motion-theme \
+  --ref master \
+  -f version=0.2.0
+```
+
+The two preflight tag/release requests must report not found. Do not dispatch
+if either object already exists, the selected commit is not the reviewed
+candidate, or repository immutability is disabled. A successful manual run
+contains only the WordPress theme runtime ZIP, its SHA-256 sidecar, and
+`manifest.json`; it never changes the checked-in `style.css` version.
 
 Release immutability is a GitHub repository setting, not something this
 workflow can establish by itself. Before enabling publishing, a repository
@@ -157,7 +181,7 @@ needs to move an existing one. That tag-ruleset exception is distinct from the
 release job's `contents: write` workflow permission, which authorizes creating
 the prerelease and uploading its assets.
 
-To make the same package locally, run `npm run package -- 0.1.123`. The
+To make the same package locally, run `npm run package -- 0.2.0`. The
 packager stages an explicit runtime allowlist, rejects development-only
 directories and files (including source maps, docs, tests, and build tooling),
 sets the version only in the staged stylesheet, and normalizes archive metadata
@@ -165,27 +189,33 @@ so a repeated build from the same source produces the same ZIP bytes.
 `dist/manifest.json` exactly binds the archive SHA-256, fixed GitHub download
 URL, WordPress requirement, and PHP requirement.
 
-Publishing an edge package does **not** install it on a WordPress site. The
-normal WordPress Themes/Updates dashboard remains the fallback when MCPWP is
-unavailable or an operator prefers a dashboard action.
+Publishing an edge package does **not** install it on a WordPress site. This
+source repository is private, while the current WordPress release client makes
+unauthenticated requests. Private GitHub release discovery and download are
+therefore not a supported deployment transport yet. Until an authenticated
+private transport or a public binary-only endpoint is separately implemented
+and proven, preview deployment must use a manual, checksummed, reversible
+operator upload. Never place a repository credential in the theme, manifest,
+MCP request, URL, log, or update result.
 
-For the explicit MCP workflow, wait for the edge prerelease, then call
-`wp_update_mumega_motion` with an MCPWP key that has the required `admin`
-scope (optionally using `force_check: true`). Review the returned package and
-installation evidence, then separately verify the homepage status, desktop
-and mobile rendering, and the absence of fatal errors. Use
-`wp_rollback_mumega_motion` only as an explicit recovery operation; updates
-are never installed merely by pushing a commit.
+The updater always installs the latest eligible release it discovers; neither
+the dashboard nor `wp_update_mumega_motion` accepts a target tag. Before any
+future automated install, force a read-only discovery refresh and verify that
+the returned latest version and release tag are exactly the intended release.
+Abort if they differ. Review the package and installation evidence, then
+separately verify the homepage status, desktop and mobile rendering, and the
+absence of fatal errors. Use `wp_rollback_mumega_motion` only as an explicit
+recovery operation; updates are never installed merely by pushing a commit.
 
 Before an install, the updater stores a local copy of the active theme and
 retains the three newest successful backups. It automatically attempts to
 restore the fresh backup when a post-backup update step fails.
 
 The MCP bridge has a one-time installation requirement: install a theme bridge
-ZIP manually through WordPress once (and ensure MCPWP includes the
-raise-only admin-scope bridge support) before relying on MCP-triggered updates.
-After that bootstrap, later verified edge packages can be discovered and
-installed through the dashboard or the explicit MCP workflow above.
+ZIP manually through WordPress once (and ensure MCPWP includes the raise-only
+admin-scope bridge support). That bootstrap does not solve private release
+transport; MCP-triggered updates remain disabled operationally until the
+distribution boundary above is implemented and verified.
 
 ## Known tradeoff — bundle size
 
