@@ -31,7 +31,24 @@ trap cleanup EXIT
 
 cd "${ROOT_DIR}"
 
-for runtime_path in style.css functions.php index.php stream-demo.php build inc; do
+for runtime_path in \
+	style.css \
+	theme.json \
+	functions.php \
+	index.php \
+	header.php \
+	footer.php \
+	page.php \
+	single.php \
+	home.php \
+	archive.php \
+	search.php \
+	404.php \
+	build \
+	inc \
+	assets \
+	page-templates \
+	template-parts; do
 	if [[ ! -e ${runtime_path} ]]; then
 		printf 'Required runtime path is missing: %s\n' "${runtime_path}" >&2
 		exit 1
@@ -42,7 +59,24 @@ mkdir -p "${STAGED_THEME}"
 
 # This explicit allowlist is the package policy. It excludes source, tests,
 # documentation, Composer/Node tooling, Git data, workflows, and local output.
-for runtime_path in style.css functions.php index.php stream-demo.php build inc; do
+for runtime_path in \
+	style.css \
+	theme.json \
+	functions.php \
+	index.php \
+	header.php \
+	footer.php \
+	page.php \
+	single.php \
+	home.php \
+	archive.php \
+	search.php \
+	404.php \
+	build \
+	inc \
+	assets \
+	page-templates \
+	template-parts; do
 	cp -R "${runtime_path}" "${STAGED_THEME}/${runtime_path}"
 done
 

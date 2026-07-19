@@ -71,9 +71,47 @@ if (JSON.stringify(manifest) !== JSON.stringify(expected)) {
 NODE
 
 unzip -Z1 "${DIST_DIR}/${ARCHIVE}" > "${DIST_DIR}/contents.txt"
-for required in style.css functions.php index.php stream-demo.php build/index.js build/index.asset.php; do
+required_runtime_files=(
+	style.css
+	theme.json
+	functions.php
+	index.php
+	header.php
+	footer.php
+	page.php
+	single.php
+	home.php
+	archive.php
+	search.php
+	404.php
+	build/index.js
+	build/index.asset.php
+	assets/css/editorial.css
+	assets/css/print.css
+	page-templates/editorial-home.php
+	template-parts/article-meta.php
+	template-parts/content-card-compact.php
+	template-parts/content-card.php
+	template-parts/empty-state.php
+	template-parts/lead-story.php
+	template-parts/newsletter.php
+	template-parts/section-heading.php
+	inc/editorial-helpers.php
+	inc/editorial-islands.php
+	inc/editorial-patterns.php
+	inc/editorial-queries.php
+	inc/editorial-setup.php
+)
+for required in "${required_runtime_files[@]}"; do
 	grep -Fxq "mumega-motion-theme/${required}" "${DIST_DIR}/contents.txt" || fail "Missing runtime file: ${required}"
 done
+
+expected_top_level_paths=$'404.php\narchive.php\nassets\nbuild\nfooter.php\nfunctions.php\nheader.php\nhome.php\ninc\nindex.php\npage-templates\npage.php\nsearch.php\nsingle.php\nstyle.css\ntemplate-parts\ntheme.json'
+actual_top_level_paths="$({
+	sed -n 's#^mumega-motion-theme/\([^/][^/]*\)/.*#\1#p' "${DIST_DIR}/contents.txt"
+	sed -n 's#^mumega-motion-theme/\([^/][^/]*\)$#\1#p' "${DIST_DIR}/contents.txt"
+} | LC_ALL=C sort -u)"
+test "${actual_top_level_paths}" = "${expected_top_level_paths}" || fail 'Package top-level runtime allowlist is not exact.'
 if grep -Ei '/(src|tests|docs|scripts|node_modules|vendor|\.git|\.github)(/|$)|\.(map|md)$' "${DIST_DIR}/contents.txt"; then
 	fail 'Package contains development-only content.'
 fi
@@ -164,6 +202,13 @@ assert_contains 'release.assets.map' "${WORKFLOW}"
 assert_contains 'grep -Ei' "${WORKFLOW}"
 assert_contains "-iname '*.map'" "${ROOT_DIR}/scripts/package-theme.sh"
 assert_contains "-iname '*.md'" "${ROOT_DIR}/scripts/package-theme.sh"
+assert_contains 'find functions.php index.php header.php footer.php page.php single.php home.php archive.php search.php 404.php page-templates template-parts inc -type f -name' "${WORKFLOW}"
+assert_step_contains 'Verify package layout and manifest' 'expected_top_level_paths='
+assert_step_contains 'Verify package layout and manifest' 'actual_top_level_paths='
+for required in "${required_runtime_files[@]}"; do
+	assert_step_contains 'Verify package layout and manifest' "${required}"
+done
+assert_not_contains 'stream-demo.php' "${WORKFLOW}"
 
 # Exercise the exact peeled-ref selection used by the workflow: a matching
 # tag object SHA must not be mistaken for the dereferenced commit SHA.

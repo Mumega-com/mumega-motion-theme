@@ -58,7 +58,7 @@ jobs:
       - name: Run PHPUnit and lint shipped PHP
         run: |
           vendor/bin/phpunit -c phpunit.xml.dist
-          find functions.php index.php stream-demo.php inc -type f -name '*.php' -print0 | xargs -0 -r -n1 php -l
+          find functions.php index.php header.php footer.php page.php single.php home.php archive.php search.php 404.php page-templates template-parts inc -type f -name '*.php' -print0 | xargs -0 -r -n1 php -l
 
   release:
     name: Package and publish edge release
@@ -102,9 +102,46 @@ jobs:
         run: |
           archive="dist/mumega-motion-theme-${VERSION}.zip"
           test "$(unzip -Z1 "$archive" | cut -d/ -f1 | sort -u)" = "mumega-motion-theme"
-          for required in style.css functions.php index.php stream-demo.php build/index.js build/index.asset.php; do
+          required_runtime_files=(
+            style.css
+            theme.json
+            functions.php
+            index.php
+            header.php
+            footer.php
+            page.php
+            single.php
+            home.php
+            archive.php
+            search.php
+            404.php
+            build/index.js
+            build/index.asset.php
+            assets/css/editorial.css
+            assets/css/print.css
+            page-templates/editorial-home.php
+            template-parts/article-meta.php
+            template-parts/content-card-compact.php
+            template-parts/content-card.php
+            template-parts/empty-state.php
+            template-parts/lead-story.php
+            template-parts/newsletter.php
+            template-parts/section-heading.php
+            inc/editorial-helpers.php
+            inc/editorial-islands.php
+            inc/editorial-patterns.php
+            inc/editorial-queries.php
+            inc/editorial-setup.php
+          )
+          for required in "${required_runtime_files[@]}"; do
             unzip -Z1 "$archive" | grep -Fx "mumega-motion-theme/${required}" >/dev/null
           done
+          expected_top_level_paths="$(printf '%s\n' 404.php archive.php assets build footer.php functions.php header.php home.php inc index.php page-templates page.php search.php single.php style.css template-parts theme.json)"
+          actual_top_level_paths="$({
+            unzip -Z1 "$archive" | sed -n 's#^mumega-motion-theme/\([^/][^/]*\)/.*#\1#p'
+            unzip -Z1 "$archive" | sed -n 's#^mumega-motion-theme/\([^/][^/]*\)$#\1#p'
+          } | LC_ALL=C sort -u)"
+          test "$actual_top_level_paths" = "$expected_top_level_paths"
           if unzip -Z1 "$archive" | grep -Ei '/(src|tests|test|docs|scripts|node_modules|vendor|\.git|\.github)(/|$)|\.(map|md)$|/readme[^/]*$|/(composer\.json|composer\.lock|package\.json|package-lock\.json)$'; then
             echo "Package contains a disallowed development file." >&2
             exit 1
