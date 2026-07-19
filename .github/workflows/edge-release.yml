@@ -31,6 +31,11 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Derive manifest timestamp from the triggering commit
+        run: |
+          published_at="$(git show -s --format=%cI "${GITHUB_SHA}")"
+          echo "MUMEGA_MOTION_MANIFEST_PUBLISHED_AT=${published_at}" >> "$GITHUB_ENV"
+
       - name: Set up Node.js
         # actions/setup-node v4.0.3
         uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b
@@ -91,8 +96,12 @@ jobs:
 
       - name: Derive immutable edge version
         run: |
-          echo "VERSION=0.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
-          echo "TAG=edge-v0.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          published_at="$(git show -s --format=%cI "${GITHUB_SHA}")"
+          {
+            echo "VERSION=0.1.${GITHUB_RUN_NUMBER}"
+            echo "TAG=edge-v0.1.${GITHUB_RUN_NUMBER}"
+            echo "MUMEGA_MOTION_MANIFEST_PUBLISHED_AT=${published_at}"
+          } >> "$GITHUB_ENV"
 
       - name: Install and build JavaScript
         run: |
@@ -157,7 +166,7 @@ jobs:
           expected_sha="$(awk 'NR == 1 { print $1 }' "${archive}.sha256")"
           test "$actual_sha" = "$expected_sha"
           # shellcheck disable=SC2016 # JavaScript template expressions are evaluated by Node.
-          ACTUAL_SHA="$actual_sha" node -e 'const fs=require("fs"); const version=process.env.VERSION; const archive=`mumega-motion-theme-${version}.zip`; const actual=process.env.ACTUAL_SHA; const manifest=JSON.parse(fs.readFileSync("dist/manifest.json", "utf8")); const expected={slug:"mumega-motion-theme",version,package_url:`https://github.com/Mumega-com/mumega-motion-theme/releases/download/edge-v${version}/${archive}`,sha256:actual,requires_wp:"6.5",requires_php:"7.4"}; if (JSON.stringify(manifest)!==JSON.stringify(expected)) { console.error("Manifest does not exactly bind the archive and runtime contract."); process.exit(1); }'
+          ACTUAL_SHA="$actual_sha" node -e 'const fs=require("fs"); const version=process.env.VERSION; const archive=`mumega-motion-theme-${version}.zip`; const actual=process.env.ACTUAL_SHA; const manifest=JSON.parse(fs.readFileSync("dist/manifest.json", "utf8")); const expected={slug:"mumega-motion-theme",version,package_url:`https://github.com/Mumega-com/mumega-motion-theme/releases/download/edge-v${version}/${archive}`,sha256:actual,requires_wordpress:"6.5",requires_php:"7.4",published_at:process.env.MUMEGA_MOTION_MANIFEST_PUBLISHED_AT}; if (JSON.stringify(manifest)!==JSON.stringify(expected)) { console.error("Manifest does not exactly bind the archive and runtime contract."); process.exit(1); }'
           (
             cd dist
             sha256sum -c "mumega-motion-theme-${VERSION}.zip.sha256"

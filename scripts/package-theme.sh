@@ -9,6 +9,53 @@ readonly REQUIRES_WP='6.5'
 readonly REQUIRES_PHP='7.4'
 readonly NORMALIZED_TIMESTAMP='198001010000'
 
+is_valid_manifest_timestamp() {
+	local timestamp="$1"
+	local year
+	local month
+	local day
+	local hour
+	local minute
+	local second
+	local offset_hour
+	local offset_minute
+	local days_in_month
+
+	if [[ ! ${timestamp} =~ ^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(Z|[+-]([0-9]{2}):([0-9]{2}))$ ]]; then
+		return 1
+	fi
+
+	year=$(( 10#${BASH_REMATCH[1]} ))
+	month=$(( 10#${BASH_REMATCH[2]} ))
+	day=$(( 10#${BASH_REMATCH[3]} ))
+	hour=$(( 10#${BASH_REMATCH[4]} ))
+	minute=$(( 10#${BASH_REMATCH[5]} ))
+	second=$(( 10#${BASH_REMATCH[6]} ))
+	offset_hour=$(( 10#${BASH_REMATCH[8]:-0} ))
+	offset_minute=$(( 10#${BASH_REMATCH[9]:-0} ))
+
+	if (( month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59 || offset_hour > 23 || offset_minute > 59 )); then
+		return 1
+	fi
+
+	case "${month}" in
+		2)
+			days_in_month=28
+			if (( year % 4 == 0 && ( year % 100 != 0 || year % 400 == 0 ) )); then
+				days_in_month=29
+			fi
+			;;
+		4|6|9|11)
+			days_in_month=30
+			;;
+		*)
+			days_in_month=31
+			;;
+	esac
+
+	(( day >= 1 && day <= days_in_month ))
+}
+
 if [[ $# -ne 1 || ! $1 =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 	printf 'Usage: %s VERSION (VERSION must use MAJOR.MINOR.PATCH)\n' "$0" >&2
 	exit 64
@@ -21,6 +68,21 @@ readonly ARCHIVE_NAME="${SLUG}-${VERSION}.zip"
 readonly ARCHIVE_PATH="${DIST_DIR}/${ARCHIVE_NAME}"
 readonly SHA_PATH="${ARCHIVE_PATH}.sha256"
 readonly MANIFEST_PATH="${DIST_DIR}/manifest.json"
+
+if [[ -n ${MUMEGA_MOTION_MANIFEST_PUBLISHED_AT+x} ]]; then
+	manifest_published_at="${MUMEGA_MOTION_MANIFEST_PUBLISHED_AT}"
+else
+	manifest_published_at="$(git -C "${ROOT_DIR}" show -s --format=%cI HEAD)"
+fi
+
+if ! is_valid_manifest_timestamp "${manifest_published_at}"; then
+	printf 'MUMEGA_MOTION_MANIFEST_PUBLISHED_AT must be a real ISO-8601/RFC3339 timestamp.\n' >&2
+	exit 64
+fi
+
+readonly MANIFEST_PUBLISHED_AT="${manifest_published_at}"
+unset manifest_published_at
+
 readonly STAGING_DIR="$(mktemp -d "${TMPDIR:-/tmp}/${SLUG}.XXXXXX")"
 readonly STAGED_THEME="${STAGING_DIR}/${SLUG}"
 
@@ -141,8 +203,9 @@ cat > "${MANIFEST_PATH}" <<EOF
   "version": "${VERSION}",
   "package_url": "https://github.com/Mumega-com/mumega-motion-theme/releases/download/edge-v${VERSION}/${ARCHIVE_NAME}",
   "sha256": "${SHA256}",
-  "requires_wp": "${REQUIRES_WP}",
-  "requires_php": "${REQUIRES_PHP}"
+  "requires_wordpress": "${REQUIRES_WP}",
+  "requires_php": "${REQUIRES_PHP}",
+  "published_at": "${MANIFEST_PUBLISHED_AT}"
 }
 EOF
 
