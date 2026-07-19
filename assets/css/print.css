@@ -49,10 +49,11 @@
 
 	.article-header,
 	.article-featured-image,
-	.article-body,
-	.article-author-bio,
-	.article-entities,
-	.affiliate-disclosure {
+	.affiliate-disclosure,
+	.article-body blockquote,
+	.article-body figure,
+	.article-body table,
+	.article-body pre {
 		break-inside: avoid;
 	}
 

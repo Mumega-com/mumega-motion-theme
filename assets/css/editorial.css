@@ -741,7 +741,9 @@ label {
 .site-footer__title,
 .primary-navigation a,
 .mobile-navigation a,
-.archive-title {
+.archive-title,
+.page-entry__title,
+.post-summary__title {
 	overflow-wrap: anywhere;
 }
 
@@ -764,7 +766,7 @@ label {
 }
 
 /* 800px: exact 7/5 lead desk while preserving source order. */
-@media (min-width: 50rem) {
+@media (min-width: 800px) {
 	.editorial-home {
 		column-gap: clamp(1.25rem, 3vw, 2.5rem);
 		grid-template-columns: repeat(12, minmax(0, 1fr));
