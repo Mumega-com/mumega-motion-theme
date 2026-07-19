@@ -19,7 +19,8 @@ $menu_category_ids   = mumega_motion_menu_category_ids();
 	</header>
 
 	<?php if ( have_posts() ) : ?>
-		<div class="editorial-listing__grid">
+		<h2 id="listing-stories-heading" class="screen-reader-text"><?php esc_html_e( 'Stories', 'mumega-motion' ); ?></h2>
+		<div class="editorial-listing__grid" aria-labelledby="listing-stories-heading">
 			<?php
 			while ( have_posts() ) :
 				the_post();

@@ -161,6 +161,44 @@ final class EditorialContentTemplatesTest extends TestCase {
 	}
 
 	/**
+	 * Associates the posts-index card grid with an H2 before shared H3 cards.
+	 */
+	public function test_home_non_empty_output_has_h1_h2_h3_hierarchy(): void {
+		$output = $this->render_non_empty_listing( 'home.php' );
+
+		$this->assert_listing_heading_hierarchy( $output );
+	}
+
+	/**
+	 * Associates the archive card grid with an H2 before shared H3 cards.
+	 */
+	public function test_archive_non_empty_output_has_h1_h2_h3_hierarchy(): void {
+		$GLOBALS['mumega_motion_test_queried_object'] = new WP_Term(
+			array(
+				'term_id'  => 5,
+				'name'     => 'Infrastructure',
+				'slug'     => 'infrastructure',
+				'taxonomy' => 'category',
+			)
+		);
+
+		$output = $this->render_non_empty_listing( 'archive.php' );
+
+		$this->assert_listing_heading_hierarchy( $output );
+	}
+
+	/**
+	 * Associates the search card grid with an H2 before shared H3 cards.
+	 */
+	public function test_search_non_empty_output_has_h1_h2_h3_hierarchy(): void {
+		$GLOBALS['mumega_motion_test_search_query'] = 'infrastructure';
+
+		$output = $this->render_non_empty_listing( 'search.php' );
+
+		$this->assert_listing_heading_hierarchy( $output );
+	}
+
+	/**
 	 * Names category-derived recommendations with the exact editorial label.
 	 */
 	public function test_single_labels_category_recommendations_more_from_this_topic(): void {
@@ -243,6 +281,76 @@ final class EditorialContentTemplatesTest extends TestCase {
 	}
 
 	/**
+	 * Treats the stable pattern class as disclosure even when editors change its copy.
+	 */
+	public function test_affiliate_disclosure_marker_suppresses_fallback_after_copy_edits(): void {
+		$post               = $this->post( 42, 'Edited disclosure report' );
+		$post->post_content = '<div class="wp-block-group mumega-motion-affiliate-disclosure"><p>Partner note with locally edited copy.</p></div>';
+
+		$GLOBALS['mumega_motion_test_post_tags'][42] = array(
+			new WP_Term(
+				array(
+					'term_id' => 9,
+					'name'    => 'Affiliate',
+					'slug'    => 'affiliate',
+				)
+			),
+		);
+
+		$output = $this->render_single( $post );
+
+		$this->assertSame( 1, substr_count( $output, 'mumega-motion-affiliate-disclosure' ) );
+		$this->assertStringNotContainsString( $this->affiliate_disclosure(), $output );
+		$this->assertStringNotContainsString( 'Read our affiliate disclosure', $output );
+	}
+
+	/**
+	 * Detects authored fallback copy regardless of case or whitespace changes.
+	 */
+	public function test_normalized_affiliate_disclosure_copy_suppresses_fallback(): void {
+		$post               = $this->post( 43, 'Normalized disclosure report' );
+		$post->post_content = "<p>  THIS ARTICLE MAY CONTAIN AFFILIATE LINKS.\n\tOur editorial conclusions are independent, and we may earn a commission when you purchase through a link.  </p>";
+
+		$GLOBALS['mumega_motion_test_post_tags'][43] = array(
+			new WP_Term(
+				array(
+					'term_id' => 9,
+					'name'    => 'Affiliate',
+					'slug'    => 'affiliate',
+				)
+			),
+		);
+
+		$output = $this->render_single( $post );
+
+		$this->assertStringNotContainsString( 'class="affiliate-disclosure', $output );
+		$this->assertStringNotContainsString( 'Read our affiliate disclosure', $output );
+	}
+
+	/**
+	 * Localizes fallback disclosure copy and carries the stable pattern marker.
+	 */
+	public function test_affiliate_fallback_is_localizable_and_uses_pattern_marker(): void {
+		$source = $this->theme_source( 'single.php' );
+		$post   = $this->post( 44, 'Fallback disclosure report' );
+
+		$GLOBALS['mumega_motion_test_post_tags'][44] = array(
+			new WP_Term(
+				array(
+					'term_id' => 9,
+					'name'    => 'Affiliate',
+					'slug'    => 'affiliate',
+				)
+			),
+		);
+
+		$output = $this->render_single( $post );
+
+		$this->assertStringContainsString( "__( 'This article may contain affiliate links.", $source );
+		$this->assertStringContainsString( 'class="affiliate-disclosure mumega-motion-affiliate-disclosure"', $output );
+	}
+
+	/**
 	 * Leaves canonical, schema, and authored navigation ownership outside the theme.
 	 */
 	public function test_single_adds_no_theme_schema_canonical_or_automatic_toc(): void {
@@ -265,8 +373,36 @@ final class EditorialContentTemplatesTest extends TestCase {
 		$this->assertStringContainsString( '.home-newsletter', $source );
 		$this->assertStringContainsString( '.more-from-topic', $source );
 		$this->assertStringContainsString( '.footer-navigation', $source );
+		$this->assertStringContainsString( '.post-navigation', $source );
 		$this->assertMatchesRegularExpression( '/\.article-body\s+a\[href\^="https?:\/\/"\][^{]*::after\s*\{[^}]*content:\s*"\s*\("\s*attr\(href\)\s*"\)"/s', $source );
 		$this->assertMatchesRegularExpression( '/\.single-article[^}]*background:\s*#fff[^}]*color:\s*#000/s', $source );
+	}
+
+	/**
+	 * Renders one populated listing template.
+	 *
+	 * @param string $filename Theme-relative template filename.
+	 * @return string
+	 */
+	private function render_non_empty_listing( $filename ): string {
+		$GLOBALS['mumega_motion_test_loop_posts']   = array( $this->post( 50, 'A listed report' ) );
+		$GLOBALS['mumega_motion_test_loop_index']   = 0;
+		$GLOBALS['mumega_motion_test_current_post'] = null;
+
+		return $this->render_theme_file( $filename );
+	}
+
+	/**
+	 * Asserts a semantic H1-H2-H3 listing outline and grid association.
+	 *
+	 * @param string $output Rendered listing output.
+	 * @return void
+	 */
+	private function assert_listing_heading_hierarchy( $output ): void {
+		$this->assertMatchesRegularExpression(
+			'/<h1\b[^>]*>.*<\/h1>.*<h2\b[^>]*id="listing-stories-heading"[^>]*>\s*Stories\s*<\/h2>.*<div\b[^>]*class="editorial-listing__grid"[^>]*aria-labelledby="listing-stories-heading"[^>]*>.*<h3\b[^>]*>.*A listed report.*<\/h3>/s',
+			$output
+		);
 	}
 
 	/**

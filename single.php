@@ -18,8 +18,11 @@ get_header();
 		$public_entity_tags      = mumega_motion_public_entity_tags( $article->ID );
 		$all_tags                = get_the_tags( $article->ID );
 		$has_affiliate_tag       = false;
-		$affiliate_disclosure    = 'This article may contain affiliate links. Our editorial conclusions are independent, and we may earn a commission when you purchase through a link.';
-		$has_authored_disclosure = false !== strpos( wp_strip_all_tags( $article->post_content ), $affiliate_disclosure );
+		$affiliate_disclosure    = __( 'This article may contain affiliate links. Our editorial conclusions are independent, and we may earn a commission when you purchase through a link.', 'mumega-motion' );
+		$normalized_article_text = strtolower( trim( (string) preg_replace( '/\s+/', ' ', wp_strip_all_tags( $article->post_content ) ) ) );
+		$normalized_disclosure   = strtolower( trim( (string) preg_replace( '/\s+/', ' ', $affiliate_disclosure ) ) );
+		$has_disclosure_marker   = false !== stripos( $article->post_content, 'mumega-motion-affiliate-disclosure' );
+		$has_authored_disclosure = $has_disclosure_marker || false !== strpos( $normalized_article_text, $normalized_disclosure );
 
 		foreach ( (array) $all_tags as $article_tag ) {
 			if ( $article_tag instanceof WP_Term && 'affiliate' === strtolower( trim( $article_tag->slug ) ) ) {
@@ -90,7 +93,7 @@ get_header();
 
 			<?php if ( $has_affiliate_tag && ! $has_authored_disclosure ) : ?>
 				<?php $affiliate_policy_page = mumega_motion_affiliate_policy_page(); ?>
-				<aside class="affiliate-disclosure">
+				<aside class="affiliate-disclosure mumega-motion-affiliate-disclosure">
 					<p>
 						<?php echo esc_html( $affiliate_disclosure ); ?>
 						<?php if ( $affiliate_policy_page instanceof WP_Post ) : ?>
