@@ -18,7 +18,7 @@ Draft the publishable article or silently broaden scope; accept its own packet; 
 
 ## Allowed transition
 
-`brief_accepted` to `research_ready`.
+`transition: brief_accepted -> research_ready`
 
 ## Stop conditions
 

@@ -18,7 +18,7 @@ Create or update a WordPress post; advance an existing workflow state; accept a 
 
 ## Allowed transition
 
-The scout may create idea from an accepted gap or update proposal using `from: null` and `to: idea`. It may not advance that record beyond `idea`.
+`transition: null -> idea`
 
 ## Stop conditions
 

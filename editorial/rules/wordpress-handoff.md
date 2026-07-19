@@ -20,6 +20,10 @@ The writer changes only the authorized post and fields. Draft status is preserve
 
 WordPress uses only its normal `draft`, `pending`, `scheduled`, `published`, and `private` statuses. The system adds no custom WordPress statuses in version 1. GitHub labels, not WordPress statuses, represent the editorial workflow. Only a human editor may authorize publication, scheduling, redirects, deletions, canonical changes, or exceptions.
 
+## Human-only authority
+
+`human-editor only: publication, scheduling, redirects, deletions, canonical changes, exceptions`
+
 ## Fail closed
 
 - Missing or incompatible contract: stop before content mutation.

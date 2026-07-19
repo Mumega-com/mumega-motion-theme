@@ -163,67 +163,30 @@ const markdownSection = (content, heading, nextHeading = null) => {
 const authorityDeclarations = [
   {
     file: 'editorial/rules/wordpress-handoff.md',
-    section: '## Draft-only procedure',
     nextSection: '## Fail closed',
-    declaration: 'Only a human editor may authorize publication, scheduling, redirects, deletions, canonical changes, or exceptions.',
-    error: 'WordPress handoff human authority declaration is missing or weakened'
+    declaration: '`human-editor only: publication, scheduling, redirects, deletions, canonical changes, exceptions`'
   },
   {
     file: 'editorial/rules/freshness-corrections.md',
-    section: '## Corrections and retirement',
     nextSection: '## Fail closed',
-    declaration: 'Redirects, deletions, canonical changes, retirement, and public correction decisions require a human editor.',
-    error: 'freshness and corrections human authority declaration is missing or weakened'
+    declaration: '`human-editor only: redirects, deletions, canonical changes, retirement, public correction decisions`'
   },
   {
     file: 'editorial/rules/authorship-disclosure.md',
-    section: '## Authority boundary',
-    declaration: 'Only the human editor may approve exceptions, public authorship, publication, redirects, deletions, and commercial conclusions.',
-    error: 'authorship and disclosure human authority declaration is missing or weakened'
+    declaration: '`human-editor only: commercial conclusions`'
   }
 ];
 
 const validateHumanAuthorityDeclarations = async (root) => {
   const errors = [];
-  for (const { file, section, nextSection, declaration, error } of authorityDeclarations) {
+  for (const { file, nextSection, declaration } of authorityDeclarations) {
     const content = await readFile(artifactPath(root, file), 'utf8');
-    const body = markdownSection(content, section, nextSection);
-    const occurrences = body.split(declaration).length - 1;
-    if (occurrences !== 1) {
-      errors.push(`${file}: ${error}`);
+    const body = markdownSection(content, '## Human-only authority', nextSection);
+    if (body !== declaration) {
+      errors.push(`${file}: Human-only authority section must be one canonical line`);
     }
   }
   return errors;
-};
-
-const sentenceContaining = (content, index) => {
-  const priorPeriod = content.lastIndexOf('.', index - 1);
-  const priorNewline = content.lastIndexOf('\n', index - 1);
-  const start = Math.max(priorPeriod, priorNewline) + 1;
-  const nextPeriod = content.indexOf('.', index);
-  const nextNewline = content.indexOf('\n', index);
-  const candidates = [nextPeriod, nextNewline].filter((position) => position !== -1);
-  const end = candidates.length > 0 ? Math.min(...candidates) : content.length;
-  return content.slice(start, end);
-};
-
-const parseRoleTransitionDeclarations = (allowedSection) => {
-  const declarations = [];
-  const addMatches = (pattern, fromGroup, toGroup) => {
-    for (const match of allowedSection.matchAll(pattern)) {
-      declarations.push({
-        from: match[fromGroup] === 'null' ? null : match[fromGroup],
-        to: match[toGroup],
-        negated: /\b(?:do not|may not|must not|can(?:not| not)|never|prohibited|forbidden)\b/i.test(
-          sentenceContaining(allowedSection, match.index)
-        )
-      });
-    }
-  };
-
-  addMatches(/`([a-z_]+)`\s+to\s+`([a-z_]+)`/g, 1, 2);
-  addMatches(/`from:\s*(null|[a-z_]+)`\s+and\s+`to:\s*([a-z_]+)`/g, 1, 2);
-  return declarations;
 };
 
 const documentedHumanTransitions = async (root) => {
@@ -347,18 +310,18 @@ const validateWorkflow = async (root, manifest, validationReportSchema, workflow
       '## Allowed transition',
       '## Stop conditions'
     );
-    const declarations = parseRoleTransitionDeclarations(allowedSection);
-    if (declarations.length !== 1) {
-      errors.push(`${roleFile}: must declare exactly one canonical transition`);
+    const declaration = allowedSection.match(
+      /^`transition: (null|[a-z_]+) -> ([a-z_]+)`$/
+    );
+    if (!declaration) {
+      errors.push(`${roleFile}: Allowed transition section must be one canonical line`);
       continue;
     }
 
-    const [declaration] = declarations;
     const assignedTransition = ownedTransitions[0];
-    if (declaration.negated) {
-      errors.push(`${roleFile}: canonical transition declaration must be affirmative`);
-    } else if (declaration.from !== assignedTransition.from
-      || declaration.to !== assignedTransition.to) {
+    const declaredFrom = declaration[1] === 'null' ? null : declaration[1];
+    const declaredTo = declaration[2];
+    if (declaredFrom !== assignedTransition.from || declaredTo !== assignedTransition.to) {
       errors.push(`${roleFile}: allowed transition does not exactly match workflow assignment`);
     }
   }

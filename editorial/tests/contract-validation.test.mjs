@@ -70,6 +70,30 @@ const loadInvalidFixture = async (name) => {
   return { artifact, expectedErrors };
 };
 
+const sectionBody = (content, heading, nextHeading = null) => {
+  const start = content.indexOf(`${heading}\n`);
+  assert.notEqual(start, -1, `missing ${heading}`);
+  const bodyStart = start + heading.length + 1;
+  const end = nextHeading ? content.indexOf(`\n${nextHeading}\n`, bodyStart) : content.length;
+  if (nextHeading) assert.notEqual(end, -1, `missing ${nextHeading}`);
+  return content.slice(bodyStart, end).trim();
+};
+
+const replaceSectionBody = (content, heading, nextHeading, body) => {
+  const currentBody = sectionBody(content, heading, nextHeading);
+  return content.replace(currentBody, body);
+};
+
+const setSectionBody = (content, heading, nextHeading, body) => {
+  if (content.includes(`${heading}\n`)) {
+    return replaceSectionBody(content, heading, nextHeading, body);
+  }
+  if (nextHeading) {
+    return content.replace(`\n${nextHeading}\n`, `\n${heading}\n\n${body}\n\n${nextHeading}\n`);
+  }
+  return `${content.trimEnd()}\n\n${heading}\n\n${body}\n`;
+};
+
 test('the repository editorial contract and all declared examples agree', async () => {
   const validateContract = requireValidator();
   const result = await validateContract(root);
@@ -179,77 +203,97 @@ test('role contract rejects a conflicting second transition declaration', async 
   const result = await withTemporaryContract(async (temporaryRoot) => {
     const roleFile = join(temporaryRoot, 'editorial/agents/writer.md');
     const content = await readFile(roleFile, 'utf8');
-    const changed = content.replace(
-      '`research_accepted` to `drafting`.\n\n## Stop conditions',
-      '`research_accepted` to `drafting`.\n\n`idea` to `brief_ready`.\n\n## Stop conditions'
+    const changed = replaceSectionBody(
+      content,
+      '## Allowed transition',
+      '## Stop conditions',
+      `${sectionBody(content, '## Allowed transition', '## Stop conditions')}\n\n\`transition: idea -> brief_ready\``
     );
-    assert.notEqual(changed, content);
     await writeFile(roleFile, changed);
     return validateContract(temporaryRoot);
   });
 
   assert.equal(result.valid, false);
-  assert.match(result.errors.join('\n'), /must declare exactly one canonical transition/);
+  assert.match(result.errors.join('\n'), /Allowed transition section must be one canonical line/);
 });
 
-test('role contract rejects a negated canonical transition declaration', async () => {
+test('role contract rejects a prose-negated transition declaration', async () => {
   const validateContract = requireValidator();
   const result = await withTemporaryContract(async (temporaryRoot) => {
     const roleFile = join(temporaryRoot, 'editorial/agents/writer.md');
     const content = await readFile(roleFile, 'utf8');
-    const changed = content.replace(
-      '`research_accepted` to `drafting`.',
-      'Do not transition `research_accepted` to `drafting`.'
+    const changed = replaceSectionBody(
+      content,
+      '## Allowed transition',
+      '## Stop conditions',
+      'The writer does not transition `research_accepted` to `drafting`.'
     );
-    assert.notEqual(changed, content);
     await writeFile(roleFile, changed);
     return validateContract(temporaryRoot);
   });
 
   assert.equal(result.valid, false);
-  assert.match(result.errors.join('\n'), /canonical transition declaration must be affirmative/);
+  assert.match(result.errors.join('\n'), /Allowed transition section must be one canonical line/);
 });
 
-const weakenedAuthorityCases = [
+test('role contract rejects extra prose after its canonical transition', async () => {
+  const validateContract = requireValidator();
+  const result = await withTemporaryContract(async (temporaryRoot) => {
+    const roleFile = join(temporaryRoot, 'editorial/agents/writer.md');
+    const content = await readFile(roleFile, 'utf8');
+    const body = sectionBody(content, '## Allowed transition', '## Stop conditions');
+    const changed = replaceSectionBody(
+      content,
+      '## Allowed transition',
+      '## Stop conditions',
+      `${body}\n\nThe writer may also advance compatible records.`
+    );
+    await writeFile(roleFile, changed);
+    return validateContract(temporaryRoot);
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /Allowed transition section must be one canonical line/);
+});
+
+const humanAuthorityCases = [
   {
-    name: 'WordPress authorization authority',
+    name: 'WordPress authority',
     file: 'editorial/rules/wordpress-handoff.md',
-    original: 'Only a human editor may authorize publication, scheduling, redirects, deletions, canonical changes, or exceptions.',
-    replacement: 'A human editor may authorize publication, scheduling, redirects, deletions, canonical changes, or exceptions.',
-    expected: 'WordPress handoff human authority declaration is missing or weakened'
+    nextHeading: '## Fail closed',
+    declaration: '`human-editor only: publication, scheduling, redirects, deletions, canonical changes, exceptions`'
   },
   {
-    name: 'correction and retirement authority',
+    name: 'freshness and corrections authority',
     file: 'editorial/rules/freshness-corrections.md',
-    original: 'Redirects, deletions, canonical changes, retirement, and public correction decisions require a human editor.',
-    replacement: 'Redirects, deletions, canonical changes, retirement, and public correction decisions may involve a human editor.',
-    expected: 'freshness and corrections human authority declaration is missing or weakened'
+    nextHeading: '## Fail closed',
+    declaration: '`human-editor only: redirects, deletions, canonical changes, retirement, public correction decisions`'
   },
   {
-    name: 'commercial conclusion authority',
+    name: 'authorship and disclosure authority',
     file: 'editorial/rules/authorship-disclosure.md',
-    original: 'Only the human editor may approve exceptions, public authorship, publication, redirects, deletions, and commercial conclusions.',
-    replacement: 'Only the human editor may approve exceptions, public authorship, publication, redirects, deletions, and commercial recommendations.',
-    expected: 'authorship and disclosure human authority declaration is missing or weakened'
+    nextHeading: null,
+    declaration: '`human-editor only: commercial conclusions`'
   }
 ];
 
-for (const { name, file, original, replacement, expected } of weakenedAuthorityCases) {
-  test(`contract rejects weakened ${name}`, async () => {
+for (const { name, file, nextHeading, declaration } of humanAuthorityCases) {
+  test(`contract rejects an additive agent grant in ${name}`, async () => {
     const validateContract = requireValidator();
     const result = await withTemporaryContract(async (temporaryRoot) => {
       const ruleFile = join(temporaryRoot, file);
       const content = await readFile(ruleFile, 'utf8');
-      const changed = content.replace(original, replacement);
-      assert.notEqual(changed, content);
+      const changed = setSectionBody(
+        content,
+        '## Human-only authority',
+        nextHeading,
+        `${declaration}\n\n\`writer also: publication\``
+      );
       await writeFile(ruleFile, changed);
       return validateContract(temporaryRoot);
     });
 
     assert.equal(result.valid, false);
-    assert.match(
-      result.errors.join('\n'),
-      new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    );
+    assert.match(result.errors.join('\n'), /Human-only authority section must be one canonical line/);
   });
 }

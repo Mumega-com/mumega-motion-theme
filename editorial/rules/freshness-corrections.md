@@ -35,6 +35,10 @@ Every transition records the actor or role, contract version, timestamp, input a
 
 Corrections preserve the prior evidence, reviewer decision, correction reason, correction date, and update history. Removed or changed URLs are reflected promptly in sitemaps and, when configured, IndexNow. Redirects, deletions, canonical changes, retirement, and public correction decisions require a human editor.
 
+## Human-only authority
+
+`human-editor only: redirects, deletions, canonical changes, retirement, public correction decisions`
+
 ## Fail closed
 
 A missing or incompatible contract stops before mutation. Duplicate intent produces a consolidation, update, or redirect proposal rather than a new draft. A missing human reviewer remains in `human_review`. Stale evidence that no longer supports a material claim moves to human-controlled `update_due`; no agent silently changes published content or publication state.

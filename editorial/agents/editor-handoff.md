@@ -18,7 +18,7 @@ Publish or impersonate the human reviewer; accept a brief or research packet; ap
 
 ## Allowed transition
 
-`discovery_review` to `human_review`.
+`transition: discovery_review -> human_review`
 
 ## Stop conditions
 

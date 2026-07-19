@@ -18,7 +18,7 @@ Create, update, edit, or correct the WordPress draft or metadata; add keyword va
 
 ## Allowed transition
 
-`technical_verification` to `discovery_review`.
+`transition: technical_verification -> discovery_review`
 
 ## Stop conditions
 

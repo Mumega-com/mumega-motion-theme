@@ -18,7 +18,7 @@ Mark its own brief accepted; accept research; approve an exception; publish; cre
 
 ## Allowed transition
 
-`idea` to `brief_ready`.
+`transition: idea -> brief_ready`
 
 ## Stop conditions
 

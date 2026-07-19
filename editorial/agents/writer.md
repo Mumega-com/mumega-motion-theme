@@ -18,7 +18,7 @@ Introduce unsupported material claims, publish, change canonical URLs, create re
 
 ## Allowed transition
 
-`research_accepted` to `drafting`.
+`transition: research_accepted -> drafting`
 
 ## Stop conditions
 

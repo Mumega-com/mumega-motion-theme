@@ -18,7 +18,7 @@ Create, update, edit, or correct the WordPress draft, even when corrections are 
 
 ## Allowed transition
 
-`drafting` to `technical_verification`.
+`transition: drafting -> technical_verification`
 
 ## Stop conditions
 

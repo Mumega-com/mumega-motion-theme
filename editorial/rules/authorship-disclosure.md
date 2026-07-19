@@ -21,3 +21,7 @@ AI-assistance and human-review disclosure must agree across the brief, research 
 ## Authority boundary
 
 Only the human editor may approve exceptions, public authorship, publication, redirects, deletions, and commercial conclusions. ASTER and every internal role lack that authority. A missing reviewer identity or unresolved disclosure remains in human review and never advances to publication.
+
+## Human-only authority
+
+`human-editor only: commercial conclusions`

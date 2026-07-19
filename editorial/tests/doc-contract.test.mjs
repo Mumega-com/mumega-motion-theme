@@ -27,6 +27,29 @@ const requiredRules = [
   'sources.md',
   'wordpress-handoff.md'
 ];
+const humanAuthoritySections = new Map([
+  [
+    'wordpress-handoff.md',
+    {
+      body: '`human-editor only: publication, scheduling, redirects, deletions, canonical changes, exceptions`',
+      nextHeading: '## Fail closed'
+    }
+  ],
+  [
+    'freshness-corrections.md',
+    {
+      body: '`human-editor only: redirects, deletions, canonical changes, retirement, public correction decisions`',
+      nextHeading: '## Fail closed'
+    }
+  ],
+  [
+    'authorship-disclosure.md',
+    {
+      body: '`human-editor only: commercial conclusions`',
+      nextHeading: null
+    }
+  ]
+]);
 const states = [
   'idea',
   'brief_ready',
@@ -109,7 +132,7 @@ test('documentation inventory and workflow match the editorial manifest', async 
   const expectedRoleTransitions = new Map(
     transitions
       .filter(({ actor }) => manifest.roles.includes(actor))
-      .map(({ actor, from, to }) => [actor, from === null ? `create ${to}` : `\`${from}\` to \`${to}\``])
+      .map(({ actor, from, to }) => [actor, `\`transition: ${from ?? 'null'} -> ${to}\``])
   );
 
   for (const name of manifest.roles) {
@@ -124,9 +147,10 @@ test('documentation inventory and workflow match the editorial manifest', async 
       /\b(?:publish|redirect|delete|change (?:a )?canonical(?: URL)?)\b/i,
       `${name} grants reserved human authority`
     );
-    assert.match(
+    assert.equal(
       section(content, '## Allowed transition', '## Stop conditions'),
-      new RegExp(expectedRoleTransitions.get(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      expectedRoleTransitions.get(name),
+      `${name} must declare one canonical transition line`
     );
   }
 
@@ -135,6 +159,14 @@ test('documentation inventory and workflow match the editorial manifest', async 
   for (const file of ruleFiles) {
     const content = await readFile(new URL(`editorial/rules/${file}`, root), 'utf8');
     assert.equal(content.startsWith('Contract version: 1.0.0\n'), true, `${file} has the wrong version`);
+    const authority = humanAuthoritySections.get(file);
+    if (authority) {
+      assert.equal(
+        section(content, '## Human-only authority', authority.nextHeading),
+        authority.body,
+        `${file} must declare one canonical human-only authority line`
+      );
+    }
   }
 
   const workflow = JSON.parse(await readFile(new URL('editorial/workflow.json', root), 'utf8'));
