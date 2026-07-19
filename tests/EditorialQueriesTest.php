@@ -193,9 +193,68 @@ final class EditorialQueriesTest extends TestCase {
 		$this->assertCount( 4, $GLOBALS['mumega_motion_test_get_posts_requests'] );
 		$this->assertSame( array( 5 ), $GLOBALS['mumega_motion_test_get_posts_requests'][3]['category__in'] );
 
-		foreach ( $GLOBALS['mumega_motion_test_get_posts_requests'] as $request ) {
-			$this->assertSame( array( 10 ), $request['post__not_in'] );
-		}
+		$this->assertSame( array( 10 ), $GLOBALS['mumega_motion_test_get_posts_requests'][0]['post__not_in'] );
+		$this->assertSame( array( 10 ), $GLOBALS['mumega_motion_test_get_posts_requests'][1]['post__not_in'] );
+		$this->assertSame( array( 10, 30, 31, 32 ), $GLOBALS['mumega_motion_test_get_posts_requests'][2]['post__not_in'] );
+		$this->assertSame( array( 10, 30, 31, 32, 40, 41, 42 ), $GLOBALS['mumega_motion_test_get_posts_requests'][3]['post__not_in'] );
+	}
+
+	/**
+	 * Commits only complete rails and keeps looking after overlap underfills a category.
+	 */
+	public function test_rail_groups_commit_only_complete_groups_and_continue_after_overlap(): void {
+		$this->assertTrue( function_exists( 'mumega_motion_select_rail_groups' ) );
+		$this->configure_primary_menu( array( 2, 3, 4, 5 ) );
+		$first_group                                = array( $this->post( 20 ), $this->post( 21 ), $this->post( 22 ) );
+		$last_group                                 = array( $this->post( 40 ), $this->post( 41 ), $this->post( 42 ) );
+		$GLOBALS['mumega_motion_test_post_queries'] = array(
+			$first_group,
+			array( $this->post( 30 ), $this->post( 31 ) ),
+			$last_group,
+		);
+		$used_ids                                   = array( 10 );
+
+		$this->assertSame(
+			array(
+				array(
+					'term_id' => 2,
+					'posts'   => $first_group,
+				),
+				array(
+					'term_id' => 4,
+					'posts'   => $last_group,
+				),
+			),
+			mumega_motion_select_rail_groups( $used_ids, 2 )
+		);
+		$this->assertSame( array( 10, 20, 21, 22, 40, 41, 42 ), $used_ids );
+		$this->assertSame( array( 10 ), $GLOBALS['mumega_motion_test_get_posts_requests'][0]['post__not_in'] );
+		$this->assertSame( array( 10, 20, 21, 22 ), $GLOBALS['mumega_motion_test_get_posts_requests'][1]['post__not_in'] );
+		$this->assertSame(
+			array( 10, 20, 21, 22 ),
+			$GLOBALS['mumega_motion_test_get_posts_requests'][2]['post__not_in'],
+			'IDs from an incomplete rail must not be reserved.'
+		);
+	}
+
+	/**
+	 * Gives Field Notes the IDs committed by earlier complete topic rails.
+	 */
+	public function test_field_notes_exclude_posts_committed_to_topic_rails(): void {
+		$this->assertTrue( function_exists( 'mumega_motion_select_rail_groups' ) );
+		$this->configure_primary_menu( array( 2 ) );
+		$GLOBALS['mumega_motion_test_categories_by_slug']['field-notes'] = new WP_Term( array( 'term_id' => 9 ) );
+		$GLOBALS['mumega_motion_test_post_queries']                      = array(
+			array( $this->post( 20 ), $this->post( 21 ), $this->post( 22 ) ),
+			array( $this->post( 30 ) ),
+		);
+		$used_ids = array( 10 );
+
+		mumega_motion_select_rail_groups( $used_ids, 3 );
+		mumega_motion_select_special_posts( 'field-notes', $used_ids, 5 );
+
+		$this->assertSame( array( 10, 20, 21, 22 ), $GLOBALS['mumega_motion_test_get_posts_requests'][1]['post__not_in'] );
+		$this->assertSame( array( 10, 20, 21, 22, 30 ), $used_ids );
 	}
 
 	/**

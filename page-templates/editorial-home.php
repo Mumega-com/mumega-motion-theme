@@ -10,26 +10,21 @@ $used_ids    = array();
 $lead        = mumega_motion_select_lead_post( $used_ids );
 $supporting  = mumega_motion_select_supporting_posts( $used_ids, 3 );
 $test_lab    = mumega_motion_select_special_posts( 'test-lab', $used_ids, 1 );
-$rails       = mumega_motion_select_rail_categories( $used_ids, 3 );
+$rail_groups = mumega_motion_select_rail_groups( $used_ids, 3 );
 $field_notes = mumega_motion_select_special_posts( 'field-notes', $used_ids, 5 );
 
 $menu_category_ids = mumega_motion_menu_category_ids();
 $test_lab_term     = ! empty( $test_lab ) ? get_category_by_slug( 'test-lab' ) : false;
 $field_notes_term  = ! empty( $field_notes ) ? get_category_by_slug( 'field-notes' ) : false;
-$rail_groups       = array();
+foreach ( $rail_groups as $rail_group_index => $rail_group ) {
+	$rail_term = get_term( $rail_group['term_id'], 'category' );
 
-foreach ( $rails as $rail_term_id ) {
-	$rail_posts = mumega_motion_select_category_posts( $rail_term_id, $used_ids, 3 );
-	$rail_term  = get_term( $rail_term_id, 'category' );
-
-	if ( 3 !== count( $rail_posts ) || ! $rail_term instanceof WP_Term ) {
+	if ( ! $rail_term instanceof WP_Term ) {
+		unset( $rail_groups[ $rail_group_index ] );
 		continue;
 	}
 
-	$rail_groups[] = array(
-		'term'  => $rail_term,
-		'posts' => $rail_posts,
-	);
+	$rail_groups[ $rail_group_index ]['term'] = $rail_term;
 }
 
 $newsletter_page = mumega_motion_newsletter_page();

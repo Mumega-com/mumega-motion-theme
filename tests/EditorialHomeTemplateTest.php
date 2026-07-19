@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 
 require_once dirname( __DIR__ ) . '/inc/editorial-helpers.php';
 require_once dirname( __DIR__ ) . '/inc/editorial-queries.php';
+require_once dirname( __DIR__ ) . '/inc/editorial-patterns.php';
 
 /**
  * Exercises the homepage template contract and global-post safety boundary.
@@ -66,15 +67,27 @@ $used_ids    = array();
 $lead        = mumega_motion_select_lead_post( $used_ids );
 $supporting  = mumega_motion_select_supporting_posts( $used_ids, 3 );
 $test_lab    = mumega_motion_select_special_posts( 'test-lab', $used_ids, 1 );
-$rails       = mumega_motion_select_rail_categories( $used_ids, 3 );
+$rail_groups = mumega_motion_select_rail_groups( $used_ids, 3 );
 $field_notes = mumega_motion_select_special_posts( 'field-notes', $used_ids, 5 );
 PHP;
 
 		$this->assertStringContainsString( $selection_contract, $source );
-		$this->assertMatchesRegularExpression(
-			'/foreach\s*\(\s*\$rails\s+as\s+\$rail_term_id\s*\).*?mumega_motion_select_category_posts\(\s*\$rail_term_id,\s*\$used_ids,\s*3\s*\)/s',
-			$source
+	}
+
+	/**
+	 * Keeps the lead as the sole H1 when Newsletter pattern content is embedded.
+	 */
+	public function test_embedded_newsletter_pattern_preserves_single_home_h1(): void {
+		$newsletter               = $this->post( 41, 'Newsletter landing page' );
+		$newsletter->post_content = mumega_motion_newsletter_page_pattern_content();
+		$output                   = $this->render_editorial_home(
+			$this->post( 10, 'Lead investigation' ),
+			array(),
+			$newsletter
 		);
+
+		$this->assertSame( 1, preg_match_all( '/<h1\b/i', $output ) );
+		$this->assertStringContainsString( 'Stay informed with reporting delivered to your inbox.', $output );
 	}
 
 	/**
@@ -219,9 +232,10 @@ PHP;
 	 *
 	 * @param WP_Post|null $lead       Optional lead post.
 	 * @param array        $supporting Supporting posts.
+	 * @param WP_Post|null $newsletter Optional newsletter page.
 	 * @return string
 	 */
-	private function render_editorial_home( $lead = null, $supporting = array() ): string {
+	private function render_editorial_home( $lead = null, $supporting = array(), $newsletter = null ): string {
 		$page = $this->post( 80, 'Editorial Desk' );
 
 		$GLOBALS['post']                                 = $page;
@@ -231,7 +245,7 @@ PHP;
 		$GLOBALS['mumega_motion_test_post_queries']      = array(
 			$lead instanceof WP_Post ? array( $lead ) : array(),
 			$supporting,
-			array(),
+			$newsletter instanceof WP_Post ? array( $newsletter ) : array(),
 		);
 
 		ob_start();

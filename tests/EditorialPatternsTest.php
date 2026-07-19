@@ -24,6 +24,9 @@ final class EditorialPatternsTest extends TestCase {
 		$GLOBALS['mumega_motion_test_translations']       = array();
 		$GLOBALS['mumega_motion_test_pattern_categories'] = array();
 		$GLOBALS['mumega_motion_test_patterns']           = array();
+		$GLOBALS['mumega_motion_test_loop_posts']         = array();
+		$GLOBALS['mumega_motion_test_loop_index']         = 0;
+		$GLOBALS['mumega_motion_test_current_post']       = null;
 	}
 
 	/**
@@ -120,9 +123,41 @@ final class EditorialPatternsTest extends TestCase {
 	public function test_newsletter_page_has_consent_copy_and_a_provider_form_insertion_area(): void {
 		$content = $this->pattern_content( 'mumega-motion/newsletter-page' );
 
-		foreach ( array( 'Newsletter', 'Stay informed with reporting delivered to your inbox.', 'By subscribing, you agree to receive email updates.', 'Insert your site&#039;s existing newsletter form block here.' ) as $field ) {
+		foreach ( array( 'Stay informed with reporting delivered to your inbox.', 'By subscribing, you agree to receive email updates.', 'Insert your site&#039;s existing newsletter form block here.' ) as $field ) {
 			$this->assertStringContainsString( $field, $content );
 		}
+	}
+
+	/**
+	 * Defers the page-level H1 to whichever template owns the newsletter content.
+	 */
+	public function test_newsletter_page_pattern_contains_no_page_level_h1(): void {
+		$content = $this->pattern_content( 'mumega-motion/newsletter-page' );
+
+		$this->assertStringNotContainsString( '<h1', $content );
+		$this->assertStringNotContainsString( '"level":1', $content );
+	}
+
+	/**
+	 * Keeps a standalone Newsletter page to one template-owned H1.
+	 */
+	public function test_standalone_newsletter_page_renders_one_h1(): void {
+		$page                                     = new WP_Post(
+			array(
+				'ID'           => 41,
+				'post_title'   => 'The Weekly Brief',
+				'post_content' => $this->pattern_content( 'mumega-motion/newsletter-page' ),
+			)
+		);
+		$GLOBALS['mumega_motion_test_loop_posts'] = array( $page );
+
+		ob_start();
+		require dirname( __DIR__ ) . '/page.php';
+		$output = (string) ob_get_clean();
+
+		$this->assertSame( 1, preg_match_all( '/<h1\b/i', $output ) );
+		$this->assertMatchesRegularExpression( '/<h1\b[^>]*>\s*The Weekly Brief\s*<\/h1>/s', $output );
+		$this->assertStringContainsString( 'Stay informed with reporting delivered to your inbox.', $output );
 	}
 
 	/**
@@ -208,7 +243,6 @@ final class EditorialPatternsTest extends TestCase {
 			'State the corrected finding.',
 			'Explanation',
 			'Explain what changed and why.',
-			'Newsletter',
 			'Stay informed with reporting delivered to your inbox.',
 			'By subscribing, you agree to receive email updates.',
 			'Insert your site\'s existing newsletter form block here.',

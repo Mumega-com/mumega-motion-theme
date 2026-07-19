@@ -189,30 +189,56 @@ function mumega_motion_select_supporting_posts( &$used_ids, $limit = 3 ) {
  * @return array
  */
 function mumega_motion_select_rail_categories( $used_ids, $limit = 3 ) {
+	$groups = mumega_motion_select_rail_groups( $used_ids, $limit );
+
+	return array_map(
+		static function ( $group ) {
+			return (int) $group['term_id'];
+		},
+		$groups
+	);
+}
+
+/**
+ * Selects complete topic-rail groups in menu order as one transaction.
+ *
+ * Candidate IDs are committed only after the category fills all three rail
+ * slots. Each later category therefore sees posts reserved by earlier complete
+ * groups, while an underfilled candidate leaves no IDs behind.
+ *
+ * @param array $used_ids Post identifiers already rendered.
+ * @param int   $limit    Maximum number of rails.
+ * @return array
+ */
+function mumega_motion_select_rail_groups( &$used_ids, $limit = 3 ) {
 	$limit = max( 0, (int) $limit );
 
 	if ( 0 === $limit ) {
 		return array();
 	}
 
-	$rail_categories = array();
+	$rail_groups = array();
 
 	foreach ( mumega_motion_menu_category_ids() as $term_id ) {
-		$dry_used_ids = $used_ids;
-		$posts        = mumega_motion_select_category_posts( $term_id, $dry_used_ids, 3 );
+		$candidate_used_ids = $used_ids;
+		$posts              = mumega_motion_select_category_posts( $term_id, $candidate_used_ids, 3 );
 
 		if ( 3 !== count( $posts ) ) {
 			continue;
 		}
 
-		$rail_categories[] = (int) $term_id;
+		$used_ids      = $candidate_used_ids;
+		$rail_groups[] = array(
+			'term_id' => (int) $term_id,
+			'posts'   => $posts,
+		);
 
-		if ( count( $rail_categories ) >= $limit ) {
+		if ( count( $rail_groups ) >= $limit ) {
 			break;
 		}
 	}
 
-	return $rail_categories;
+	return $rail_groups;
 }
 
 /**

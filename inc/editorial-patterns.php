@@ -254,7 +254,6 @@ function mumega_motion_newsletter_page_pattern_content() {
 	return implode(
 		"\n\n",
 		array(
-			mumega_motion_editorial_pattern_heading( 'Newsletter', 1 ),
 			mumega_motion_editorial_pattern_paragraph( 'Stay informed with reporting delivered to your inbox.' ),
 			mumega_motion_editorial_pattern_paragraph( 'By subscribing, you agree to receive email updates.' ),
 			mumega_motion_editorial_pattern_group(
