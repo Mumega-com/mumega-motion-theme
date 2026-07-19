@@ -34,6 +34,8 @@ final class EditorialHomeTemplateTest extends TestCase {
 		$GLOBALS['mumega_motion_test_nav_menu_locations']        = array();
 		$GLOBALS['mumega_motion_test_nav_menu_objects']          = array();
 		$GLOBALS['mumega_motion_test_nav_menu_items']            = array();
+		$GLOBALS['mumega_motion_test_terms']                     = array();
+		$GLOBALS['mumega_motion_test_term_requests']             = array();
 		$GLOBALS['mumega_motion_test_queried_object_id']         = 0;
 		$GLOBALS['post'] = null;
 	}
@@ -218,6 +220,274 @@ PHP;
 	}
 
 	/**
+	 * Renders up to three menu-derived audience pathways behind one labelled heading.
+	 */
+	public function test_home_audiences_renders_pathways_with_one_heading_in_menu_order(): void {
+		$output = $this->render_template_part(
+			'template-parts/home-audiences.php',
+			array(
+				'items' => array(
+					array(
+						'title'       => 'Team leads',
+						'description' => 'Playbooks for people managers.',
+						'url'         => 'https://example.test/audience/team-leads/',
+					),
+					array(
+						'title'       => 'Analysts',
+						'description' => '',
+						'url'         => 'https://example.test/audience/analysts/',
+					),
+					array(
+						'title'       => 'Executives',
+						'description' => 'Board-level briefings.',
+						'url'         => 'https://example.test/audience/executives/',
+					),
+				),
+			)
+		);
+
+		$this->assertSame( 1, preg_match_all( '/<h2\b/i', $output ) );
+		$this->assertStringContainsString( 'Explore by audience', $output );
+		$this->assertSame( 3, substr_count( $output, 'home-audiences__item' ) );
+		$this->assertSame( 3, substr_count( $output, '<a class="home-audiences__link"' ) );
+		$this->assertStringContainsString( 'href="https://example.test/audience/team-leads/"', $output );
+		$this->assertStringContainsString( 'href="https://example.test/audience/analysts/"', $output );
+		$this->assertStringContainsString( 'href="https://example.test/audience/executives/"', $output );
+		$this->assertStringContainsString( 'Playbooks for people managers.', $output );
+		$this->assertStringContainsString( 'Board-level briefings.', $output );
+		$this->assertSame( 2, substr_count( $output, 'home-audiences__description' ) );
+
+		$team_leads_position = strpos( $output, 'Team leads' );
+		$analysts_position   = strpos( $output, 'Analysts' );
+		$executives_position = strpos( $output, 'Executives' );
+
+		$this->assertLessThan( $analysts_position, $team_leads_position );
+		$this->assertLessThan( $executives_position, $analysts_position );
+	}
+
+	/**
+	 * Omits the audiences section entirely when no pathways are configured.
+	 */
+	public function test_home_audiences_with_no_items_renders_nothing(): void {
+		$output = $this->render_template_part( 'template-parts/home-audiences.php', array( 'items' => array() ) );
+
+		$this->assertSame( '', $output );
+	}
+
+	/**
+	 * Renders the one-plus-four coverage grid behind the translatable fallback heading.
+	 */
+	public function test_home_coverage_renders_feature_and_support_grid(): void {
+		$output = $this->render_template_part(
+			'template-parts/home-coverage.php',
+			array(
+				'feature' => $this->post( 21, 'Feature Investigation' ),
+				'support' => array(
+					$this->post( 22, 'Support One' ),
+					$this->post( 23, 'Support Two' ),
+					$this->post( 24, 'Support Three' ),
+					$this->post( 25, 'Support Four' ),
+				),
+			)
+		);
+
+		$this->assertSame( 1, preg_match_all( '/<h2\b/i', $output ) );
+		$this->assertStringContainsString( 'Latest coverage', $output );
+		$this->assertSame( 5, preg_match_all( '/<h3\b/i', $output ) );
+		$this->assertStringContainsString( 'Support One', $output );
+		$this->assertStringContainsString( 'Support Two', $output );
+		$this->assertStringContainsString( 'Support Three', $output );
+		$this->assertStringContainsString( 'Support Four', $output );
+
+		$feature_position = strpos( $output, 'Feature Investigation' );
+		$support_position = strpos( $output, 'Support One' );
+
+		$this->assertLessThan( $support_position, $feature_position );
+	}
+
+	/**
+	 * Omits the empty support wrapper when only the feature card is available.
+	 */
+	public function test_home_coverage_with_feature_only_omits_the_empty_support_wrapper(): void {
+		$output = $this->render_template_part(
+			'template-parts/home-coverage.php',
+			array( 'feature' => $this->post( 21, 'Feature Investigation' ) )
+		);
+
+		$this->assertSame( 1, preg_match_all( '/<h3\b/i', $output ) );
+		$this->assertStringNotContainsString( 'home-coverage__support', $output );
+	}
+
+	/**
+	 * Omits the coverage section entirely when neither the feature nor support posts exist.
+	 */
+	public function test_home_coverage_with_no_feature_and_no_support_renders_nothing(): void {
+		$output = $this->render_template_part( 'template-parts/home-coverage.php', array() );
+
+		$this->assertSame( '', $output );
+	}
+
+	/**
+	 * Renders complete two-post field-guide groups with category title, description and link.
+	 */
+	public function test_home_guides_renders_complete_groups_with_category_details_in_order(): void {
+		$GLOBALS['mumega_motion_test_terms'][5] = new WP_Term(
+			array(
+				'term_id'     => 5,
+				'name'        => 'Deep Dives',
+				'description' => 'Long-form investigations.',
+			)
+		);
+		$GLOBALS['mumega_motion_test_terms'][6] = new WP_Term(
+			array(
+				'term_id'     => 6,
+				'name'        => 'Quick Takes',
+				'description' => '',
+			)
+		);
+
+		$output = $this->render_template_part(
+			'template-parts/home-guides.php',
+			array(
+				'groups' => array(
+					array(
+						'term_id' => 5,
+						'posts'   => array( $this->post( 30, 'Deep Dive One' ), $this->post( 31, 'Deep Dive Two' ) ),
+					),
+					array(
+						'term_id' => 6,
+						'posts'   => array( $this->post( 32, 'Quick Take One' ), $this->post( 33, 'Quick Take Two' ) ),
+					),
+				),
+			)
+		);
+
+		$this->assertSame( 1, preg_match_all( '/<h2\b/i', $output ) );
+		$this->assertStringContainsString( 'Field guides', $output );
+		$this->assertSame( 4, preg_match_all( '/<h3\b/i', $output ) );
+		$this->assertStringContainsString( 'Deep Dives', $output );
+		$this->assertStringContainsString( 'https://example.test/category/5/', $output );
+		$this->assertStringContainsString( 'Long-form investigations.', $output );
+		$this->assertStringContainsString( 'Quick Takes', $output );
+		$this->assertSame( 1, substr_count( $output, 'home-guides__group-description' ) );
+		$this->assertStringContainsString( 'Deep Dive One', $output );
+		$this->assertStringContainsString( 'Deep Dive Two', $output );
+		$this->assertStringContainsString( 'Quick Take One', $output );
+		$this->assertStringContainsString( 'Quick Take Two', $output );
+
+		$deep_dives_position  = strpos( $output, 'Deep Dives' );
+		$quick_takes_position = strpos( $output, 'Quick Takes' );
+
+		$this->assertLessThan( $quick_takes_position, $deep_dives_position );
+	}
+
+	/**
+	 * Skips a group whose category term cannot be resolved without breaking sibling groups.
+	 */
+	public function test_home_guides_skips_a_group_with_an_unresolvable_term(): void {
+		$GLOBALS['mumega_motion_test_terms'][6] = new WP_Term(
+			array(
+				'term_id' => 6,
+				'name'    => 'Quick Takes',
+			)
+		);
+
+		$output = $this->render_template_part(
+			'template-parts/home-guides.php',
+			array(
+				'groups' => array(
+					array(
+						'term_id' => 99,
+						'posts'   => array( $this->post( 30, 'Deep Dive One' ), $this->post( 31, 'Deep Dive Two' ) ),
+					),
+					array(
+						'term_id' => 6,
+						'posts'   => array( $this->post( 32, 'Quick Take One' ), $this->post( 33, 'Quick Take Two' ) ),
+					),
+				),
+			)
+		);
+
+		$this->assertStringNotContainsString( 'Deep Dive One', $output );
+		$this->assertStringContainsString( 'Quick Take One', $output );
+	}
+
+	/**
+	 * Omits the guides section entirely when no complete groups are configured.
+	 */
+	public function test_home_guides_with_no_groups_renders_nothing(): void {
+		$output = $this->render_template_part( 'template-parts/home-guides.php', array( 'groups' => array() ) );
+
+		$this->assertSame( '', $output );
+	}
+
+	/**
+	 * Places pathways, coverage and guides between the briefing and the newsletter in source
+	 * order, and never repeats the briefing post inside either module.
+	 */
+	public function test_home_pathways_coverage_and_guides_render_in_order_without_repeating_the_briefing_post(): void {
+		$GLOBALS['mumega_motion_test_nav_menu_locations']['audiences'] = 31;
+		$GLOBALS['mumega_motion_test_nav_menu_objects'][31]            = new WP_Term( array( 'term_id' => 31 ) );
+		$GLOBALS['mumega_motion_test_nav_menu_items'][31]              = array(
+			(object) array(
+				'title'       => 'Team leads',
+				'description' => 'Playbooks for people managers.',
+				'url'         => 'https://example.test/audience/team-leads/',
+			),
+		);
+
+		$GLOBALS['mumega_motion_test_nav_menu_locations']['primary'] = 50;
+		$GLOBALS['mumega_motion_test_nav_menu_objects'][50]           = new WP_Term( array( 'term_id' => 50 ) );
+		$GLOBALS['mumega_motion_test_nav_menu_items'][50]             = array(
+			(object) array(
+				'type'      => 'taxonomy',
+				'object'    => 'category',
+				'object_id' => 7,
+			),
+		);
+		$GLOBALS['mumega_motion_test_terms'][7] = new WP_Term(
+			array(
+				'term_id'     => 7,
+				'name'        => 'Field Category',
+				'description' => 'A category description.',
+			)
+		);
+
+		$output = $this->render_editorial_home(
+			array(
+				'briefing'         => array( $this->post( 10, 'Lead investigation' ) ),
+				'coverage_feature' => array( $this->post( 21, 'Feature Investigation' ) ),
+				'coverage_support' => array( $this->post( 22, 'Support One' ) ),
+				'guide_groups'     => array(
+					array( $this->post( 60, 'Guide Post One' ), $this->post( 61, 'Guide Post Two' ) ),
+				),
+				'newsletter'       => array( $this->post( 41, 'Newsletter landing page' ) ),
+			)
+		);
+
+		$briefing_position   = strpos( $output, 'home-briefing' );
+		$audiences_position  = strpos( $output, 'home-audiences' );
+		$coverage_position   = strpos( $output, 'home-coverage' );
+		$guides_position     = strpos( $output, 'home-guides' );
+		$newsletter_position = strpos( $output, 'home-newsletter' );
+
+		foreach ( array( $briefing_position, $audiences_position, $coverage_position, $guides_position, $newsletter_position ) as $position ) {
+			$this->assertIsInt( $position );
+		}
+
+		$this->assertLessThan( $audiences_position, $briefing_position );
+		$this->assertLessThan( $coverage_position, $audiences_position );
+		$this->assertLessThan( $guides_position, $coverage_position );
+		$this->assertLessThan( $newsletter_position, $guides_position );
+
+		$this->assertStringContainsString( 'Feature Investigation', $output );
+		$this->assertStringContainsString( 'Guide Post One', $output );
+
+		$coverage_and_guides = substr( $output, $coverage_position, $newsletter_position - $coverage_position );
+		$this->assertStringNotContainsString( 'Lead investigation', $coverage_and_guides );
+	}
+
+	/**
 	 * Leaves interactive plugin forms outside React-owned Motion mounts.
 	 */
 	public function test_newsletter_section_is_not_a_motion_mount(): void {
@@ -321,8 +591,10 @@ PHP;
 	 *
 	 * Each `get_posts()` result queues in the exact order the template resolves
 	 * its data: briefing lead, related pair, coverage feature, coverage support,
-	 * the editorial guide page, the methodology page, the knowledge map page, and
-	 * finally the newsletter page.
+	 * one result per matched rail-group category (only consumed when a `primary`
+	 * nav menu fixture supplies matching category items), the editorial guide
+	 * page, the methodology page, the knowledge map page, and finally the
+	 * newsletter page.
 	 *
 	 * @param array $overrides Named query-result overrides.
 	 * @return string
@@ -334,6 +606,7 @@ PHP;
 			'related'          => array(),
 			'coverage_feature' => array(),
 			'coverage_support' => array(),
+			'guide_groups'     => array(),
 			'guide'            => array(),
 			'methodology'      => array(),
 			'knowledge_map'    => array(),
@@ -346,15 +619,20 @@ PHP;
 		$GLOBALS['mumega_motion_test_current_post']       = $page;
 		$GLOBALS['mumega_motion_test_queried_object_id']  = $page->ID;
 		$GLOBALS['mumega_motion_test_posts'][ $page->ID ] = $page;
-		$GLOBALS['mumega_motion_test_post_queries']       = array(
-			$config['briefing'],
-			$config['related'],
-			$config['coverage_feature'],
-			$config['coverage_support'],
-			$config['guide'],
-			$config['methodology'],
-			$config['knowledge_map'],
-			$config['newsletter'],
+		$GLOBALS['mumega_motion_test_post_queries']       = array_merge(
+			array(
+				$config['briefing'],
+				$config['related'],
+				$config['coverage_feature'],
+				$config['coverage_support'],
+			),
+			array_values( $config['guide_groups'] ),
+			array(
+				$config['guide'],
+				$config['methodology'],
+				$config['knowledge_map'],
+				$config['newsletter'],
+			)
 		);
 
 		ob_start();

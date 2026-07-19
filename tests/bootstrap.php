@@ -46,6 +46,8 @@ $GLOBALS['mumega_motion_test_post_queries']     = array();
 $GLOBALS['mumega_motion_test_get_posts_requests'] = array();
 $GLOBALS['mumega_motion_test_categories_by_slug'] = array();
 $GLOBALS['mumega_motion_test_category_by_slug_requests'] = array();
+$GLOBALS['mumega_motion_test_terms']            = array();
+$GLOBALS['mumega_motion_test_term_requests']    = array();
 $GLOBALS['mumega_motion_test_categories']       = array();
 $GLOBALS['mumega_motion_test_get_categories_requests'] = array();
 $GLOBALS['mumega_motion_test_nav_menu_items']   = array();
@@ -1500,6 +1502,24 @@ function get_category_by_slug( $slug ) {
 	return isset( $GLOBALS['mumega_motion_test_categories_by_slug'][ $slug ] )
 		? $GLOBALS['mumega_motion_test_categories_by_slug'][ $slug ]
 		: false;
+}
+
+/**
+ * Retrieves a configured taxonomy term by identifier.
+ *
+ * @param int    $term_id  Term identifier.
+ * @param string $taxonomy Taxonomy name.
+ * @return WP_Term|null
+ */
+function get_term( $term_id, $taxonomy = '' ) {
+	$GLOBALS['mumega_motion_test_term_requests'][] = array(
+		'term_id'  => (int) $term_id,
+		'taxonomy' => $taxonomy,
+	);
+
+	return isset( $GLOBALS['mumega_motion_test_terms'][ (int) $term_id ] )
+		? $GLOBALS['mumega_motion_test_terms'][ (int) $term_id ]
+		: null;
 }
 
 /**

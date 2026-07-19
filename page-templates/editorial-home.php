@@ -48,6 +48,37 @@ mumega_motion_get_header();
 	);
 	?>
 
+	<?php
+	get_template_part(
+		'template-parts/home-audiences',
+		null,
+		array( 'items' => $audience_items )
+	);
+	?>
+
+	<?php
+	get_template_part(
+		'template-parts/home-coverage',
+		null,
+		array(
+			'feature'           => $coverage_feature,
+			'support'           => $coverage_support,
+			'menu_category_ids' => $menu_category_ids,
+		)
+	);
+	?>
+
+	<?php
+	get_template_part(
+		'template-parts/home-guides',
+		null,
+		array(
+			'groups'            => $guide_groups,
+			'menu_category_ids' => $menu_category_ids,
+		)
+	);
+	?>
+
 	<?php if ( $newsletter_page instanceof WP_Post ) : ?>
 		<section class="home-newsletter">
 			<?php
