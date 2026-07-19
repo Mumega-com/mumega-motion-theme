@@ -50,6 +50,13 @@ $GLOBALS['mumega_motion_test_nav_menu_locations'] = array();
 $GLOBALS['mumega_motion_test_nav_menu_location_requests'] = array();
 $GLOBALS['mumega_motion_test_nav_menu_objects'] = array();
 $GLOBALS['mumega_motion_test_nav_menu_object_requests'] = array();
+$GLOBALS['mumega_motion_test_theme_supports']   = array();
+$GLOBALS['mumega_motion_test_menu_locations']   = array();
+$GLOBALS['mumega_motion_test_enqueued_styles']  = array();
+$GLOBALS['mumega_motion_test_enqueued_scripts'] = array();
+$GLOBALS['mumega_motion_test_conditionals']     = array();
+$GLOBALS['mumega_motion_test_page_template']    = '';
+$GLOBALS['mumega_motion_test_queried_object_id'] = 0;
 
 /**
  * Minimal post value used by editorial helper tests.
@@ -496,6 +503,177 @@ function get_option( $option, $default = false ) {
 	return array_key_exists( $option, $GLOBALS['mumega_motion_test_options'] )
 		? $GLOBALS['mumega_motion_test_options'][ $option ]
 		: $default;
+}
+
+/**
+ * Registers a theme feature for assertions.
+ *
+ * @param string $feature Theme feature name.
+ * @param mixed  ...$args Feature arguments.
+ * @return true
+ */
+function add_theme_support( $feature, ...$args ) {
+	$GLOBALS['mumega_motion_test_theme_supports'][ $feature ] = $args;
+
+	return true;
+}
+
+/**
+ * Registers navigation locations for assertions.
+ *
+ * @param array $locations Menu locations.
+ * @return void
+ */
+function register_nav_menus( $locations = array() ) {
+	$GLOBALS['mumega_motion_test_menu_locations'] = $locations;
+}
+
+/**
+ * Reports whether the configured request is singular.
+ *
+ * @return bool
+ */
+function is_singular( $post_types = '' ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found
+	return ! empty( $GLOBALS['mumega_motion_test_conditionals']['is_singular'] );
+}
+
+/**
+ * Reports whether the configured request is the posts index.
+ *
+ * @return bool
+ */
+function is_home() {
+	return ! empty( $GLOBALS['mumega_motion_test_conditionals']['is_home'] );
+}
+
+/**
+ * Reports whether the configured request is an archive.
+ *
+ * @return bool
+ */
+function is_archive() {
+	return ! empty( $GLOBALS['mumega_motion_test_conditionals']['is_archive'] );
+}
+
+/**
+ * Reports whether the configured request is search results.
+ *
+ * @return bool
+ */
+function is_search() {
+	return ! empty( $GLOBALS['mumega_motion_test_conditionals']['is_search'] );
+}
+
+/**
+ * Reports whether the configured request is a 404 response.
+ *
+ * @return bool
+ */
+function is_404() {
+	return ! empty( $GLOBALS['mumega_motion_test_conditionals']['is_404'] );
+}
+
+/**
+ * Reports whether the configured page template matches.
+ *
+ * @param string $template Template path.
+ * @return bool
+ */
+function is_page_template( $template = '' ) {
+	return $template === $GLOBALS['mumega_motion_test_page_template'];
+}
+
+/**
+ * Returns the current queried object identifier.
+ *
+ * @return int
+ */
+function get_queried_object_id() {
+	return (int) $GLOBALS['mumega_motion_test_queried_object_id'];
+}
+
+/**
+ * Enqueues a stylesheet for assertions.
+ *
+ * @param string $handle Stylesheet handle.
+ * @param string $src Source URL.
+ * @param array  $deps Dependencies.
+ * @param mixed  $ver Version.
+ * @param string $media Media query.
+ * @return void
+ */
+function wp_enqueue_style( $handle, $src = '', $deps = array(), $ver = false, $media = 'all' ) {
+	$GLOBALS['mumega_motion_test_enqueued_styles'][ $handle ] = array(
+		'src'   => $src,
+		'deps'  => $deps,
+		'ver'   => $ver,
+		'media' => $media,
+	);
+}
+
+/**
+ * Enqueues a script for assertions.
+ *
+ * @param string $handle Script handle.
+ * @param string $src Source URL.
+ * @param array  $deps Dependencies.
+ * @param mixed  $ver Version.
+ * @param bool   $in_footer Footer flag.
+ * @return void
+ */
+function wp_enqueue_script( $handle, $src = '', $deps = array(), $ver = false, $in_footer = false ) {
+	$GLOBALS['mumega_motion_test_enqueued_scripts'][ $handle ] = array(
+		'src'       => $src,
+		'deps'      => $deps,
+		'ver'       => $ver,
+		'in_footer' => $in_footer,
+	);
+}
+
+/**
+ * Returns the test theme directory.
+ *
+ * @return string
+ */
+function get_template_directory() {
+	return dirname( __DIR__ );
+}
+
+/**
+ * Returns the test theme directory URI.
+ *
+ * @return string
+ */
+function get_template_directory_uri() {
+	return 'https://example.test/wp-content/themes/mumega-motion';
+}
+
+/**
+ * Returns the test stylesheet URI.
+ *
+ * @return string
+ */
+function get_stylesheet_uri() {
+	return get_template_directory_uri() . '/style.css';
+}
+
+/**
+ * Returns a theme object with a stable version.
+ *
+ * @return object
+ */
+function wp_get_theme() {
+	return new class() {
+		/**
+		 * Returns the test theme version.
+		 *
+		 * @param string $header Theme header name.
+		 * @return string
+		 */
+		public function get( $header ) {
+			return 'Version' === $header ? '0.1.0' : '';
+		}
+	};
 }
 
 /**
