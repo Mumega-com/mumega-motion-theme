@@ -379,6 +379,56 @@ final class EditorialContentTemplatesTest extends TestCase {
 	}
 
 	/**
+	 * Keeps every Task 4-6 homepage module readable in print: headings, article
+	 * links, methodology/disclosure/sources text, and the newsletter destination
+	 * link stay on the page; only decorative backgrounds, box-shadows, and
+	 * non-functional form controls are removed. Nothing essential gets display:none.
+	 */
+	public function test_print_styles_keep_every_homepage_module_readable(): void {
+		$source = $this->theme_source( 'assets/css/print.css' );
+
+		foreach (
+			array(
+				'.home-intro',
+				'.home-briefing',
+				'.home-audiences',
+				'.home-coverage',
+				'.home-guides',
+				'.home-methodology',
+				'.home-tools',
+				'.home-knowledge',
+				'.home-newsletter',
+			) as $selector
+		) {
+			$this->assertStringContainsString( $selector, $source, $selector . ' must be addressed by print.css.' );
+		}
+
+		// The newsletter destination link must survive print: .home-newsletter is no
+		// longer inside the blanket chrome-hiding display:none selector list.
+		$this->assertSame(
+			1,
+			preg_match( '/\.site-header,.*?display:\s*none\s*!important;/s', $source, $chrome_hide_rule ),
+			'Chrome-hiding display:none rule must still exist.'
+		);
+		$this->assertStringNotContainsString( '.home-newsletter', $chrome_hide_rule[0] );
+
+		// Decorative visual-only styling is stripped for print, not the module itself.
+		$this->assertMatchesRegularExpression(
+			'/\.home-intro,[\s\S]*\.home-newsletter\s*\{[^}]*background:\s*none\s*!important;[^}]*box-shadow:\s*none\s*!important;/',
+			$source
+		);
+
+		// The inverted-color newsletter callout is repainted for a printable page.
+		$this->assertMatchesRegularExpression( '/\.home-newsletter\s*\{[^}]*color:\s*#000\s*!important;/s', $source );
+
+		// Only non-functional form controls are hidden — never the section, heading, or links.
+		$this->assertMatchesRegularExpression(
+			'/\.home-newsletter\s+input,\s*\.home-newsletter\s+select,\s*\.home-newsletter\s+textarea,\s*\.home-newsletter\s+button\s*\{[^}]*display:\s*none\s*!important;/s',
+			$source
+		);
+	}
+
+	/**
 	 * Renders one populated listing template.
 	 *
 	 * @param string $filename Theme-relative template filename.

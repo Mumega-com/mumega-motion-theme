@@ -34,6 +34,26 @@
           "color": "#6545a4"
         },
         {
+          "name": "Navy",
+          "slug": "navy",
+          "color": "#1b2a4a"
+        },
+        {
+          "name": "Teal",
+          "slug": "teal",
+          "color": "#0f6a63"
+        },
+        {
+          "name": "Cobalt",
+          "slug": "cobalt",
+          "color": "#2454a6"
+        },
+        {
+          "name": "Amber",
+          "slug": "amber",
+          "color": "#8a5a12"
+        },
+        {
           "name": "Rule",
           "slug": "rule",
           "color": "#cbc4b8"
