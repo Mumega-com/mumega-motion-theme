@@ -3,6 +3,7 @@
  */
 
 @media print {
+
 	@page {
 		margin: 18mm;
 	}
