@@ -37,6 +37,7 @@ $GLOBALS['mumega_motion_test_copy_count']       = 0;
 $GLOBALS['mumega_motion_test_copy_after_file']  = null;
 $GLOBALS['mumega_motion_test_salt']             = 'mumega-motion-test-secret';
 $GLOBALS['mumega_motion_test_posts']            = array();
+$GLOBALS['mumega_motion_test_post_thumbnails']  = array();
 $GLOBALS['mumega_motion_test_generated_excerpts'] = array();
 $GLOBALS['mumega_motion_test_post_terms']       = array();
 $GLOBALS['mumega_motion_test_post_tags']        = array();
@@ -880,11 +881,22 @@ function the_post() {
 }
 
 /**
- * Returns the configured current post.
+ * Returns a configured post value by object, identifier, or the current post.
  *
+ * @param WP_Post|int|null $post Post value or identifier.
  * @return WP_Post|null
  */
-function get_post() {
+function get_post( $post = null ) {
+	if ( $post instanceof WP_Post ) {
+		return $post;
+	}
+
+	if ( is_numeric( $post ) ) {
+		return isset( $GLOBALS['mumega_motion_test_posts'][ (int) $post ] )
+			? $GLOBALS['mumega_motion_test_posts'][ (int) $post ]
+			: null;
+	}
+
 	return $GLOBALS['mumega_motion_test_current_post'];
 }
 
@@ -929,13 +941,61 @@ function get_the_title( $post = null ) {
 }
 
 /**
- * Reports that rendered test posts do not have featured images by default.
+ * Reports whether a configured test post has a featured image assigned.
  *
  * @param WP_Post|int|null $post Post value or identifier.
  * @return bool
  */
-function has_post_thumbnail( $post = null ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
-	return false;
+function has_post_thumbnail( $post = null ) {
+	if ( is_numeric( $post ) ) {
+		$post = isset( $GLOBALS['mumega_motion_test_posts'][ (int) $post ] )
+			? $GLOBALS['mumega_motion_test_posts'][ (int) $post ]
+			: null;
+	}
+
+	if ( ! $post instanceof WP_Post ) {
+		$post = $GLOBALS['mumega_motion_test_current_post'];
+	}
+
+	return $post instanceof WP_Post && ! empty( $GLOBALS['mumega_motion_test_post_thumbnails'][ $post->ID ] );
+}
+
+/**
+ * Returns deterministic responsive image markup for a configured thumbnail.
+ *
+ * @param WP_Post|int|null $post Post value or identifier.
+ * @param string|array     $size Registered image size.
+ * @param string|array     $attr Additional image attributes.
+ * @return string
+ */
+function get_the_post_thumbnail( $post = null, $size = 'post-thumbnail', $attr = '' ) {
+	if ( is_numeric( $post ) ) {
+		$post = isset( $GLOBALS['mumega_motion_test_posts'][ (int) $post ] )
+			? $GLOBALS['mumega_motion_test_posts'][ (int) $post ]
+			: null;
+	}
+
+	if ( ! $post instanceof WP_Post ) {
+		$post = $GLOBALS['mumega_motion_test_current_post'];
+	}
+
+	if ( ! $post instanceof WP_Post || empty( $GLOBALS['mumega_motion_test_post_thumbnails'][ $post->ID ] ) ) {
+		return '';
+	}
+
+	$attr        = is_array( $attr ) ? $attr : array();
+	$size_class  = sanitize_key( is_array( $size ) ? implode( 'x', $size ) : (string) $size );
+	$classes     = 'attachment-' . $size_class . ' size-' . $size_class;
+
+	if ( ! empty( $attr['class'] ) ) {
+		$classes .= ' ' . $attr['class'];
+	}
+
+	return sprintf(
+		'<img src="https://example.test/uploads/thumb-%1$d.jpg" srcset="https://example.test/uploads/thumb-%1$d.jpg 600w, https://example.test/uploads/thumb-%1$d-2x.jpg 1200w" sizes="(max-width: 600px) 100vw, 600px" class="%2$s" alt="" />',
+		(int) $post->ID,
+		esc_attr( $classes )
+	);
 }
 
 /**

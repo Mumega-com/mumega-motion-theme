@@ -24,6 +24,7 @@ final class EditorialHomeTemplateTest extends TestCase {
 		$GLOBALS['mumega_motion_test_postdata_events']           = array();
 		$GLOBALS['mumega_motion_test_options']                   = array();
 		$GLOBALS['mumega_motion_test_posts']                     = array();
+		$GLOBALS['mumega_motion_test_post_thumbnails']           = array();
 		$GLOBALS['mumega_motion_test_post_terms']                = array();
 		$GLOBALS['mumega_motion_test_post_queries']              = array();
 		$GLOBALS['mumega_motion_test_get_posts_requests']        = array();
@@ -63,27 +64,31 @@ final class EditorialHomeTemplateTest extends TestCase {
 	public function test_home_selection_uses_one_shared_used_id_list(): void {
 		$source             = $this->theme_source( 'page-templates/editorial-home.php' );
 		$selection_contract = <<<'PHP'
-$used_ids    = array();
-$lead        = mumega_motion_select_lead_post( $used_ids );
-$supporting  = mumega_motion_select_supporting_posts( $used_ids, 3 );
-$test_lab    = mumega_motion_select_special_posts( 'test-lab', $used_ids, 1 );
-$rail_groups = mumega_motion_select_rail_groups( $used_ids, 3 );
-$field_notes = mumega_motion_select_special_posts( 'field-notes', $used_ids, 5 );
+$used_ids          = array();
+$briefing           = mumega_motion_select_lead_post( $used_ids );
+$briefing_related   = mumega_motion_select_related_posts( $used_ids );
+$coverage_feature   = mumega_motion_select_coverage_feature( $used_ids );
+$coverage_support   = mumega_motion_select_supporting_posts( $used_ids, 4 );
+$guide_groups       = mumega_motion_select_rail_groups( $used_ids, 4, 2 );
+$tool_posts         = mumega_motion_select_special_posts( 'tools-reviews', $used_ids, 3 );
 PHP;
 
 		$this->assertStringContainsString( $selection_contract, $source );
 	}
 
 	/**
-	 * Keeps the lead as the sole H1 when Newsletter pattern content is embedded.
+	 * Keeps the page-owned intro as the sole H1 when Newsletter pattern content is embedded.
 	 */
 	public function test_embedded_newsletter_pattern_preserves_single_home_h1(): void {
 		$newsletter               = $this->post( 41, 'Newsletter landing page' );
 		$newsletter->post_content = mumega_motion_newsletter_page_pattern_content();
-		$output                   = $this->render_editorial_home(
-			$this->post( 10, 'Lead investigation' ),
-			array(),
-			$newsletter
+
+		$output = $this->render_editorial_home(
+			array(
+				'page'        => $this->post( 80, 'Editorial Desk' ),
+				'briefing'    => array( $this->post( 10, 'Lead investigation' ) ),
+				'newsletter'  => array( $newsletter ),
+			)
 		);
 
 		$this->assertSame( 1, preg_match_all( '/<h1\b/i', $output ) );
@@ -91,53 +96,125 @@ PHP;
 	}
 
 	/**
-	 * Gives the rendered lead sole ownership of the homepage document heading.
+	 * Gives the page-owned intro sole ownership of the homepage H1, ahead of the briefing.
 	 */
-	public function test_lead_heading_is_the_only_home_h1(): void {
+	public function test_home_intro_owns_the_sole_h1_and_precedes_the_briefing(): void {
+		$page              = $this->post( 80, 'Editorial Desk' );
+		$page->post_excerpt = 'A promise about what this desk covers.';
+		$page->post_content = 'Read on for the full mission.';
+
 		$output = $this->render_editorial_home(
-			$this->post( 10, 'Lead investigation' )
+			array(
+				'page'     => $page,
+				'briefing' => array( $this->post( 10, 'Lead investigation' ) ),
+			)
 		);
 
 		$this->assertSame( 1, preg_match_all( '/<h1\b/i', $output ) );
-		$this->assertMatchesRegularExpression( '/<h1\b[^>]*>.*Lead investigation.*<\/h1>/s', $output );
+		$this->assertMatchesRegularExpression( '/<h1\b[^>]*>.*Editorial Desk.*<\/h1>/s', $output );
+		$this->assertDoesNotMatchRegularExpression( '/<h1\b[^>]*>.*Lead investigation.*<\/h1>/s', $output );
+		$this->assertMatchesRegularExpression( '/<h3\b[^>]*>.*Lead investigation.*<\/h3>/s', $output );
+		$this->assertStringContainsString( 'A promise about what this desk covers.', $output );
+		$this->assertStringContainsString( 'Read on for the full mission.', $output );
+
+		$intro_position    = strpos( $output, 'home-intro' );
+		$briefing_position = strpos( $output, 'home-briefing' );
+
+		$this->assertIsInt( $intro_position );
+		$this->assertIsInt( $briefing_position );
+		$this->assertLessThan( $briefing_position, $intro_position );
 	}
 
 	/**
-	 * Preserves a single WordPress-sourced H1 when no post can become the lead.
+	 * Preserves the page promise and offers a useful empty state when no post can brief.
 	 */
-	public function test_empty_editorial_home_uses_page_title_as_sole_h1(): void {
-		$output = $this->render_editorial_home();
+	public function test_missing_briefing_still_shows_the_page_promise_and_an_empty_state(): void {
+		$page              = $this->post( 80, 'Editorial Desk' );
+		$page->post_excerpt = 'A promise about what this desk covers.';
+
+		$output = $this->render_editorial_home( array( 'page' => $page ) );
 
 		$this->assertSame( 1, preg_match_all( '/<h1\b/i', $output ) );
 		$this->assertMatchesRegularExpression( '/<h1\b[^>]*>.*Editorial Desk.*<\/h1>/s', $output );
+		$this->assertStringContainsString( 'A promise about what this desk covers.', $output );
 		$this->assertStringContainsString( 'Nothing found', $output );
 	}
 
 	/**
-	 * Introduces supporting-card H3 titles with an associated section H2.
+	 * Renders the page-owned title, manual excerpt, and filtered block content.
 	 */
-	public function test_supporting_stories_heading_precedes_card_headings(): void {
-		$output = $this->render_editorial_home(
-			$this->post( 10, 'Lead investigation' ),
-			array( $this->post( 11, 'Supporting report' ) )
+	public function test_home_intro_renders_page_title_excerpt_and_content(): void {
+		$page              = $this->post( 80, 'Editorial Desk' );
+		$page->post_excerpt = 'A promise about what this desk covers.';
+		$page->post_content = 'Read on for the full mission.';
+
+		$output = $this->render_template_part(
+			'template-parts/home-intro.php',
+			array( 'page' => $page )
 		);
 
-		$this->assertMatchesRegularExpression(
-			'/<section\b[^>]*aria-labelledby="supporting-stories-heading"[^>]*>.*<h2\b[^>]*id="supporting-stories-heading"[^>]*>\s*Supporting stories\s*<\/h2>.*<h3\b[^>]*>.*Supporting report.*<\/h3>/s',
-			$output
-		);
+		$this->assertSame( 1, preg_match_all( '/<h1\b/i', $output ) );
+		$this->assertMatchesRegularExpression( '/<h1\b[^>]*>.*Editorial Desk.*<\/h1>/s', $output );
+		$this->assertStringContainsString( 'A promise about what this desk covers.', $output );
+		$this->assertStringContainsString( 'Read on for the full mission.', $output );
 	}
 
 	/**
-	 * Declares Motion only when the template will render a bounded mount.
+	 * Renders the guide profile, possessive label, responsive image, and related links.
 	 */
-	public function test_rendered_template_mount_declares_motion_before_the_header(): void {
-		$this->render_editorial_home(
-			$this->post( 10, 'Lead investigation' ),
-			array( $this->post( 11, 'Supporting report' ) )
+	public function test_home_briefing_renders_guide_profile_possessive_label_and_related_links(): void {
+		$guide               = $this->post( 90, 'Jordan Lee' );
+		$guide->post_excerpt = 'Site editor and disclosure lead.';
+		$GLOBALS['mumega_motion_test_post_thumbnails'][90] = true;
+
+		$briefing_post = $this->post( 10, 'Lead investigation' );
+		$related_a     = $this->post( 11, 'Related report one' );
+		$related_b     = $this->post( 12, 'Related report two' );
+
+		$output = $this->render_template_part(
+			'template-parts/home-briefing.php',
+			array(
+				'post'    => $briefing_post,
+				'guide'   => $guide,
+				'related' => array( $related_a, $related_b ),
+			)
 		);
 
-		$this->assertTrue( apply_filters( 'mumega_motion_enqueue_motion', false ) );
+		$this->assertStringContainsString( 'Jordan Lee&#039;s briefing', $output );
+		$this->assertStringContainsString( 'Site editor and disclosure lead.', $output );
+		$this->assertStringContainsString( 'https://example.test/?p=90', $output );
+		$this->assertMatchesRegularExpression( '/<img\b[^>]*srcset="[^"]+"/', $output );
+		$this->assertMatchesRegularExpression( '/<h3\b[^>]*>.*Lead investigation.*<\/h3>/s', $output );
+		$this->assertStringNotContainsString( '<h1', $output );
+		$this->assertStringContainsString( 'Related report one', $output );
+		$this->assertStringContainsString( 'Related report two', $output );
+	}
+
+	/**
+	 * Omits the guide profile cleanly — generic label, no image, no dead link — when absent.
+	 */
+	public function test_home_briefing_without_a_guide_page_omits_the_profile_cleanly(): void {
+		$briefing_post = $this->post( 10, 'Lead investigation' );
+
+		$output = $this->render_template_part(
+			'template-parts/home-briefing.php',
+			array( 'post' => $briefing_post )
+		);
+
+		$this->assertStringContainsString( 'Editor&#039;s briefing', $output );
+		$this->assertStringNotContainsString( '<img', $output );
+		$this->assertStringNotContainsString( 'home-briefing__guide-link', $output );
+		$this->assertMatchesRegularExpression( '/<h3\b[^>]*>.*Lead investigation.*<\/h3>/s', $output );
+	}
+
+	/**
+	 * Falls back to the shared empty state when no post is available to brief.
+	 */
+	public function test_home_briefing_without_a_post_shows_the_useful_empty_state(): void {
+		$output = $this->render_template_part( 'template-parts/home-briefing.php', array() );
+
+		$this->assertStringContainsString( 'Nothing found', $output );
+		$this->assertStringNotContainsString( '<h3', $output );
 	}
 
 	/**
@@ -242,22 +319,42 @@ PHP;
 	/**
 	 * Renders the full Editorial Home with deterministic query results.
 	 *
-	 * @param WP_Post|null $lead       Optional lead post.
-	 * @param array        $supporting Supporting posts.
-	 * @param WP_Post|null $newsletter Optional newsletter page.
+	 * Each `get_posts()` result queues in the exact order the template resolves
+	 * its data: briefing lead, related pair, coverage feature, coverage support,
+	 * the editorial guide page, the methodology page, the knowledge map page, and
+	 * finally the newsletter page.
+	 *
+	 * @param array $overrides Named query-result overrides.
 	 * @return string
 	 */
-	private function render_editorial_home( $lead = null, $supporting = array(), $newsletter = null ): string {
-		$page = $this->post( 80, 'Editorial Desk' );
+	private function render_editorial_home( array $overrides = array() ): string {
+		$defaults = array(
+			'page'             => $this->post( 80, 'Editorial Desk' ),
+			'briefing'         => array(),
+			'related'          => array(),
+			'coverage_feature' => array(),
+			'coverage_support' => array(),
+			'guide'            => array(),
+			'methodology'      => array(),
+			'knowledge_map'    => array(),
+			'newsletter'       => array(),
+		);
+		$config = array_merge( $defaults, $overrides );
+		$page   = $config['page'];
 
-		$GLOBALS['post']                                 = $page;
-		$GLOBALS['mumega_motion_test_current_post']      = $page;
-		$GLOBALS['mumega_motion_test_queried_object_id'] = 80;
-		$GLOBALS['mumega_motion_test_posts'][80]         = $page;
-		$GLOBALS['mumega_motion_test_post_queries']      = array(
-			$lead instanceof WP_Post ? array( $lead ) : array(),
-			$supporting,
-			$newsletter instanceof WP_Post ? array( $newsletter ) : array(),
+		$GLOBALS['post']                                  = $page;
+		$GLOBALS['mumega_motion_test_current_post']       = $page;
+		$GLOBALS['mumega_motion_test_queried_object_id']  = $page->ID;
+		$GLOBALS['mumega_motion_test_posts'][ $page->ID ] = $page;
+		$GLOBALS['mumega_motion_test_post_queries']       = array(
+			$config['briefing'],
+			$config['related'],
+			$config['coverage_feature'],
+			$config['coverage_support'],
+			$config['guide'],
+			$config['methodology'],
+			$config['knowledge_map'],
+			$config['newsletter'],
 		);
 
 		ob_start();
