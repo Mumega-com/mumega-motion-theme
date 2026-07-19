@@ -87,6 +87,8 @@ final class EditorialSetupTest extends TestCase {
 	 */
 	public function test_editorial_styles_are_conditional_and_print_css_uses_print_media(): void {
 		$this->assertFileExists( dirname( __DIR__ ) . '/inc/editorial-setup.php' );
+		$this->assertFileExists( dirname( __DIR__ ) . '/assets/css/editorial.css' );
+		$this->assertFileExists( dirname( __DIR__ ) . '/assets/css/print.css' );
 		mumega_motion_enqueue_editorial_styles();
 		$this->assertSame( array(), $GLOBALS['mumega_motion_test_enqueued_styles'] );
 
@@ -122,6 +124,35 @@ final class EditorialSetupTest extends TestCase {
 	 */
 	public function test_motion_assets_require_a_mount_or_filter_opt_in(): void {
 		$this->assertFileExists( dirname( __DIR__ ) . '/inc/editorial-setup.php' );
+		mumega_motion_enqueue_motion_assets();
+		$this->assertArrayNotHasKey( 'mumega-motion', $GLOBALS['mumega_motion_test_enqueued_scripts'] );
+
+		add_filter(
+			'mumega_motion_enqueue_motion',
+			static function () {
+				return true;
+			}
+		);
+		mumega_motion_enqueue_motion_assets();
+		$this->assertArrayHasKey( 'mumega-motion', $GLOBALS['mumega_motion_test_enqueued_scripts'] );
+	}
+
+	/**
+	 * Lets the temporary posts-index template opt in before the asset hook runs.
+	 */
+	public function test_posts_index_template_declaration_enqueues_motion_without_a_queried_post(): void {
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- The local template source is the test subject.
+		$index_template = file_get_contents( dirname( __DIR__ ) . '/index.php' );
+
+		$this->assertIsString( $index_template );
+		$this->assertStringContainsString( "add_filter( 'mumega_motion_enqueue_motion'", $index_template );
+		$this->assertLessThan(
+			strpos( $index_template, 'wp_head();' ),
+			strpos( $index_template, "add_filter( 'mumega_motion_enqueue_motion'" )
+		);
+
+		$GLOBALS['mumega_motion_test_conditionals'] = array( 'is_home' => true );
+		$this->assertSame( 0, get_queried_object_id() );
 		mumega_motion_enqueue_motion_assets();
 		$this->assertArrayNotHasKey( 'mumega-motion', $GLOBALS['mumega_motion_test_enqueued_scripts'] );
 
