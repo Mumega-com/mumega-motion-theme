@@ -36,6 +36,61 @@ final class EditorialSetupTest extends TestCase {
 		$GLOBALS['mumega_motion_test_posts'] = array();
 
 		$GLOBALS['mumega_motion_test_filters'] = array();
+
+		$GLOBALS['mumega_motion_test_elementor_locations'] = array();
+
+		$GLOBALS['mumega_motion_test_elementor_shell_calls'] = array();
+	}
+
+	/**
+	 * Registers only the Elementor locations the theme explicitly renders.
+	 */
+	public function test_registers_header_and_footer_elementor_locations(): void {
+		$manager = new class() {
+			/**
+			 * Registered location names.
+			 *
+			 * @var array
+			 */
+			public $locations = array();
+
+			/**
+			 * Records a supported Theme Builder location.
+			 *
+			 * @param string $location Theme Builder location.
+			 */
+			public function register_location( $location ): void {
+				$this->locations[] = $location;
+			}
+		};
+
+		mumega_motion_register_elementor_locations( $manager );
+
+		$this->assertSame( array( 'header', 'footer' ), $manager->locations );
+	}
+
+	/**
+	 * Keeps every public template on WordPress's document-shell contract.
+	 */
+	public function test_public_templates_keep_wordpress_header_and_footer_calls(): void {
+		$templates = array(
+			'404.php',
+			'archive.php',
+			'home.php',
+			'index.php',
+			'page.php',
+			'search.php',
+			'single.php',
+			'page-templates/editorial-home.php',
+		);
+
+		foreach ( $templates as $template ) {
+			$contents = file_get_contents( dirname( __DIR__ ) . '/' . $template ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Tests inspect local theme templates.
+
+			$this->assertIsString( $contents, $template );
+			$this->assertStringContainsString( 'get_header();', $contents, $template );
+			$this->assertStringContainsString( 'get_footer();', $contents, $template );
+		}
 	}
 
 	/**

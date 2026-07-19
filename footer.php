@@ -5,19 +5,22 @@
  * @package Mumega_Motion
  */
 
-$footer_menu_markup = has_nav_menu( 'footer' )
-	? wp_nav_menu(
-		array(
-			'theme_location' => 'footer',
-			'container'      => false,
-			'fallback_cb'    => false,
-			'menu_class'     => 'footer-navigation__list',
-			'menu_id'        => 'footer-menu',
-			'echo'           => false,
+$elementor_footer_rendered = function_exists( 'elementor_theme_do_location' ) && elementor_theme_do_location( 'footer' );
+
+if ( ! $elementor_footer_rendered ) :
+	$footer_menu_markup = has_nav_menu( 'footer' )
+		? wp_nav_menu(
+			array(
+				'theme_location' => 'footer',
+				'container'      => false,
+				'fallback_cb'    => false,
+				'menu_class'     => 'footer-navigation__list',
+				'menu_id'        => 'footer-menu',
+				'echo'           => false,
+			)
 		)
-	)
-	: '';
-?>
+		: '';
+	?>
 
 <footer class="site-footer">
 	<div class="site-footer__identity">
@@ -37,6 +40,7 @@ $footer_menu_markup = has_nav_menu( 'footer' )
 		&copy; <?php echo esc_html( wp_date( 'Y' ) ); ?> <?php bloginfo( 'name' ); ?>
 	</p>
 </footer>
+<?php endif; ?>
 
 <?php wp_footer(); ?>
 </body>

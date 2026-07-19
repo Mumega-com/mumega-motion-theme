@@ -999,6 +999,23 @@ function get_footer() {
 }
 
 /**
+ * Simulates Elementor Pro's conditional theme-location renderer.
+ *
+ * @param string $location Theme Builder location.
+ * @return bool
+ */
+function elementor_theme_do_location( $location ) {
+	$rendered = ! empty( $GLOBALS['mumega_motion_test_elementor_locations'][ $location ] );
+
+	if ( $rendered ) {
+		$GLOBALS['mumega_motion_test_elementor_shell_calls'][] = $location;
+		echo '<!-- elementor_' . esc_attr( $location ) . ' -->';
+	}
+
+	return $rendered;
+}
+
+/**
  * Includes a theme template part when it exists.
  *
  * @param string $slug Template-part slug.

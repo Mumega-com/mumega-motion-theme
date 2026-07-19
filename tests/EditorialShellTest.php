@@ -23,27 +23,55 @@ final class EditorialShellTest extends TestCase {
 	 * Resets deterministic request and template output fixtures.
 	 */
 	protected function setUp(): void {
-		$GLOBALS['mumega_motion_test_bloginfo']            = array(
+		$GLOBALS['mumega_motion_test_bloginfo']              = array(
 			'name'        => 'Mumega',
 			'description' => 'Independent technology reporting.',
 			'charset'     => 'UTF-8',
 		);
-		$GLOBALS['mumega_motion_test_has_nav_menu']        = array();
-		$GLOBALS['mumega_motion_test_nav_menu_markup']     = '<ul class="menu"><li><a href="https://example.test/topic/">Topic</a></li></ul>';
-		$GLOBALS['mumega_motion_test_categories']          = array();
-		$GLOBALS['mumega_motion_test_loop_posts']          = array();
-		$GLOBALS['mumega_motion_test_loop_index']          = 0;
-		$GLOBALS['mumega_motion_test_current_post']        = null;
-		$GLOBALS['mumega_motion_test_post_queries']        = array();
-		$GLOBALS['mumega_motion_test_get_posts_requests']  = array();
-		$GLOBALS['mumega_motion_test_enqueued_styles']     = array();
-		$GLOBALS['mumega_motion_test_enqueued_scripts']    = array();
-		$GLOBALS['mumega_motion_test_filters']             = array();
-		$GLOBALS['mumega_motion_test_conditionals']        = array();
-		$GLOBALS['mumega_motion_test_page_template']       = '';
-		$GLOBALS['mumega_motion_test_elementor_edit_mode'] = '';
-		$GLOBALS['mumega_motion_test_queried_object_id']   = 0;
-		$GLOBALS['mumega_motion_test_posts']               = array();
+		$GLOBALS['mumega_motion_test_has_nav_menu']          = array();
+		$GLOBALS['mumega_motion_test_nav_menu_markup']       = '<ul class="menu"><li><a href="https://example.test/topic/">Topic</a></li></ul>';
+		$GLOBALS['mumega_motion_test_categories']            = array();
+		$GLOBALS['mumega_motion_test_loop_posts']            = array();
+		$GLOBALS['mumega_motion_test_loop_index']            = 0;
+		$GLOBALS['mumega_motion_test_current_post']          = null;
+		$GLOBALS['mumega_motion_test_post_queries']          = array();
+		$GLOBALS['mumega_motion_test_get_posts_requests']    = array();
+		$GLOBALS['mumega_motion_test_enqueued_styles']       = array();
+		$GLOBALS['mumega_motion_test_enqueued_scripts']      = array();
+		$GLOBALS['mumega_motion_test_filters']               = array();
+		$GLOBALS['mumega_motion_test_conditionals']          = array();
+		$GLOBALS['mumega_motion_test_page_template']         = '';
+		$GLOBALS['mumega_motion_test_elementor_edit_mode']   = '';
+		$GLOBALS['mumega_motion_test_queried_object_id']     = 0;
+		$GLOBALS['mumega_motion_test_posts']                 = array();
+		$GLOBALS['mumega_motion_test_elementor_locations']   = array();
+		$GLOBALS['mumega_motion_test_elementor_shell_calls'] = array();
+	}
+
+	/**
+	 * Keeps the document shell while replacing only native header markup.
+	 */
+	public function test_matching_elementor_header_preserves_document_shell(): void {
+		$GLOBALS['mumega_motion_test_elementor_locations']['header'] = true;
+
+		$output = $this->render_theme_file( 'header.php' );
+
+		$this->assertStringContainsString( '<!doctype html>', $output );
+		$this->assertStringContainsString( '<!-- wp_head -->', $output );
+		$this->assertStringContainsString( '<body', $output );
+		$this->assertStringContainsString( '<!-- wp_body_open -->', $output );
+		$this->assertStringContainsString( '<!-- elementor_header -->', $output );
+		$this->assertStringNotContainsString( '<header class="site-header">', $output );
+	}
+
+	/**
+	 * Renders the native header when Elementor has no matching condition.
+	 */
+	public function test_unmatched_elementor_header_uses_native_markup(): void {
+		$output = $this->render_theme_file( 'header.php' );
+
+		$this->assertStringNotContainsString( '<!-- elementor_header -->', $output );
+		$this->assertStringContainsString( '<header class="site-header">', $output );
 	}
 
 	/**
@@ -149,6 +177,31 @@ final class EditorialShellTest extends TestCase {
 
 		$this->assertStringContainsString( '<!-- wp_footer -->', $output );
 		$this->assertLessThan( strpos( $output, '</body>' ), strpos( $output, '<!-- wp_footer -->' ) );
+	}
+
+	/**
+	 * Keeps final document hooks while replacing only native footer markup.
+	 */
+	public function test_matching_elementor_footer_preserves_document_close(): void {
+		$GLOBALS['mumega_motion_test_elementor_locations']['footer'] = true;
+
+		$output = $this->render_theme_file( 'footer.php' );
+
+		$this->assertStringContainsString( '<!-- elementor_footer -->', $output );
+		$this->assertStringNotContainsString( '<footer class="site-footer">', $output );
+		$this->assertStringContainsString( '<!-- wp_footer -->', $output );
+		$this->assertStringContainsString( '</body>', $output );
+		$this->assertStringContainsString( '</html>', $output );
+	}
+
+	/**
+	 * Renders the native footer when Elementor has no matching condition.
+	 */
+	public function test_unmatched_elementor_footer_uses_native_markup(): void {
+		$output = $this->render_theme_file( 'footer.php' );
+
+		$this->assertStringNotContainsString( '<!-- elementor_footer -->', $output );
+		$this->assertStringContainsString( '<footer class="site-footer">', $output );
 	}
 
 	/**
