@@ -21,6 +21,7 @@ final class EditorialPatternsTest extends TestCase {
 	 * Resets recorded registrations before each assertion.
 	 */
 	protected function setUp(): void {
+		$GLOBALS['mumega_motion_test_translations']       = array();
 		$GLOBALS['mumega_motion_test_pattern_categories'] = array();
 		$GLOBALS['mumega_motion_test_patterns']           = array();
 	}
@@ -119,7 +120,7 @@ final class EditorialPatternsTest extends TestCase {
 	public function test_newsletter_page_has_consent_copy_and_a_provider_form_insertion_area(): void {
 		$content = $this->pattern_content( 'mumega-motion/newsletter-page' );
 
-		foreach ( array( 'Newsletter', 'Stay informed with reporting delivered to your inbox.', 'By subscribing, you agree to receive email updates.', 'Insert your site\'s existing newsletter form block here.' ) as $field ) {
+		foreach ( array( 'Newsletter', 'Stay informed with reporting delivered to your inbox.', 'By subscribing, you agree to receive email updates.', 'Insert your site&#039;s existing newsletter form block here.' ) as $field ) {
 			$this->assertStringContainsString( $field, $content );
 		}
 	}
@@ -132,10 +133,89 @@ final class EditorialPatternsTest extends TestCase {
 
 		foreach ( $GLOBALS['mumega_motion_test_patterns'] as $pattern ) {
 			preg_match_all( '/<!--\\s*\\/?([^\\s]+).*?-->/', $pattern['content'], $matches );
+			$this->assertSame(
+				substr_count( $pattern['content'], '<!-- wp:' ),
+				substr_count( $pattern['content'], '<!-- /wp:' )
+			);
 
 			foreach ( $matches[1] as $block_name ) {
 				$this->assertStringStartsWith( 'wp:', $block_name );
 			}
+		}
+	}
+
+	/**
+	 * Localizes every editor-visible pattern string before serializing block markup.
+	 */
+	public function test_visible_pattern_content_uses_the_translation_mapping(): void {
+		$source_strings = array(
+			'Summary',
+			'Write a concise summary of the reporting and its significance.',
+			'Key takeaways',
+			'Add the first key finding.',
+			'Add the second key finding.',
+			'Contents',
+			'Methodology',
+			'Sources',
+			'Corrections / updates',
+			'Describe how the reporting, testing, or analysis was conducted.',
+			'Add sources, documents, or interviews.',
+			'Record material corrections or updates here.',
+			'Question',
+			'State the question this test is designed to answer.',
+			'Environment',
+			'Record the hardware, software, settings, and relevant conditions.',
+			'Models/tools tested',
+			'Add each model or tool and version.',
+			'Procedure',
+			'Describe the repeatable steps followed during the test.',
+			'Date',
+			'Record the date of testing.',
+			'Limitations',
+			'Note constraints, unknowns, and conditions that may affect the results.',
+			'Results',
+			'Report the observed results and link to supporting evidence.',
+			'Claim',
+			'Observation',
+			'Source',
+			'Confidence',
+			'Add a claim.',
+			'Add the observed evidence.',
+			'Add a source.',
+			'Add a confidence assessment.',
+			'This article may contain affiliate links. Our editorial conclusions are independent, and we may earn a commission when you purchase through a link.',
+			'Read our affiliate policy',
+			'Correction',
+			'Date: [Insert correction date]',
+			'Previous claim',
+			'State the original claim.',
+			'Revised finding',
+			'State the corrected finding.',
+			'Explanation',
+			'Explain what changed and why.',
+			'Newsletter',
+			'Stay informed with reporting delivered to your inbox.',
+			'By subscribing, you agree to receive email updates.',
+			'Insert your site\'s existing newsletter form block here.',
+		);
+
+		$translations = array();
+
+		foreach ( $source_strings as $index => $source_string ) {
+			$translations[ $source_string ] = 'Localized pattern text ' . (string) $index;
+		}
+
+		$GLOBALS['mumega_motion_test_translations']['mumega-motion'] = $translations;
+		do_action( 'init' );
+
+		$all_content = implode(
+			"\n",
+			array_column( $GLOBALS['mumega_motion_test_patterns'], 'content' )
+		);
+
+		foreach ( $translations as $source_string => $translated_string ) {
+			$this->assertStringContainsString( $translated_string, $all_content );
+			$this->assertStringNotContainsString( $source_string, $all_content );
 		}
 	}
 

@@ -20,6 +20,7 @@ if ( ! defined( 'DAY_IN_SECONDS' ) ) {
 
 $GLOBALS['mumega_motion_test_filters']          = array();
 $GLOBALS['mumega_motion_test_actions']          = array();
+$GLOBALS['mumega_motion_test_translations']     = array();
 $GLOBALS['mumega_motion_test_pattern_categories'] = array();
 $GLOBALS['mumega_motion_test_patterns']         = array();
 $GLOBALS['mumega_motion_test_routes']           = array();
@@ -387,8 +388,10 @@ function is_wp_error( $thing ) {
  * @param string $domain Optional text domain.
  * @return string
  */
-function __( $text, $domain = 'default' ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
-	return $text;
+function __( $text, $domain = 'default' ) {
+	return isset( $GLOBALS['mumega_motion_test_translations'][ $domain ][ $text ] )
+		? $GLOBALS['mumega_motion_test_translations'][ $domain ][ $text ]
+		: $text;
 }
 
 /**
@@ -421,8 +424,8 @@ function number_format_i18n( $number ) {
  * @param string $domain Optional text domain.
  * @return void
  */
-function esc_html_e( $text, $domain = 'default' ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
-	echo htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
+function esc_html_e( $text, $domain = 'default' ) {
+	echo esc_html__( $text, $domain );
 }
 
 /**
@@ -442,8 +445,8 @@ function esc_html( $text ) {
  * @param string $domain Optional text domain.
  * @return string
  */
-function esc_html__( $text, $domain = 'default' ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
-	return esc_html( $text );
+function esc_html__( $text, $domain = 'default' ) {
+	return esc_html( __( $text, $domain ) );
 }
 
 /**
@@ -463,8 +466,19 @@ function wp_kses_post( $content ) {
  * @param string $domain Optional text domain.
  * @return void
  */
-function esc_attr_e( $text, $domain = 'default' ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
-	echo htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
+function esc_attr_e( $text, $domain = 'default' ) {
+	echo esc_attr( __( $text, $domain ) );
+}
+
+/**
+ * Returns a translated and escaped attribute string in tests.
+ *
+ * @param string $text Text to translate and escape.
+ * @param string $domain Optional text domain.
+ * @return string
+ */
+function esc_attr__( $text, $domain = 'default' ) {
+	return esc_attr( __( $text, $domain ) );
 }
 
 /**
