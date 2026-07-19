@@ -319,6 +319,34 @@ PHP;
 	}
 
 	/**
+	 * Renders the compact support grid alone when only supporting posts are available.
+	 *
+	 * Guards the `content-card.php` null-post no-op: with no feature post, the feature
+	 * slot must render nothing (no bare `content-card` article) while the support posts
+	 * still render as `content-card--compact` cards beneath the section heading.
+	 */
+	public function test_home_coverage_with_support_only_renders_compact_cards_without_a_feature_card(): void {
+		$output = $this->render_template_part(
+			'template-parts/home-coverage.php',
+			array(
+				'support' => array(
+					$this->post( 22, 'Support One' ),
+					$this->post( 23, 'Support Two' ),
+				),
+			)
+		);
+
+		$this->assertSame( 1, preg_match_all( '/<h2\b/i', $output ) );
+		$this->assertStringContainsString( 'Latest coverage', $output );
+		$this->assertStringContainsString( 'home-coverage__support', $output );
+		$this->assertStringNotContainsString( '<article class="content-card">', $output );
+		$this->assertSame( 2, preg_match_all( '/<article class="content-card content-card--compact">/', $output ) );
+		$this->assertSame( 2, preg_match_all( '/<h3\b/i', $output ) );
+		$this->assertStringContainsString( 'Support One', $output );
+		$this->assertStringContainsString( 'Support Two', $output );
+	}
+
+	/**
 	 * Omits the coverage section entirely when neither the feature nor support posts exist.
 	 */
 	public function test_home_coverage_with_no_feature_and_no_support_renders_nothing(): void {
