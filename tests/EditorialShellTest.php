@@ -88,6 +88,35 @@ final class EditorialShellTest extends TestCase {
 	}
 
 	/**
+	 * Falls back when Elementor emits support output without a real header.
+	 */
+	public function test_nonsemantic_elementor_header_output_uses_native_markup(): void {
+		$GLOBALS['mumega_motion_test_elementor_locations']['header']       = true;
+		$GLOBALS['mumega_motion_test_elementor_location_output']['header'] = '<style>.elementor-location-header{display:block}</style>';
+
+		$output = $this->render_theme_file( 'header.php' );
+
+		$this->assertStringContainsString( '<header class="site-header">', $output );
+	}
+
+	/**
+	 * Gives editorial request types deterministic ownership of the native shell.
+	 */
+	public function test_editorial_view_uses_native_shell_when_elementor_matches(): void {
+		$GLOBALS['mumega_motion_test_page_template']                 = 'page-templates/editorial-home.php';
+		$GLOBALS['mumega_motion_test_elementor_locations']['header'] = true;
+		$GLOBALS['mumega_motion_test_elementor_locations']['footer'] = true;
+
+		$header = $this->render_theme_file( 'header.php' );
+		$footer = $this->render_theme_file( 'footer.php' );
+
+		$this->assertStringContainsString( '<header class="site-header">', $header );
+		$this->assertStringContainsString( '<footer class="site-footer">', $footer );
+		$this->assertStringNotContainsString( '<!-- elementor_header -->', $header );
+		$this->assertStringNotContainsString( '<!-- elementor_footer -->', $footer );
+	}
+
+	/**
 	 * Keeps the configurable site identity outside the document heading outline.
 	 */
 	public function test_header_site_title_is_not_an_h1(): void {
@@ -223,6 +252,18 @@ final class EditorialShellTest extends TestCase {
 	public function test_empty_elementor_footer_output_uses_native_markup(): void {
 		$GLOBALS['mumega_motion_test_elementor_locations']['footer']       = true;
 		$GLOBALS['mumega_motion_test_elementor_location_output']['footer'] = '';
+
+		$output = $this->render_theme_file( 'footer.php' );
+
+		$this->assertStringContainsString( '<footer class="site-footer">', $output );
+	}
+
+	/**
+	 * Falls back when Elementor emits support output without a real footer.
+	 */
+	public function test_nonsemantic_elementor_footer_output_uses_native_markup(): void {
+		$GLOBALS['mumega_motion_test_elementor_locations']['footer']       = true;
+		$GLOBALS['mumega_motion_test_elementor_location_output']['footer'] = '<style>.elementor-location-footer{display:block}</style>';
 
 		$output = $this->render_theme_file( 'footer.php' );
 

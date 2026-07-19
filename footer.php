@@ -5,7 +5,7 @@
  * @package Mumega_Motion
  */
 
-$elementor_footer_rendered = mumega_motion_render_elementor_location( 'footer' );
+$elementor_footer_rendered = ! mumega_motion_is_editorial_view() && mumega_motion_render_elementor_location( 'footer' );
 
 if ( ! $elementor_footer_rendered ) :
 	$footer_menu_markup = has_nav_menu( 'footer' )

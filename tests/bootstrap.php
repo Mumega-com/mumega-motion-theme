@@ -1012,7 +1012,10 @@ function elementor_theme_do_location( $location ) {
 		$GLOBALS['mumega_motion_test_elementor_shell_calls'][] = $location;
 		$output = array_key_exists( $location, $GLOBALS['mumega_motion_test_elementor_location_output'] )
 			? $GLOBALS['mumega_motion_test_elementor_location_output'][ $location ]
-			: '<!-- elementor_' . esc_attr( $location ) . ' -->';
+			: sprintf(
+				'<!-- elementor_%1$s --><%1$s data-elementor-type="%1$s"></%1$s>',
+				esc_attr( $location )
+			);
 		echo $output; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Deterministic test fixture.
 	}
 
