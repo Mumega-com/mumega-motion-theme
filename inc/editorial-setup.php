@@ -170,6 +170,73 @@ function mumega_motion_enqueue_editorial_styles() {
 add_action( 'wp_enqueue_scripts', 'mumega_motion_enqueue_editorial_styles' );
 
 /**
+ * Identifies an asset registered by Elementor or Elementor Pro.
+ *
+ * @param string $handle     Registered asset handle.
+ * @param mixed  $dependency Registered WordPress dependency object.
+ * @return bool Whether the asset belongs to Elementor's front end.
+ */
+function mumega_motion_is_elementor_asset( $handle, $dependency ) {
+	if ( 0 === strpos( $handle, 'elementor-gf-' ) ) {
+		return true;
+	}
+
+	if ( ! is_object( $dependency ) || ! isset( $dependency->src ) || ! is_string( $dependency->src ) ) {
+		return false;
+	}
+
+	foreach ( array( '/plugins/elementor/', '/plugins/elementor-pro/', '/uploads/elementor/' ) as $marker ) {
+		if ( false !== strpos( $dependency->src, $marker ) ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Removes Theme Builder shell assets from theme-owned editorial routes.
+ *
+ * Elementor Pro can enqueue a globally conditioned header or footer before the
+ * theme deliberately chooses its native editorial shell. Those assets then run
+ * without rendered Elementor configuration and can throw on otherwise native
+ * pages. Legacy pages keep the complete Elementor queue.
+ *
+ * @return void
+ */
+function mumega_motion_remove_editorial_elementor_assets() {
+	if ( ! mumega_motion_is_editorial_view() ) {
+		return;
+	}
+
+	global $wp_scripts, $wp_styles;
+
+	$registries = array(
+		'script' => $wp_scripts,
+		'style'  => $wp_styles,
+	);
+
+	foreach ( $registries as $type => $registry ) {
+		if ( ! is_object( $registry ) || ! isset( $registry->queue, $registry->registered ) || ! is_array( $registry->queue ) || ! is_array( $registry->registered ) ) {
+			continue;
+		}
+
+		foreach ( $registry->queue as $handle ) {
+			if ( ! isset( $registry->registered[ $handle ] ) || ! mumega_motion_is_elementor_asset( $handle, $registry->registered[ $handle ] ) ) {
+				continue;
+			}
+
+			if ( 'script' === $type ) {
+				wp_dequeue_script( $handle );
+			} else {
+				wp_dequeue_style( $handle );
+			}
+		}
+	}
+}
+add_action( 'wp_enqueue_scripts', 'mumega_motion_remove_editorial_elementor_assets', PHP_INT_MAX );
+
+/**
  * Enqueues the optional Motion bundle when a page declares a mount.
  *
  * The generated dependency list preserves WordPress core's React runtime.

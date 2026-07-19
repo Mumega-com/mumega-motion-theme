@@ -27,6 +27,14 @@ final class EditorialSetupTest extends TestCase {
 
 		$GLOBALS['mumega_motion_test_enqueued_scripts'] = array();
 
+		$GLOBALS['mumega_motion_test_dequeued_styles'] = array();
+
+		$GLOBALS['mumega_motion_test_dequeued_scripts'] = array();
+
+		$GLOBALS['wp_styles'] = null;
+
+		$GLOBALS['wp_scripts'] = null;
+
 		$GLOBALS['mumega_motion_test_conditionals'] = array();
 
 		$GLOBALS['mumega_motion_test_page_template'] = '';
@@ -158,6 +166,48 @@ final class EditorialSetupTest extends TestCase {
 		$this->assertSame( 'all', $GLOBALS['mumega_motion_test_enqueued_styles']['mumega-motion-editorial']['media'] );
 		$this->assertArrayHasKey( 'mumega-motion-print', $GLOBALS['mumega_motion_test_enqueued_styles'] );
 		$this->assertSame( 'print', $GLOBALS['mumega_motion_test_enqueued_styles']['mumega-motion-print']['media'] );
+	}
+
+	/**
+	 * Removes Elementor shell assets only from routes owned by the editorial system.
+	 */
+	public function test_editorial_views_remove_elementor_shell_assets_without_touching_other_assets(): void {
+		$GLOBALS['wp_styles']  = (object) array(
+			'queue'      => array( 'mumega-motion-style', 'elementor-frontend', 'elementor-post-315', 'elementor-gf-inter' ),
+			'registered' => array(
+				'mumega-motion-style' => (object) array( 'src' => 'https://example.test/wp-content/themes/mumega-motion/style.css' ),
+				'elementor-frontend'  => (object) array( 'src' => 'https://example.test/wp-content/plugins/elementor/assets/css/frontend.min.css' ),
+				'elementor-post-315'  => (object) array( 'src' => 'https://example.test/wp-content/uploads/elementor/css/post-315.css' ),
+				'elementor-gf-inter'  => (object) array( 'src' => 'https://fonts.googleapis.com/css?family=Inter' ),
+			),
+		);
+		$GLOBALS['wp_scripts'] = (object) array(
+			'queue'      => array( 'jquery', 'elementor-webpack-runtime', 'elementor-frontend', 'smartmenus' ),
+			'registered' => array(
+				'jquery'                    => (object) array( 'src' => 'https://example.test/wp-includes/js/jquery/jquery.min.js' ),
+				'elementor-webpack-runtime' => (object) array( 'src' => 'https://example.test/wp-content/plugins/elementor/assets/js/webpack.runtime.min.js' ),
+				'elementor-frontend'        => (object) array( 'src' => 'https://example.test/wp-content/plugins/elementor/assets/js/frontend.min.js' ),
+				'smartmenus'                => (object) array( 'src' => 'https://example.test/wp-content/plugins/elementor-pro/assets/lib/smartmenus/jquery.smartmenus.min.js' ),
+			),
+		);
+
+		mumega_motion_remove_editorial_elementor_assets();
+		$this->assertSame( array(), $GLOBALS['mumega_motion_test_dequeued_styles'] );
+		$this->assertSame( array(), $GLOBALS['mumega_motion_test_dequeued_scripts'] );
+
+		$GLOBALS['mumega_motion_test_conditionals'] = array( 'is_archive' => true );
+		mumega_motion_remove_editorial_elementor_assets();
+
+		$this->assertSame(
+			array( 'elementor-frontend', 'elementor-post-315', 'elementor-gf-inter' ),
+			$GLOBALS['mumega_motion_test_dequeued_styles']
+		);
+		$this->assertSame(
+			array( 'elementor-webpack-runtime', 'elementor-frontend', 'smartmenus' ),
+			$GLOBALS['mumega_motion_test_dequeued_scripts']
+		);
+		$this->assertNotContains( 'mumega-motion-style', $GLOBALS['mumega_motion_test_dequeued_styles'] );
+		$this->assertNotContains( 'jquery', $GLOBALS['mumega_motion_test_dequeued_scripts'] );
 	}
 
 	/**
