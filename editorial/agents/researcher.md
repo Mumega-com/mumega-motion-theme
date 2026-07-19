@@ -14,7 +14,7 @@ Browse current primary sources and record uncertainty.
 
 ## May not
 
-Draft the publishable article or silently broaden scope; accept its own packet; approve an exception; publish; create a redirect; delete content; change a canonical URL; or create or update a WordPress post.
+Draft the publishable article or silently broaden scope; accept its own packet; approve an exception; publish; create a redirect; delete content; change a canonical URL; or create or update a WordPress post. This role must use `wordpress_operation: none`.
 
 ## Allowed transition
 

@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { validateArtifact } from '../scripts/contract-lib.mjs';
+import {
+  contractSourceHash,
+  createValidators,
+  loadManifest,
+  validateArtifact
+} from '../scripts/contract-lib.mjs';
 
 const root = new URL('../../', import.meta.url);
 
@@ -79,12 +84,36 @@ const validValidationReport = {
       gate: 'evidence',
       status: 'pass',
       details: 'Every material claim has a primary source or test artifact.'
+    },
+    {
+      gate: 'template',
+      status: 'pass',
+      details: 'The draft follows the selected template.'
+    },
+    {
+      gate: 'wordpress',
+      status: 'pass',
+      details: 'The authorized draft and fields are valid.'
     }
   ],
   unresolved_risks: [],
   next_allowed_role: 'discovery-reviewer',
   overall_status: 'pass'
 };
+
+test('contract library exports reusable source-derived interfaces', async () => {
+  const manifest = await loadManifest(root);
+  const validators = await createValidators(root);
+  const firstHash = await contractSourceHash(root);
+  const secondHash = await contractSourceHash(root);
+
+  assert.equal(manifest.editorial_contract, '1.0.0');
+  assert.ok(validators instanceof Map);
+  assert.deepEqual([...validators.keys()], manifest.schemas);
+  for (const validate of validators.values()) assert.equal(typeof validate, 'function');
+  assert.match(firstHash, /^[a-f0-9]{64}$/);
+  assert.equal(firstHash, secondHash);
+});
 
 test('content brief accepts the complete controlled contract', async () => {
   const result = await validateArtifact(root, 'content-brief', validBrief);

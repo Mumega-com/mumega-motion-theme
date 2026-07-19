@@ -27,7 +27,7 @@ const invalidCases = [
   {
     fixture: 'workflow-non-human-published.json',
     target: 'editorial/examples/valid/workflow-attempt.json',
-    expected: 'non-human transition to published is prohibited'
+    expected: 'workflow attempts cannot represent human-only transitions'
   },
   {
     fixture: 'manifest-missing-file.json',
@@ -37,7 +37,37 @@ const invalidCases = [
   {
     fixture: 'workflow-wordpress-before-pass.json',
     target: 'editorial/examples/valid/workflow-attempt.json',
-    expected: 'WordPress mutation requires a passing validation report'
+    expected: 'every workflow attempt requires a passing validation report'
+  },
+  {
+    fixture: 'workflow-failed-non-wordpress-transition.json',
+    target: 'editorial/examples/valid/workflow-attempt.json',
+    expected: 'every workflow attempt requires a passing validation report'
+  },
+  {
+    fixture: 'workflow-researcher-draft-mutation.json',
+    target: 'editorial/examples/valid/workflow-attempt.json',
+    expected: 'only writer may perform a WordPress draft operation'
+  },
+  {
+    fixture: 'workflow-forbidden-operation.json',
+    target: 'editorial/examples/valid/workflow-attempt.json',
+    expected: 'wordpress_operation'
+  },
+  {
+    fixture: 'validation-report-missing-required-gate.json',
+    target: 'editorial/examples/valid/validation-report.json',
+    expected: 'missing required gate'
+  },
+  {
+    fixture: 'validation-report-duplicate-gate.json',
+    target: 'editorial/examples/valid/validation-report.json',
+    expected: 'duplicate gate identifier'
+  },
+  {
+    fixture: 'validation-report-wrong-next-role.json',
+    target: 'editorial/examples/valid/validation-report.json',
+    expected: 'next_allowed_role does not match workflow transition'
   }
 ];
 
@@ -123,11 +153,12 @@ for (const { fixture, target, expected } of invalidCases) {
   });
 }
 
-test('WordPress mutation requires the actor to own the workflow transition', async () => {
+test('WordPress draft operation requires the actor to own the workflow transition', async () => {
   const validateContract = requireValidator();
   const { artifact } = await loadInvalidFixture('workflow-wordpress-before-pass.json');
-  artifact.actor = 'researcher';
   artifact.validation_report_status = 'pass';
+  artifact.from_state = 'idea';
+  artifact.to_state = 'brief_ready';
 
   const result = await withTemporaryContract(async (temporaryRoot) => {
     await writeFile(
@@ -162,7 +193,7 @@ for (const attempt of [
       actor: attempt.actor,
       from_state: attempt.from_state,
       to_state: attempt.to_state,
-      wordpress_mutation: false,
+      wordpress_operation: 'none',
       validation_report_status: 'pass'
     };
 
@@ -188,7 +219,9 @@ test('workflow rejects an extra human transition outside the documented state ma
       from: 'idea',
       to: 'approved',
       actor: 'human-editor',
-      human_only: true
+      human_only: true,
+      required_gates: ['human'],
+      next_allowed_role: 'human-editor'
     });
     await writeFile(workflowFile, `${JSON.stringify(workflow, null, 2)}\n`);
     return validateContract(temporaryRoot);
@@ -196,6 +229,116 @@ test('workflow rejects an extra human transition outside the documented state ma
 
   assert.equal(result.valid, false);
   assert.match(result.errors.join('\n'), /human transition graph does not match documented state machine/);
+});
+
+test('workflow rejects missing gate metadata without crashing report validation', async () => {
+  const validateContract = requireValidator();
+  const result = await withTemporaryContract(async (temporaryRoot) => {
+    const workflowFile = join(temporaryRoot, 'editorial/workflow.json');
+    const workflow = JSON.parse(await readFile(workflowFile, 'utf8'));
+    const handoff = workflow.transitions.find(({ from, to }) => (
+      from === 'discovery_review' && to === 'human_review'
+    ));
+    delete handoff.required_gates;
+    await writeFile(workflowFile, `${JSON.stringify(workflow, null, 2)}\n`);
+    return validateContract(temporaryRoot);
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /required property 'required_gates'/);
+});
+
+test('WordPress target rejects duplicate fields and unknown target properties', async () => {
+  const validateContract = requireValidator();
+  const artifact = {
+    kind: 'workflow-attempt',
+    actor: 'writer',
+    from_state: 'research_accepted',
+    to_state: 'drafting',
+    wordpress_operation: 'update-draft',
+    wordpress_target: {
+      canonical_slug: 'prepare-safe-wordpress-draft',
+      authorized_fields: ['title', 'title'],
+      post_id: 42
+    },
+    validation_report_status: 'pass'
+  };
+
+  const result = await withTemporaryContract(async (temporaryRoot) => {
+    await writeFile(
+      join(temporaryRoot, 'editorial/examples/valid/workflow-attempt.json'),
+      `${JSON.stringify(artifact, null, 2)}\n`
+    );
+    return validateContract(temporaryRoot);
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /wordpress_target.*additionalProperties/);
+  assert.match(result.errors.join('\n'), /authorized_fields.*uniqueItems/);
+});
+
+for (const wordpressOperation of [
+  'publish',
+  'schedule',
+  'redirect',
+  'delete',
+  'canonical-change',
+  'correct',
+  'retire'
+]) {
+  test(`workflow attempt rejects forbidden WordPress operation ${wordpressOperation}`, async () => {
+    const validateContract = requireValidator();
+    const artifact = {
+      kind: 'workflow-attempt',
+      actor: 'writer',
+      from_state: 'research_accepted',
+      to_state: 'drafting',
+      wordpress_operation: wordpressOperation,
+      wordpress_target: {
+        canonical_slug: 'prepare-safe-wordpress-draft',
+        authorized_fields: ['content']
+      },
+      validation_report_status: 'pass'
+    };
+
+    const result = await withTemporaryContract(async (temporaryRoot) => {
+      await writeFile(
+        join(temporaryRoot, 'editorial/examples/valid/workflow-attempt.json'),
+        `${JSON.stringify(artifact, null, 2)}\n`
+      );
+      return validateContract(temporaryRoot);
+    });
+
+    assert.equal(result.valid, false);
+    assert.match(result.errors.join('\n'), /wordpress_operation.*enum/);
+  });
+}
+
+test('a non-WordPress attempt rejects a target object', async () => {
+  const validateContract = requireValidator();
+  const artifact = {
+    kind: 'workflow-attempt',
+    actor: 'scout',
+    from_state: null,
+    to_state: 'idea',
+    wordpress_operation: 'none',
+    wordpress_target: {
+      canonical_slug: 'prepare-safe-wordpress-draft',
+      authorized_fields: ['content']
+    },
+    validation_report_status: 'pass'
+  };
+
+  const result = await withTemporaryContract(async (temporaryRoot) => {
+    await writeFile(
+      join(temporaryRoot, 'editorial/examples/valid/workflow-attempt.json'),
+      `${JSON.stringify(artifact, null, 2)}\n`
+    );
+    return validateContract(temporaryRoot);
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /wordpress_target.*must NOT be valid/);
 });
 
 test('role contract rejects a conflicting second transition declaration', async () => {

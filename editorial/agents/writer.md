@@ -10,7 +10,7 @@ WordPress draft and validation artifact.
 
 ## May
 
-Synthesize, organize, and explain supported material; create or update only the authorized WordPress draft and fields when the required operation is exposed and authorized.
+Synthesize, organize, and explain supported material; request only `create-draft` or `update-draft` with a strict `wordpress_target` for the authorized WordPress draft and fields when the required operation is exposed and authorized.
 
 ## May not
 

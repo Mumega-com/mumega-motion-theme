@@ -14,7 +14,7 @@ Identify overlap, stale content, and emerging primary sources.
 
 ## May not
 
-Create or update a WordPress post; advance an existing workflow state; accept a brief or research packet; approve an exception; publish; create a redirect; delete content; or change a canonical URL.
+Create or update a WordPress post; advance an existing workflow state; accept a brief or research packet; approve an exception; publish; create a redirect; delete content; or change a canonical URL. This role must use `wordpress_operation: none`.
 
 ## Allowed transition
 

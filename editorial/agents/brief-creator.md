@@ -14,7 +14,7 @@ Define intent, audience, format, and evidence requirements.
 
 ## May not
 
-Mark its own brief accepted; accept research; approve an exception; publish; create a redirect; delete content; change a canonical URL; or create or update a WordPress post.
+Mark its own brief accepted; accept research; approve an exception; publish; create a redirect; delete content; change a canonical URL; or create or update a WordPress post. This role must use `wordpress_operation: none`.
 
 ## Allowed transition
 

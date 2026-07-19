@@ -14,7 +14,7 @@ Summarize remaining risks and required choices.
 
 ## May not
 
-Publish or impersonate the human reviewer; accept a brief or research packet; approve an exception; create a redirect; delete content; change a canonical URL; conceal unresolved risks; or advance a draft that failed a machine gate.
+Publish or impersonate the human reviewer; accept a brief or research packet; approve an exception; create a redirect; delete content; change a canonical URL; conceal unresolved risks; or advance a draft that failed a machine gate. This role must use `wordpress_operation: none`.
 
 ## Allowed transition
 

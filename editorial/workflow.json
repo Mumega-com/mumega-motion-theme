@@ -16,19 +16,117 @@
     "retired"
   ],
   "transitions": [
-    { "from": null, "to": "idea", "actor": "scout", "human_only": false },
-    { "from": "idea", "to": "brief_ready", "actor": "brief-creator", "human_only": false },
-    { "from": "brief_ready", "to": "brief_accepted", "actor": "human-editor", "human_only": true },
-    { "from": "brief_accepted", "to": "research_ready", "actor": "researcher", "human_only": false },
-    { "from": "research_ready", "to": "research_accepted", "actor": "human-editor", "human_only": true },
-    { "from": "research_accepted", "to": "drafting", "actor": "writer", "human_only": false },
-    { "from": "drafting", "to": "technical_verification", "actor": "technical-verifier", "human_only": false },
-    { "from": "technical_verification", "to": "discovery_review", "actor": "discovery-reviewer", "human_only": false },
-    { "from": "discovery_review", "to": "human_review", "actor": "editor-handoff", "human_only": false },
-    { "from": "human_review", "to": "approved", "actor": "human-editor", "human_only": true },
-    { "from": "approved", "to": "published", "actor": "human-editor", "human_only": true },
-    { "from": "published", "to": "update_due", "actor": "human-editor", "human_only": true },
-    { "from": "published", "to": "corrected", "actor": "human-editor", "human_only": true },
-    { "from": "published", "to": "retired", "actor": "human-editor", "human_only": true }
+    {
+      "from": null,
+      "to": "idea",
+      "actor": "scout",
+      "human_only": false,
+      "required_gates": ["schema", "scope-duplication"],
+      "next_allowed_role": "brief-creator"
+    },
+    {
+      "from": "idea",
+      "to": "brief_ready",
+      "actor": "brief-creator",
+      "human_only": false,
+      "required_gates": ["schema", "scope-duplication"],
+      "next_allowed_role": "human-editor"
+    },
+    {
+      "from": "brief_ready",
+      "to": "brief_accepted",
+      "actor": "human-editor",
+      "human_only": true,
+      "required_gates": ["schema", "scope-duplication", "human"],
+      "next_allowed_role": "researcher"
+    },
+    {
+      "from": "brief_accepted",
+      "to": "research_ready",
+      "actor": "researcher",
+      "human_only": false,
+      "required_gates": ["schema", "evidence"],
+      "next_allowed_role": "human-editor"
+    },
+    {
+      "from": "research_ready",
+      "to": "research_accepted",
+      "actor": "human-editor",
+      "human_only": true,
+      "required_gates": ["schema", "evidence", "human"],
+      "next_allowed_role": "writer"
+    },
+    {
+      "from": "research_accepted",
+      "to": "drafting",
+      "actor": "writer",
+      "human_only": false,
+      "required_gates": ["schema", "scope-duplication", "evidence", "template", "wordpress"],
+      "next_allowed_role": "technical-verifier"
+    },
+    {
+      "from": "drafting",
+      "to": "technical_verification",
+      "actor": "technical-verifier",
+      "human_only": false,
+      "required_gates": ["schema", "evidence", "template", "wordpress"],
+      "next_allowed_role": "discovery-reviewer"
+    },
+    {
+      "from": "technical_verification",
+      "to": "discovery_review",
+      "actor": "discovery-reviewer",
+      "human_only": false,
+      "required_gates": ["schema", "scope-duplication", "discovery"],
+      "next_allowed_role": "editor-handoff"
+    },
+    {
+      "from": "discovery_review",
+      "to": "human_review",
+      "actor": "editor-handoff",
+      "human_only": false,
+      "required_gates": ["schema", "scope-duplication", "evidence", "template", "wordpress", "discovery"],
+      "next_allowed_role": "human-editor"
+    },
+    {
+      "from": "human_review",
+      "to": "approved",
+      "actor": "human-editor",
+      "human_only": true,
+      "required_gates": ["schema", "scope-duplication", "evidence", "template", "wordpress", "discovery", "human"],
+      "next_allowed_role": "human-editor"
+    },
+    {
+      "from": "approved",
+      "to": "published",
+      "actor": "human-editor",
+      "human_only": true,
+      "required_gates": ["schema", "scope-duplication", "evidence", "template", "wordpress", "discovery", "human"],
+      "next_allowed_role": "human-editor"
+    },
+    {
+      "from": "published",
+      "to": "update_due",
+      "actor": "human-editor",
+      "human_only": true,
+      "required_gates": ["evidence", "human"],
+      "next_allowed_role": "human-editor"
+    },
+    {
+      "from": "published",
+      "to": "corrected",
+      "actor": "human-editor",
+      "human_only": true,
+      "required_gates": ["schema", "evidence", "human"],
+      "next_allowed_role": "human-editor"
+    },
+    {
+      "from": "published",
+      "to": "retired",
+      "actor": "human-editor",
+      "human_only": true,
+      "required_gates": ["scope-duplication", "human"],
+      "next_allowed_role": "human-editor"
+    }
   ]
 }

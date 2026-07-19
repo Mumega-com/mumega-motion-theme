@@ -14,7 +14,7 @@ Flag unclear intent, duplicate coverage, poor headings, missing internal links, 
 
 ## May not
 
-Create, update, edit, or correct the WordPress draft or metadata; add keyword variants or unsupported FAQ content solely for ranking; accept artifacts; approve an exception; publish; create a redirect; delete content; change a canonical URL; or introduce a doorway variant.
+Create, update, edit, or correct the WordPress draft or metadata; add keyword variants or unsupported FAQ content solely for ranking; accept artifacts; approve an exception; publish; create a redirect; delete content; change a canonical URL; or introduce a doorway variant. This role must use `wordpress_operation: none`.
 
 ## Allowed transition
 

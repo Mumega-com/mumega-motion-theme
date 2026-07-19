@@ -1,0 +1,13 @@
+{
+  "kind": "workflow-attempt",
+  "actor": "researcher",
+  "from_state": "brief_accepted",
+  "to_state": "research_ready",
+  "wordpress_operation": "create-draft",
+  "wordpress_target": {
+    "canonical_slug": "prepare-safe-wordpress-draft",
+    "authorized_fields": ["content"]
+  },
+  "validation_report_status": "pass",
+  "_expected_errors": ["only writer may perform a WordPress draft operation"]
+}

@@ -1,0 +1,13 @@
+{
+  "kind": "workflow-attempt",
+  "actor": "writer",
+  "from_state": "research_accepted",
+  "to_state": "drafting",
+  "wordpress_operation": "publish",
+  "wordpress_target": {
+    "canonical_slug": "prepare-safe-wordpress-draft",
+    "authorized_fields": ["content"]
+  },
+  "validation_report_status": "pass",
+  "_expected_errors": ["wordpress_operation"]
+}

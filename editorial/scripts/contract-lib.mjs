@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
@@ -31,6 +32,13 @@ const requiredRuleFiles = [
   'seo-geo.md',
   'sources.md',
   'wordpress-handoff.md'
+];
+
+const sourceDirectories = [
+  'editorial/schemas',
+  'editorial/templates',
+  'editorial/agents',
+  'editorial/rules'
 ];
 
 const manifestSchema = {
@@ -68,10 +76,42 @@ const json = async (root, relativePath) => JSON.parse(
   await readFile(artifactPath(root, relativePath), 'utf8')
 );
 
+const listContractSourceFiles = async (root) => {
+  const files = ['editorial/manifest.json', 'editorial/workflow.json'];
+  for (const directory of sourceDirectories) {
+    const names = await readdir(artifactPath(root, `${directory}/`));
+    files.push(...names.sort().map((name) => `${directory}/${name}`));
+  }
+  return files.sort();
+};
+
 const validatorFor = (schema) => {
   const ajv = new Ajv2020({ allErrors: true });
   addFormats(ajv);
   return ajv.compile(schema);
+};
+
+export const loadManifest = async (root) => json(root, 'editorial/manifest.json');
+
+export const createValidators = async (root) => {
+  const manifest = await loadManifest(root);
+  const validators = new Map();
+  for (const schemaName of manifest.schemas) {
+    const schema = await json(root, `editorial/schemas/${schemaName}.schema.json`);
+    validators.set(schemaName, validatorFor(schema));
+  }
+  return validators;
+};
+
+export const contractSourceHash = async (root) => {
+  const hash = createHash('sha256');
+  for (const file of await listContractSourceFiles(root)) {
+    hash.update(file);
+    hash.update('\0');
+    hash.update(await readFile(artifactPath(root, file)));
+    hash.update('\0');
+  }
+  return hash.digest('hex');
 };
 
 const schemaErrors = (validate, label) => normalizeErrors(validate.errors ?? [])
@@ -222,8 +262,14 @@ const transitionKey = ({ from, to, actor, human_only: humanOnly }) => (
 const validateWorkflow = async (root, manifest, validationReportSchema, workflow, label) => {
   const errors = [];
   const approvedStates = validationReportSchema?.$defs?.state?.enum;
+  const approvedRoles = validationReportSchema?.$defs?.role?.enum;
+  const approvedGates = validationReportSchema?.properties?.gate_results
+    ?.items?.properties?.gate?.enum;
   if (!Array.isArray(approvedStates)) {
     return [`${label}: validation-report schema does not declare the approved state list`];
+  }
+  if (!Array.isArray(approvedRoles) || !Array.isArray(approvedGates)) {
+    return [`${label}: validation-report schema does not declare approved roles and gates`];
   }
 
   const workflowSchema = {
@@ -243,12 +289,26 @@ const validateWorkflow = async (root, manifest, validationReportSchema, workflow
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['from', 'to', 'actor', 'human_only'],
+          required: [
+            'from',
+            'to',
+            'actor',
+            'human_only',
+            'required_gates',
+            'next_allowed_role'
+          ],
           properties: {
             from: { anyOf: [{ enum: approvedStates }, { type: 'null' }] },
             to: { enum: approvedStates },
-            actor: { type: 'string', minLength: 1 },
-            human_only: { type: 'boolean' }
+            actor: { enum: approvedRoles },
+            human_only: { type: 'boolean' },
+            required_gates: {
+              type: 'array',
+              minItems: 1,
+              uniqueItems: true,
+              items: { enum: approvedGates }
+            },
+            next_allowed_role: { enum: approvedRoles }
           }
         }
       }
@@ -269,7 +329,14 @@ const validateWorkflow = async (root, manifest, validationReportSchema, workflow
     }
   }
 
+  const transitionEdges = new Set();
   for (const transition of workflow.transitions) {
+    const edge = `${String(transition.from)}:${transition.to}`;
+    if (transitionEdges.has(edge)) {
+      errors.push(`${label}: workflow edge ${edge} must be unique`);
+    }
+    transitionEdges.add(edge);
+
     const actorIsRole = manifest.roles.includes(transition.actor);
     if (actorIsRole && transition.human_only) {
       errors.push(`${label}: ${transition.actor} transition cannot be human_only`);
@@ -279,6 +346,12 @@ const validateWorkflow = async (root, manifest, validationReportSchema, workflow
     }
     if (transition.to === 'published' && transition.actor !== 'human-editor') {
       errors.push(`${label}: non-human transition to published is prohibited`);
+    }
+    if (transition.human_only && !transition.required_gates.includes('human')) {
+      errors.push(`${label}: human-only transition ${edge} requires the human gate`);
+    }
+    if (!transition.human_only && transition.required_gates.includes('human')) {
+      errors.push(`${label}: small-agent transition ${edge} cannot require the human gate`);
     }
   }
 
@@ -349,7 +422,16 @@ const researchEvidenceErrors = (artifact, label) => (artifact.claims ?? []).flat
     : [`${label}: claims/${index} material claim requires a source URL or evidence reference`]
 );
 
-const workflowAttemptErrors = (artifact, workflow, approvedStates, label) => {
+const authorizedWordPressDraftFields = [
+  'title',
+  'content',
+  'excerpt',
+  'featured_media',
+  'categories',
+  'tags'
+];
+
+const workflowAttemptErrors = (artifact, manifest, workflow, approvedStates, label) => {
   const schema = {
     type: 'object',
     additionalProperties: false,
@@ -358,7 +440,7 @@ const workflowAttemptErrors = (artifact, workflow, approvedStates, label) => {
       'actor',
       'from_state',
       'to_state',
-      'wordpress_mutation',
+      'wordpress_operation',
       'validation_report_status'
     ],
     properties: {
@@ -366,33 +448,123 @@ const workflowAttemptErrors = (artifact, workflow, approvedStates, label) => {
       actor: { type: 'string', minLength: 1 },
       from_state: { anyOf: [{ enum: approvedStates }, { type: 'null' }] },
       to_state: { enum: approvedStates },
-      wordpress_mutation: { type: 'boolean' },
+      wordpress_operation: { enum: ['none', 'create-draft', 'update-draft'] },
+      wordpress_target: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['canonical_slug', 'authorized_fields'],
+        properties: {
+          canonical_slug: {
+            type: 'string',
+            minLength: 1,
+            pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+          },
+          authorized_fields: {
+            type: 'array',
+            minItems: 1,
+            uniqueItems: true,
+            items: { enum: authorizedWordPressDraftFields }
+          }
+        }
+      },
       validation_report_status: { enum: ['pass', 'fail'] }
-    }
+    },
+    allOf: [
+      {
+        if: {
+          required: ['wordpress_operation'],
+          properties: { wordpress_operation: { const: 'none' } }
+        },
+        then: { not: { required: ['wordpress_target'] } },
+        else: { required: ['wordpress_target'] }
+      }
+    ]
   };
   const validate = validatorFor(schema);
   const errors = validate(artifact) ? [] : schemaErrors(validate, label);
+  if (artifact.wordpress_operation === 'none' && artifact.wordpress_target !== undefined) {
+    errors.push(`${label}: wordpress_target must NOT be valid when wordpress_operation is none`);
+  }
   if (errors.length > 0) {
     return errors;
   }
 
-  if (artifact.to_state === 'published' && artifact.actor !== 'human-editor') {
-    errors.push(`${label}: non-human transition to published is prohibited`);
+  if (artifact.validation_report_status !== 'pass') {
+    errors.push(`${label}: every workflow attempt requires a passing validation report`);
   }
 
-  const actorOwnsTransition = workflow.transitions.some((transition) => (
-    transition.actor === artifact.actor
-    && transition.from === artifact.from_state
-    && transition.to === artifact.to_state
+  const transition = workflow.transitions.find(({ from, to }) => (
+    from === artifact.from_state && to === artifact.to_state
   ));
-  if (!actorOwnsTransition) {
+  if (transition?.human_only) {
+    errors.push(`${label}: workflow attempts cannot represent human-only transitions`);
+  }
+  if (!manifest.roles.includes(artifact.actor)
+    || !transition
+    || transition.actor !== artifact.actor) {
     errors.push(`${label}: workflow attempt actor does not own the workflow transition`);
   }
 
-  if (artifact.wordpress_mutation) {
-    if (artifact.validation_report_status !== 'pass') {
-      errors.push(`${label}: WordPress mutation requires a passing validation report`);
+  if (artifact.wordpress_operation !== 'none'
+    && (
+      artifact.actor !== 'writer'
+      || artifact.from_state !== 'research_accepted'
+      || artifact.to_state !== 'drafting'
+    )) {
+    errors.push(
+      `${label}: only writer may perform a WordPress draft operation on research_accepted -> drafting`
+    );
+  }
+
+  return errors;
+};
+
+const validationReportWorkflowErrors = (artifact, workflow, approvedStates, label) => {
+  const errors = [];
+  const transition = workflow.transitions.find(({ from, to }) => (
+    from === artifact.state_transition.from && to === artifact.state_transition.to
+  ));
+
+  if (!transition || transition.actor !== artifact.role) {
+    errors.push(`${label}: validation report role does not own its exact workflow transition`);
+  }
+  if (!approvedStates.includes(artifact.state_transition.to)) {
+    errors.push(`${label}: validation report uses an unapproved state`);
+  }
+
+  const gateCounts = new Map();
+  for (const { gate } of artifact.gate_results) {
+    gateCounts.set(gate, (gateCounts.get(gate) ?? 0) + 1);
+  }
+  for (const [gate, count] of gateCounts) {
+    if (count > 1) {
+      errors.push(`${label}: duplicate gate identifier ${gate}`);
     }
+  }
+
+  if (artifact.overall_status !== 'pass'
+    || !transition
+    || !Array.isArray(transition.required_gates)) {
+    return errors;
+  }
+
+  for (const requiredGate of transition.required_gates) {
+    const result = artifact.gate_results.find(({ gate }) => gate === requiredGate);
+    if (!result) {
+      errors.push(`${label}: missing required gate ${requiredGate}`);
+    } else if (result.status !== 'pass') {
+      errors.push(`${label}: required gate ${requiredGate} must pass`);
+    }
+  }
+
+  for (const { gate } of artifact.gate_results) {
+    if (!transition.required_gates.includes(gate)) {
+      errors.push(`${label}: unexpected gate ${gate} is not required by the workflow transition`);
+    }
+  }
+
+  if (artifact.next_allowed_role !== transition.next_allowed_role) {
+    errors.push(`${label}: next_allowed_role does not match workflow transition`);
   }
 
   return errors;
@@ -419,15 +591,7 @@ const validateSchemaArtifact = async (
   errors.push(...result.errors.map((error) => `${label}: ${error}`));
 
   if (schemaName === 'validation-report' && result.valid) {
-    const transition = workflow.transitions.find(({ from, to }) => (
-      from === artifact.state_transition.from && to === artifact.state_transition.to
-    ));
-    if (!transition || transition.actor !== artifact.role) {
-      errors.push(`${label}: validation report role does not own its workflow transition`);
-    }
-    if (!approvedStates.includes(artifact.state_transition.to)) {
-      errors.push(`${label}: validation report uses an unapproved state`);
-    }
+    errors.push(...validationReportWorkflowErrors(artifact, workflow, approvedStates, label));
   }
   return errors;
 };
@@ -465,6 +629,7 @@ const validateFixtureArtifact = async (
   if (type === 'workflow-attempt') {
     return workflowAttemptErrors(
       artifact,
+      manifest,
       workflow,
       validationReportSchema.$defs.state.enum,
       label
@@ -480,14 +645,14 @@ const validateFixtureArtifact = async (
 };
 
 export const validateArtifact = async (root, schemaName, artifact) => {
-  const manifest = await json(root, 'editorial/manifest.json');
+  const manifest = await loadManifest(root);
 
   if (!manifest.schemas.includes(schemaName)) {
     throw new Error(`Schema "${schemaName}" is not declared in editorial/manifest.json`);
   }
 
-  const schema = await json(root, `editorial/schemas/${schemaName}.schema.json`);
-  const validate = validatorFor(schema);
+  const validators = await createValidators(root);
+  const validate = validators.get(schemaName);
   const valid = validate(artifact);
 
   return {
@@ -500,7 +665,7 @@ export const validateContract = async (root) => {
   const errors = [];
   let manifest;
   try {
-    manifest = await json(root, 'editorial/manifest.json');
+    manifest = await loadManifest(root);
   } catch (error) {
     return { valid: false, errors: [`editorial/manifest.json: ${error.message}`] };
   }
@@ -534,6 +699,7 @@ export const validateContract = async (root) => {
   const validBriefFormats = new Set();
   const briefSlugs = new Set();
   let researchSlug = null;
+  let reportSlug = null;
 
   for (const file of validFiles) {
     const label = `${validDirectory}/${file}`;
@@ -559,11 +725,24 @@ export const validateContract = async (root) => {
       }
     }
     if (fixtureErrors.length === 0 && fixtureType(file, artifact) === 'validation-report') {
+      reportSlug = artifact.canonical_slug;
       if (!briefSlugs.has(artifact.canonical_slug) || artifact.canonical_slug !== researchSlug) {
         errors.push(`${label}: canonical_slug does not match a valid brief and research packet`);
       }
       if (artifact.overall_status !== 'pass') {
         errors.push(`${label}: repository validation report must pass`);
+      }
+    }
+    if (fixtureErrors.length === 0
+      && fixtureType(file, artifact) === 'workflow-attempt'
+      && artifact.wordpress_operation !== 'none') {
+      const targetSlug = artifact.wordpress_target.canonical_slug;
+      if (!briefSlugs.has(targetSlug)
+        || targetSlug !== researchSlug
+        || targetSlug !== reportSlug) {
+        errors.push(
+          `${label}: wordpress_target canonical_slug does not match a valid brief, research packet, and validation report`
+        );
       }
     }
   }
@@ -573,7 +752,11 @@ export const validateContract = async (root) => {
       errors.push(`editorial/examples/valid: no valid brief fixture for format ${format}`);
     }
   }
-  for (const requiredFile of ['research-packet.json', 'validation-report.json']) {
+  for (const requiredFile of [
+    'research-packet.json',
+    'validation-report.json',
+    'workflow-attempt.json'
+  ]) {
     if (!validFiles.includes(requiredFile)) {
       errors.push(`${validDirectory}: missing ${requiredFile}`);
     }

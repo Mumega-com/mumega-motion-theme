@@ -8,6 +8,5 @@
     "canonical_slug": "prepare-safe-wordpress-draft",
     "authorized_fields": ["title", "content", "excerpt"]
   },
-  "validation_report_status": "fail",
-  "_expected_errors": ["every workflow attempt requires a passing validation report"]
+  "validation_report_status": "pass"
 }

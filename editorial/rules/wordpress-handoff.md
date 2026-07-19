@@ -20,6 +20,14 @@ The writer changes only the authorized post and fields. Draft status is preserve
 
 WordPress uses only its normal `draft`, `pending`, `scheduled`, `published`, and `private` statuses. The system adds no custom WordPress statuses in version 1. GitHub labels, not WordPress statuses, represent the editorial workflow. Only a human editor may authorize publication, scheduling, redirects, deletions, canonical changes, or exceptions.
 
+## Workflow attempt contract
+
+Every bounded automation attempt is a strict object with `kind: workflow-attempt`, a manifest-declared `actor`, `from_state`, `to_state`, `validation_report_status: pass`, and `wordpress_operation: none | create-draft | update-draft`. Every transition attempt requires `pass`, including attempts that do not touch WordPress.
+
+`wordpress_operation: none` omits `wordpress_target`. `create-draft` and `update-draft` require a strict `wordpress_target` containing the same `canonical_slug` join key and a non-empty, unique `authorized_fields` list. Authorized field names are exactly `title`, `content`, `excerpt`, `featured_media`, `categories`, and `tags`.
+
+Only `writer` on its owned `research_accepted` to `drafting` edge may request `create-draft` or `update-draft`; all other roles and edges require `none`. Publication, scheduling, redirects, deletion, canonical changes, public corrections, and retirement have no WordPress operation value and cannot be represented by a bounded automation attempt.
+
 ## Human-only authority
 
 `human-editor only: publication, scheduling, redirects, deletions, canonical changes, exceptions`

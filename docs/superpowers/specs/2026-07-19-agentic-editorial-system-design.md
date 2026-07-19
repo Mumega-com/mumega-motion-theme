@@ -143,7 +143,7 @@ editorial/
     invalid/
 ```
 
-The full contract remains in the private repository. A generated, condensed site-context document contains only the instructions needed by authorized MCPWP agents. The build process must detect when the condensed context is out of sync with the contract version.
+The full contract remains in the private repository. A generated, condensed site-context document contains only the instructions needed by authorized MCPWP agents. Pure generation parses the canonical workflow metadata and role, format, and rule sections; it does not maintain a second hard-coded policy summary. The build process must detect when the condensed context is semantically or byte-for-byte out of sync with those sources.
 
 ## Knowledge and classification model
 
@@ -424,7 +424,7 @@ Inputs: complete handoff.
 Output: approve, return, reject, publish or schedule.
 Only the human editor may approve exceptions, public authorship, publication, redirects, deletions and commercial conclusions.
 
-Human-only transitions are `brief_ready` to `brief_accepted`, `research_ready` to `research_accepted`, `human_review` to `approved`, `approved` to `published`, and the post-publication transitions from `published` to `update_due`, `corrected`, or `retired`. `editorial/workflow.json` is the machine-readable authority for these assignments; role files and GitHub labels must agree with it.
+Human-only transitions are `brief_ready` to `brief_accepted`, `research_ready` to `research_accepted`, `human_review` to `approved`, `approved` to `published`, and the post-publication transitions from `published` to `update_due`, `corrected`, or `retired`. `editorial/workflow.json` is the machine-readable authority for these assignments, each edge's required gates, and its exact next allowed role; role files, validation reports, generated context, and GitHub labels must agree with it.
 
 ## Workflow state machine
 
@@ -457,7 +457,11 @@ Every transition records:
 - unresolved risks;
 - next allowed role.
 
-An agent may perform only the transition assigned to its role. Failed validation returns the artifact to the role that owns the defect; it does not advance with a warning.
+The workflow's required gates use only `schema`, `scope-duplication`, `evidence`, `template`, `wordpress`, `discovery`, and `human`. Each human-only edge requires `human`; final handoff and human approval accumulate the relevant earlier gates. A passing validation report must name the exact edge and actor, contain exactly one passing result for each required gate with no duplicate identifiers, and name the workflow edge's exact next allowed role.
+
+Bounded automation attempts are available only to roles declared in the manifest. Every attempt preserves `kind`, `actor`, `from_state`, `to_state`, and `validation_report_status`, and uses `wordpress_operation` with exactly `none`, `create-draft`, or `update-draft`. Every transition attempt requires a passing validation report, including a transition with `wordpress_operation: none`.
+
+Only the writer on its owned `research_accepted` to `drafting` edge may use `create-draft` or `update-draft`. Those operations require a strict `wordpress_target` containing the shared `canonical_slug` join key and a unique list of authorized draft fields. `none` forbids a target, and all other roles and edges require `none`. Publication, scheduling, redirects, deletions, canonical changes, public correction decisions, and retirement have no automation operation value. Failed validation returns the artifact to the role that owns the defect; it does not advance with a warning.
 
 ## WordPress handoff
 
@@ -473,7 +477,7 @@ Before writing, the writer must:
 6. preserve WordPress revisions;
 7. return the draft ID, preview URL, slug and validation report.
 
-When MCPWP lacks a required capability, the writer stops and reports the missing operation. The system does not infer tool names or use a broader operation as a substitute.
+The only authorized draft field names in the first release are `title`, `content`, `excerpt`, `featured_media`, `categories`, and `tags`. When MCPWP lacks a required capability, the writer stops and reports the missing operation. The system does not infer tool names or use a broader operation as a substitute.
 
 ## Gutenberg and visible components
 

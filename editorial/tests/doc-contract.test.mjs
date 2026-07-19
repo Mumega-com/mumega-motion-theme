@@ -67,20 +67,118 @@ const states = [
   'retired'
 ];
 const transitions = [
-  { from: null, to: 'idea', actor: 'scout', human_only: false },
-  { from: 'idea', to: 'brief_ready', actor: 'brief-creator', human_only: false },
-  { from: 'brief_ready', to: 'brief_accepted', actor: 'human-editor', human_only: true },
-  { from: 'brief_accepted', to: 'research_ready', actor: 'researcher', human_only: false },
-  { from: 'research_ready', to: 'research_accepted', actor: 'human-editor', human_only: true },
-  { from: 'research_accepted', to: 'drafting', actor: 'writer', human_only: false },
-  { from: 'drafting', to: 'technical_verification', actor: 'technical-verifier', human_only: false },
-  { from: 'technical_verification', to: 'discovery_review', actor: 'discovery-reviewer', human_only: false },
-  { from: 'discovery_review', to: 'human_review', actor: 'editor-handoff', human_only: false },
-  { from: 'human_review', to: 'approved', actor: 'human-editor', human_only: true },
-  { from: 'approved', to: 'published', actor: 'human-editor', human_only: true },
-  { from: 'published', to: 'update_due', actor: 'human-editor', human_only: true },
-  { from: 'published', to: 'corrected', actor: 'human-editor', human_only: true },
-  { from: 'published', to: 'retired', actor: 'human-editor', human_only: true }
+  {
+    from: null,
+    to: 'idea',
+    actor: 'scout',
+    human_only: false,
+    required_gates: ['schema', 'scope-duplication'],
+    next_allowed_role: 'brief-creator'
+  },
+  {
+    from: 'idea',
+    to: 'brief_ready',
+    actor: 'brief-creator',
+    human_only: false,
+    required_gates: ['schema', 'scope-duplication'],
+    next_allowed_role: 'human-editor'
+  },
+  {
+    from: 'brief_ready',
+    to: 'brief_accepted',
+    actor: 'human-editor',
+    human_only: true,
+    required_gates: ['schema', 'scope-duplication', 'human'],
+    next_allowed_role: 'researcher'
+  },
+  {
+    from: 'brief_accepted',
+    to: 'research_ready',
+    actor: 'researcher',
+    human_only: false,
+    required_gates: ['schema', 'evidence'],
+    next_allowed_role: 'human-editor'
+  },
+  {
+    from: 'research_ready',
+    to: 'research_accepted',
+    actor: 'human-editor',
+    human_only: true,
+    required_gates: ['schema', 'evidence', 'human'],
+    next_allowed_role: 'writer'
+  },
+  {
+    from: 'research_accepted',
+    to: 'drafting',
+    actor: 'writer',
+    human_only: false,
+    required_gates: ['schema', 'scope-duplication', 'evidence', 'template', 'wordpress'],
+    next_allowed_role: 'technical-verifier'
+  },
+  {
+    from: 'drafting',
+    to: 'technical_verification',
+    actor: 'technical-verifier',
+    human_only: false,
+    required_gates: ['schema', 'evidence', 'template', 'wordpress'],
+    next_allowed_role: 'discovery-reviewer'
+  },
+  {
+    from: 'technical_verification',
+    to: 'discovery_review',
+    actor: 'discovery-reviewer',
+    human_only: false,
+    required_gates: ['schema', 'scope-duplication', 'discovery'],
+    next_allowed_role: 'editor-handoff'
+  },
+  {
+    from: 'discovery_review',
+    to: 'human_review',
+    actor: 'editor-handoff',
+    human_only: false,
+    required_gates: ['schema', 'scope-duplication', 'evidence', 'template', 'wordpress', 'discovery'],
+    next_allowed_role: 'human-editor'
+  },
+  {
+    from: 'human_review',
+    to: 'approved',
+    actor: 'human-editor',
+    human_only: true,
+    required_gates: ['schema', 'scope-duplication', 'evidence', 'template', 'wordpress', 'discovery', 'human'],
+    next_allowed_role: 'human-editor'
+  },
+  {
+    from: 'approved',
+    to: 'published',
+    actor: 'human-editor',
+    human_only: true,
+    required_gates: ['schema', 'scope-duplication', 'evidence', 'template', 'wordpress', 'discovery', 'human'],
+    next_allowed_role: 'human-editor'
+  },
+  {
+    from: 'published',
+    to: 'update_due',
+    actor: 'human-editor',
+    human_only: true,
+    required_gates: ['evidence', 'human'],
+    next_allowed_role: 'human-editor'
+  },
+  {
+    from: 'published',
+    to: 'corrected',
+    actor: 'human-editor',
+    human_only: true,
+    required_gates: ['schema', 'evidence', 'human'],
+    next_allowed_role: 'human-editor'
+  },
+  {
+    from: 'published',
+    to: 'retired',
+    actor: 'human-editor',
+    human_only: true,
+    required_gates: ['scope-duplication', 'human'],
+    next_allowed_role: 'human-editor'
+  }
 ];
 
 const loadManifest = async () => JSON.parse(
@@ -188,6 +286,19 @@ test('writer is the only non-human role allowed to mutate a WordPress draft', as
 
   assert.deepEqual(draftMutators, ['writer']);
 
+  const writer = roles.find(({ name }) => name === 'writer').content;
+  assert.match(
+    section(writer, '## May', '## May not'),
+    /`create-draft` or `update-draft`[\s\S]*`wordpress_target`/
+  );
+  for (const { name, content } of roles.filter(({ name }) => name !== 'writer')) {
+    assert.match(
+      section(content, '## May not', '## Allowed transition'),
+      /must use `wordpress_operation: none`/,
+      `${name} must explicitly require a non-WordPress workflow attempt`
+    );
+  }
+
   const technicalVerifier = roles.find(({ name }) => name === 'technical-verifier').content;
   assert.match(
     section(technicalVerifier, '## May not', '## Allowed transition'),
@@ -207,4 +318,28 @@ test('writer is the only non-human role allowed to mutate a WordPress draft', as
     section(discoveryReviewer, '## Stop conditions'),
     /return[\s\S]*(?:content|metadata)[\s\S]*(?:defects?|corrections?)[\s\S]*owning role/i
   );
+});
+
+test('WordPress attempt contract documents the exact fail-closed shape', async () => {
+  const content = await readFile(
+    new URL('editorial/rules/wordpress-handoff.md', root),
+    'utf8'
+  );
+  const attemptContract = section(
+    content,
+    '## Workflow attempt contract',
+    '## Human-only authority'
+  );
+
+  assert.match(attemptContract, /`kind: workflow-attempt`/);
+  assert.match(attemptContract, /`wordpress_operation: none \| create-draft \| update-draft`/);
+  assert.match(attemptContract, /`wordpress_target`/);
+  assert.match(attemptContract, /`canonical_slug`/);
+  assert.match(attemptContract, /unique `authorized_fields`/);
+  for (const field of ['title', 'content', 'excerpt', 'featured_media', 'categories', 'tags']) {
+    assert.match(attemptContract, new RegExp('`' + field + '`'));
+  }
+  assert.match(attemptContract, /Every transition attempt requires `pass`/);
+  assert.match(attemptContract, /Only `writer`[\s\S]*`research_accepted` to `drafting`/);
+  assert.match(attemptContract, /all other roles and edges require `none`/);
 });

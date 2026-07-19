@@ -1,0 +1,26 @@
+{
+  "contract_version": "1.0.0",
+  "canonical_slug": "prepare-safe-wordpress-draft",
+  "role": "editor-handoff",
+  "state_transition": {
+    "from": "discovery_review",
+    "to": "human_review"
+  },
+  "timestamp": "2026-07-19T16:30:00Z",
+  "artifact_hashes": {
+    "content-brief.json": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "research-packet.json": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "gate_results": [
+    { "gate": "schema", "status": "pass", "details": "Schema validation passed." },
+    { "gate": "scope-duplication", "status": "pass", "details": "Scope validation passed." },
+    { "gate": "evidence", "status": "pass", "details": "Evidence validation passed." },
+    { "gate": "template", "status": "pass", "details": "Template validation passed." },
+    { "gate": "wordpress", "status": "pass", "details": "WordPress validation passed." },
+    { "gate": "discovery", "status": "pass", "details": "Discovery validation passed." }
+  ],
+  "unresolved_risks": [],
+  "next_allowed_role": "writer",
+  "overall_status": "pass",
+  "_expected_errors": ["next_allowed_role does not match workflow transition"]
+}

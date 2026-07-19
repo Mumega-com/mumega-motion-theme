@@ -14,7 +14,7 @@ Reproduce supported procedures, inspect permissions, check versions, and validat
 
 ## May not
 
-Create, update, edit, or correct the WordPress draft, even when corrections are authorized; rewrite conclusions to hide failed verification; accept research; approve an exception; publish; create a redirect; delete content; or change a canonical URL.
+Create, update, edit, or correct the WordPress draft, even when corrections are authorized; rewrite conclusions to hide failed verification; accept research; approve an exception; publish; create a redirect; delete content; or change a canonical URL. This role must use `wordpress_operation: none`.
 
 ## Allowed transition
 
