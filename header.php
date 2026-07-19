@@ -5,43 +5,6 @@
  * @package Mumega_Motion
  */
 
-$primary_menu_assigned = has_nav_menu( 'primary' );
-$primary_menu_markup   = $primary_menu_assigned
-	? wp_nav_menu(
-		array(
-			'theme_location' => 'primary',
-			'container'      => false,
-			'fallback_cb'    => false,
-			'menu_class'     => 'primary-navigation__list',
-			'menu_id'        => 'primary-menu',
-			'echo'           => false,
-		)
-	)
-	: '';
-$mobile_menu_markup    = $primary_menu_assigned
-	? wp_nav_menu(
-		array(
-			'theme_location' => 'primary',
-			'container'      => false,
-			'fallback_cb'    => false,
-			'menu_class'     => 'mobile-navigation__list',
-			'menu_id'        => 'mobile-menu',
-			'echo'           => false,
-		)
-	)
-	: '';
-$header_categories     = $primary_menu_assigned
-	? array()
-	: get_categories(
-		array(
-			'hide_empty' => true,
-			'number'     => 6,
-			'orderby'    => 'count',
-			'order'      => 'DESC',
-		)
-	);
-$has_primary_links     = ! empty( trim( (string) $primary_menu_markup ) ) || ! empty( $header_categories );
-$newsletter_page       = mumega_motion_newsletter_page();
 ?>
 <!doctype html>
 <html <?php language_attributes(); ?>>
@@ -54,6 +17,48 @@ $newsletter_page       = mumega_motion_newsletter_page();
 <?php wp_body_open(); ?>
 <a class="skip-link screen-reader-text" href="#primary"><?php esc_html_e( 'Skip to content', 'mumega-motion' ); ?></a>
 
+<?php
+$elementor_header_rendered = function_exists( 'elementor_theme_do_location' ) && elementor_theme_do_location( 'header' );
+
+if ( ! $elementor_header_rendered ) :
+	$primary_menu_assigned = has_nav_menu( 'primary' );
+	$primary_menu_markup   = $primary_menu_assigned
+		? wp_nav_menu(
+			array(
+				'theme_location' => 'primary',
+				'container'      => false,
+				'fallback_cb'    => false,
+				'menu_class'     => 'primary-navigation__list',
+				'menu_id'        => 'primary-menu',
+				'echo'           => false,
+			)
+		)
+		: '';
+	$mobile_menu_markup    = $primary_menu_assigned
+		? wp_nav_menu(
+			array(
+				'theme_location' => 'primary',
+				'container'      => false,
+				'fallback_cb'    => false,
+				'menu_class'     => 'mobile-navigation__list',
+				'menu_id'        => 'mobile-menu',
+				'echo'           => false,
+			)
+		)
+		: '';
+	$header_categories     = $primary_menu_assigned
+		? array()
+		: get_categories(
+			array(
+				'hide_empty' => true,
+				'number'     => 6,
+				'orderby'    => 'count',
+				'order'      => 'DESC',
+			)
+		);
+	$has_primary_links     = ! empty( trim( (string) $primary_menu_markup ) ) || ! empty( $header_categories );
+	$newsletter_page       = mumega_motion_newsletter_page();
+	?>
 <header class="site-header">
 	<div class="site-header__identity">
 		<a class="site-title" href="<?php echo esc_url( home_url( '/' ) ); ?>" rel="home"><?php bloginfo( 'name' ); ?></a>
@@ -111,3 +116,4 @@ $newsletter_page       = mumega_motion_newsletter_page();
 		</details>
 	<?php endif; ?>
 </header>
+<?php endif; ?>

@@ -33,6 +33,26 @@ function mumega_motion_setup() {
 add_action( 'after_setup_theme', 'mumega_motion_setup' );
 
 /**
+ * Registers the supported Theme Builder locations when Elementor Pro is active.
+ *
+ * Explicit location registration keeps Elementor from replacing get_header()
+ * and get_footer() through its compatibility layer. Templates can then ask
+ * Elementor for a matching location and retain the native theme fallback.
+ *
+ * @param object $manager Elementor's theme location manager.
+ * @return void
+ */
+function mumega_motion_register_elementor_locations( $manager ) {
+	if ( ! is_object( $manager ) || ! is_callable( array( $manager, 'register_location' ) ) ) {
+		return;
+	}
+
+	$manager->register_location( 'header' );
+	$manager->register_location( 'footer' );
+}
+add_action( 'elementor/theme/register_locations', 'mumega_motion_register_elementor_locations' );
+
+/**
  * Determines whether the request uses an editorial theme template.
  *
  * Legacy Elementor pages are deliberately excluded, so the editorial CSS and
