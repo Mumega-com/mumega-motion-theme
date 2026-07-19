@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
  * Exercises the real packager output through the installed release consumer.
  */
 final class PackageManifestIntegrationTest extends TestCase {
-	private const VERSION      = '0.1.986';
+	private const VERSION      = '0.2.0';
 	private const PUBLISHED_AT = '2026-07-19T01:02:03Z';
 
 	/**
@@ -147,6 +147,16 @@ final class PackageManifestIntegrationTest extends TestCase {
 	}
 
 	/**
+	 * A release version with a leading zero is not canonical SemVer.
+	 */
+	public function test_packager_rejects_noncanonical_leading_zero_version(): void {
+		$result = $this->run_packager_for_version( '01.2.0', self::PUBLISHED_AT );
+
+		$this->assertSame( 64, $result['status'] );
+		$this->assertStringContainsString( 'MAJOR.MINOR.PATCH', implode( "\n", $result['output'] ) );
+	}
+
+	/**
 	 * Without an override the manifest uses the source commit timestamp.
 	 */
 	public function test_manifest_defaults_to_source_commit_timestamp(): void {
@@ -170,12 +180,23 @@ final class PackageManifestIntegrationTest extends TestCase {
 	 * @return array{status:int,output:array}
 	 */
 	private function run_packager( $published_at ): array {
+		return $this->run_packager_for_version( self::VERSION, $published_at );
+	}
+
+	/**
+	 * Runs the real package producer for an explicit version.
+	 *
+	 * @param string      $version      Package version.
+	 * @param string|null $published_at Optional manifest timestamp override.
+	 * @return array{status:int,output:array}
+	 */
+	private function run_packager_for_version( $version, $published_at ): array {
 		$root    = dirname( __DIR__ );
 		$script  = $root . '/scripts/package-theme.sh';
 		$prefix  = null === $published_at
 			? 'env -u MUMEGA_MOTION_MANIFEST_PUBLISHED_AT'
 			: 'MUMEGA_MOTION_MANIFEST_PUBLISHED_AT=' . escapeshellarg( $published_at );
-		$command = $prefix . ' ' . escapeshellarg( $script ) . ' ' . escapeshellarg( self::VERSION ) . ' 2>&1';
+		$command = $prefix . ' ' . escapeshellarg( $script ) . ' ' . escapeshellarg( $version ) . ' 2>&1';
 		$output  = array();
 		$status  = 0;
 

@@ -56,8 +56,8 @@ is_valid_manifest_timestamp() {
 	(( day >= 1 && day <= days_in_month ))
 }
 
-if [[ $# -ne 1 || ! $1 =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-	printf 'Usage: %s VERSION (VERSION must use MAJOR.MINOR.PATCH)\n' "$0" >&2
+if [[ $# -ne 1 || ! $1 =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+	printf 'Usage: %s VERSION (VERSION must use canonical MAJOR.MINOR.PATCH)\n' "$0" >&2
 	exit 64
 fi
 
