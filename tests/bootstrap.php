@@ -57,6 +57,10 @@ $GLOBALS['mumega_motion_test_enqueued_scripts'] = array();
 $GLOBALS['mumega_motion_test_conditionals']     = array();
 $GLOBALS['mumega_motion_test_page_template']    = '';
 $GLOBALS['mumega_motion_test_queried_object_id'] = 0;
+$GLOBALS['mumega_motion_test_queried_object']   = null;
+$GLOBALS['mumega_motion_test_search_query']     = '';
+$GLOBALS['mumega_motion_test_author_meta']      = array();
+$GLOBALS['mumega_motion_test_adjacent_post_navigation'] = '';
 $GLOBALS['mumega_motion_test_bloginfo']         = array(
 	'name'        => 'Mumega',
 	'description' => 'Independent technology reporting.',
@@ -128,6 +132,12 @@ class WP_Term {
 
 	/** @var string */
 	public $slug = '';
+
+	/** @var string */
+	public $taxonomy = '';
+
+	/** @var string */
+	public $description = '';
 
 	/**
 	 * Creates a test term from the supplied property values.
@@ -421,6 +431,27 @@ function esc_html_e( $text, $domain = 'default' ) { // phpcs:ignore Generic.Code
  */
 function esc_html( $text ) {
 	return htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
+}
+
+/**
+ * Returns a translated and escaped string unchanged in tests.
+ *
+ * @param string $text   Text to translate and escape.
+ * @param string $domain Optional text domain.
+ * @return string
+ */
+function esc_html__( $text, $domain = 'default' ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
+	return esc_html( $text );
+}
+
+/**
+ * Preserves safe post HTML in deterministic template fixtures.
+ *
+ * @param string $content Post HTML.
+ * @return string
+ */
+function wp_kses_post( $content ) {
+	return (string) $content;
 }
 
 /**
@@ -728,6 +759,16 @@ function get_category_link( $category_id ) {
 }
 
 /**
+ * Returns a deterministic native tag archive URL.
+ *
+ * @param int $tag_id Tag identifier.
+ * @return string
+ */
+function get_tag_link( $tag_id ) {
+	return 'https://example.test/tag/' . (int) $tag_id . '/';
+}
+
+/**
  * Returns a deterministic post permalink.
  *
  * @param WP_Post|int $post Post value or identifier.
@@ -759,7 +800,17 @@ function have_posts() {
  */
 function the_post() {
 	$GLOBALS['mumega_motion_test_current_post'] = $GLOBALS['mumega_motion_test_loop_posts'][ $GLOBALS['mumega_motion_test_loop_index'] ];
+	$GLOBALS['post']                            = $GLOBALS['mumega_motion_test_current_post'];
 	++$GLOBALS['mumega_motion_test_loop_index'];
+}
+
+/**
+ * Returns the configured current post.
+ *
+ * @return WP_Post|null
+ */
+function get_post() {
+	return $GLOBALS['mumega_motion_test_current_post'];
 }
 
 /**
@@ -820,6 +871,14 @@ function has_post_thumbnail( $post = null ) { // phpcs:ignore Generic.CodeAnalys
  * @return string
  */
 function get_the_author_meta( $field = '', $user_id = false ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
+	if ( isset( $GLOBALS['mumega_motion_test_author_meta'][ (int) $user_id ][ $field ] ) ) {
+		return $GLOBALS['mumega_motion_test_author_meta'][ (int) $user_id ][ $field ];
+	}
+
+	if ( 'description' === $field ) {
+		return '';
+	}
+
 	return (int) $user_id > 0 ? 'Test Author' : '';
 }
 
@@ -846,6 +905,31 @@ function get_the_date( $format = '', $post = null ) {
 	}
 
 	return 'c' === $format ? $post->post_date_gmt . 'Z' : $post->post_date;
+}
+
+/**
+ * Returns a deterministic modified date for an explicit test post.
+ *
+ * @param string           $format Date format.
+ * @param WP_Post|int|null $post   Post value or identifier.
+ * @return string
+ */
+function get_the_modified_date( $format = '', $post = null ) {
+	if ( is_numeric( $post ) ) {
+		$post = isset( $GLOBALS['mumega_motion_test_posts'][ (int) $post ] )
+			? $GLOBALS['mumega_motion_test_posts'][ (int) $post ]
+			: null;
+	}
+
+	if ( ! $post instanceof WP_Post ) {
+		$post = $GLOBALS['mumega_motion_test_current_post'];
+	}
+
+	if ( ! $post instanceof WP_Post ) {
+		return '';
+	}
+
+	return 'c' === $format ? $post->post_modified_gmt . 'Z' : $post->post_date;
 }
 
 /**
@@ -923,6 +1007,72 @@ function wp_reset_postdata() {
  */
 function the_posts_pagination() {
 	echo '<nav class="pagination" aria-label="Posts"><a href="#page-2">Next</a></nav>';
+}
+
+/**
+ * Prints configured native previous/next article navigation.
+ *
+ * @return void
+ */
+function the_post_navigation() {
+	echo $GLOBALS['mumega_motion_test_adjacent_post_navigation']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Native navigation fixture.
+}
+
+/**
+ * Returns the configured native queried object.
+ *
+ * @return WP_Term|null
+ */
+function get_queried_object() {
+	return $GLOBALS['mumega_motion_test_queried_object'];
+}
+
+/**
+ * Returns a deterministic native archive heading.
+ *
+ * @return string
+ */
+function get_the_archive_title() {
+	$term = get_queried_object();
+
+	if ( ! $term instanceof WP_Term ) {
+		return 'Archive';
+	}
+
+	$prefix = 'post_tag' === $term->taxonomy ? 'Tag: ' : 'Category: ';
+
+	return $prefix . $term->name;
+}
+
+/**
+ * Prints the deterministic native archive heading.
+ *
+ * @param string $before Markup before the title.
+ * @param string $after  Markup after the title.
+ * @return void
+ */
+function the_archive_title( $before = '', $after = '' ) {
+	echo $before . wp_kses_post( get_the_archive_title() ) . $after; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Native archive-title fixture.
+}
+
+/**
+ * Returns the configured native archive description.
+ *
+ * @return string
+ */
+function get_the_archive_description() {
+	$term = get_queried_object();
+
+	return $term instanceof WP_Term ? (string) $term->description : '';
+}
+
+/**
+ * Returns the configured native search query.
+ *
+ * @return string
+ */
+function get_search_query() {
+	return $GLOBALS['mumega_motion_test_search_query'];
 }
 
 /**

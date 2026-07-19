@@ -1,5 +1,46 @@
 /*
  * Editorial print entry point.
- *
- * Article-specific print rules are introduced with the article templates.
  */
+
+@media print {
+	.site-header,
+	.primary-navigation,
+	.mobile-navigation,
+	.site-header__search,
+	.search-form,
+	.subscribe-link,
+	.home-newsletter,
+	.more-from-topic,
+	.motion-decoration,
+	[data-motion]::before,
+	[data-motion]::after,
+	.footer-navigation {
+		display: none !important;
+	}
+
+	html,
+	body,
+	.single-article,
+	.article-entry,
+	.article-body {
+		background: #fff !important;
+		color: #000 !important;
+	}
+
+	.single-article {
+		background: #fff;
+		color: #000;
+	}
+
+	.article-body a {
+		color: #000 !important;
+		text-decoration: underline;
+	}
+
+	.article-body a[href^="http://"]::after,
+	.article-body a[href^="https://"]::after {
+		content: " (" attr(href) ")";
+		font-size: 0.85em;
+		overflow-wrap: anywhere;
+	}
+}
