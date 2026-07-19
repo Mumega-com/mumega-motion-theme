@@ -136,6 +136,39 @@ fi
 rm -f "${ROOT_DIR}/inc/DEVELOPMENT.MD"
 
 # Release workflow invariants: immutable, verified tag and release bindings.
+awk '
+	$0 == "  pull_request:" {
+		in_trigger = 1
+		next
+	}
+	in_trigger && /^  [[:alnum:]_-]+:$/ {
+		exit
+	}
+	in_trigger && $0 == "    branches:" {
+		branches = 1
+	}
+	in_trigger && $0 == "      - master" {
+		master = 1
+	}
+	END {
+		exit branches && master ? 0 : 1
+	}
+' "${WORKFLOW}" || fail 'Pull requests to master must run the verification job.'
+awk '
+	$0 == "  release:" {
+		in_release = 1
+		next
+	}
+	in_release && /^  [[:alnum:]_-]+:$/ {
+		exit
+	}
+	in_release && $0 == "    if: github.event_name == '\''push'\'' && github.ref == '\''refs/heads/master'\''" {
+		guarded = 1
+	}
+	END {
+		exit guarded ? 0 : 1
+	}
+' "${WORKFLOW}" || fail 'The release job must publish only for pushes to master.'
 while IFS= read -r action; do
 	[[ "${action}" =~ @[0-9a-f]{40}(\ #.*)?$ ]] || fail "Action is not pinned to a full commit SHA: ${action}"
 done < <(grep -E '^ +uses: ' "${WORKFLOW}")
