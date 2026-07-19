@@ -78,6 +78,15 @@ class WP_Post {
 	public $ID = 0;
 
 	/** @var string */
+	public $post_title = '';
+
+	/** @var int */
+	public $post_author = 0;
+
+	/** @var string */
+	public $post_date = '';
+
+	/** @var string */
 	public $post_content = '';
 
 	/** @var string */
@@ -368,6 +377,29 @@ function is_wp_error( $thing ) {
  */
 function __( $text, $domain = 'default' ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
 	return $text;
+}
+
+/**
+ * Returns a translated singular or plural string unchanged in tests.
+ *
+ * @param string $single Singular string.
+ * @param string $plural Plural string.
+ * @param int    $number Quantity.
+ * @param string $domain Optional text domain.
+ * @return string
+ */
+function _n( $single, $plural, $number, $domain = 'default' ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
+	return 1 === (int) $number ? $single : $plural;
+}
+
+/**
+ * Formats a number for deterministic test output.
+ *
+ * @param int|float $number Number to format.
+ * @return string
+ */
+function number_format_i18n( $number ) {
+	return number_format( $number );
 }
 
 /**
@@ -751,14 +783,69 @@ function post_class( $class = '', $post_id = null ) { // phpcs:ignore Generic.Co
 }
 
 /**
- * Returns the current post title.
+ * Returns a configured post title.
  *
+ * @param WP_Post|int|null $post Post value or identifier.
  * @return string
  */
-function get_the_title() {
-	return isset( $GLOBALS['mumega_motion_test_current_post']->post_title )
-		? $GLOBALS['mumega_motion_test_current_post']->post_title
-		: '';
+function get_the_title( $post = null ) {
+	if ( is_numeric( $post ) ) {
+		$post = isset( $GLOBALS['mumega_motion_test_posts'][ (int) $post ] )
+			? $GLOBALS['mumega_motion_test_posts'][ (int) $post ]
+			: null;
+	}
+
+	if ( ! $post instanceof WP_Post ) {
+		$post = $GLOBALS['mumega_motion_test_current_post'];
+	}
+
+	return $post instanceof WP_Post ? $post->post_title : '';
+}
+
+/**
+ * Reports that rendered test posts do not have featured images by default.
+ *
+ * @param WP_Post|int|null $post Post value or identifier.
+ * @return bool
+ */
+function has_post_thumbnail( $post = null ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
+	return false;
+}
+
+/**
+ * Returns a deterministic author display name.
+ *
+ * @param string $field   Author field.
+ * @param int    $user_id Author identifier.
+ * @return string
+ */
+function get_the_author_meta( $field = '', $user_id = false ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
+	return (int) $user_id > 0 ? 'Test Author' : '';
+}
+
+/**
+ * Returns a deterministic date for an explicit test post.
+ *
+ * @param string           $format Date format.
+ * @param WP_Post|int|null $post   Post value or identifier.
+ * @return string
+ */
+function get_the_date( $format = '', $post = null ) {
+	if ( is_numeric( $post ) ) {
+		$post = isset( $GLOBALS['mumega_motion_test_posts'][ (int) $post ] )
+			? $GLOBALS['mumega_motion_test_posts'][ (int) $post ]
+			: null;
+	}
+
+	if ( ! $post instanceof WP_Post ) {
+		$post = $GLOBALS['mumega_motion_test_current_post'];
+	}
+
+	if ( ! $post instanceof WP_Post ) {
+		return '';
+	}
+
+	return 'c' === $format ? $post->post_date_gmt . 'Z' : $post->post_date;
 }
 
 /**

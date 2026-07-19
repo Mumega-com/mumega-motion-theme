@@ -49,10 +49,16 @@ $newsletter_page = mumega_motion_newsletter_page();
 			)
 		);
 		?>
+	<?php else : ?>
+		<section class="editorial-home__empty">
+			<h1 class="page-entry__title"><?php echo esc_html( get_the_title( get_queried_object_id() ) ); ?></h1>
+			<?php get_template_part( 'template-parts/empty-state' ); ?>
+		</section>
 	<?php endif; ?>
 
 	<?php if ( ! empty( $supporting ) ) : ?>
-		<section class="home-supporting" aria-label="<?php esc_attr_e( 'Supporting stories', 'mumega-motion' ); ?>" data-motion="fade-in">
+		<section class="home-supporting" aria-labelledby="supporting-stories-heading" data-motion="fade-in">
+			<h2 id="supporting-stories-heading" class="screen-reader-text"><?php esc_html_e( 'Supporting stories', 'mumega-motion' ); ?></h2>
 			<div class="home-supporting__grid">
 				<?php foreach ( $supporting as $supporting_post ) : ?>
 					<?php
