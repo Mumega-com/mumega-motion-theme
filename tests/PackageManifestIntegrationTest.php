@@ -15,12 +15,34 @@ final class PackageManifestIntegrationTest extends TestCase {
 	private const PUBLISHED_AT = '2026-07-19T01:02:03Z';
 
 	/**
+	 * Original contents of the package artifacts this test may overwrite.
+	 *
+	 * @var array<string,string|null>
+	 */
+	private $original_dist_artifacts = array();
+
+	/**
+	 * Whether the package output directory existed before the test.
+	 *
+	 * @var bool
+	 */
+	private $dist_existed = false;
+
+	/**
 	 * Resets network doubles before each integration run.
 	 */
 	protected function setUp(): void {
 		$GLOBALS['mumega_motion_test_site_transients']  = array();
 		$GLOBALS['mumega_motion_test_remote_requests']  = array();
 		$GLOBALS['mumega_motion_test_remote_responses'] = array();
+
+		$dist               = dirname( __DIR__ ) . '/dist';
+		$this->dist_existed = is_dir( $dist );
+
+		foreach ( $this->affected_dist_artifacts() as $artifact ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Snapshotting a local integration artifact.
+			$this->original_dist_artifacts[ $artifact ] = is_file( $artifact ) ? file_get_contents( $artifact ) : null;
+		}
 	}
 
 	/**
@@ -29,8 +51,29 @@ final class PackageManifestIntegrationTest extends TestCase {
 	protected function tearDown(): void {
 		$dist = dirname( __DIR__ ) . '/dist';
 
-		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec -- Integration test cleans its local package output.
-		exec( 'rm -rf ' . escapeshellarg( $dist ) );
+		foreach ( $this->original_dist_artifacts as $artifact => $contents ) {
+			if ( null === $contents ) {
+				if ( is_file( $artifact ) ) {
+					// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- Removing only an integration artifact that did not exist before the test.
+					unlink( $artifact );
+				}
+
+				continue;
+			}
+
+			if ( ! is_dir( $dist ) ) {
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_mkdir -- Recreating a local directory that existed before the test.
+				mkdir( $dist, 0777, true );
+			}
+
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Restoring a local integration artifact.
+			file_put_contents( $artifact, $contents );
+		}
+
+		if ( ! $this->dist_existed && is_dir( $dist ) ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- Removing the empty local directory created by the integration test.
+			rmdir( $dist );
+		}
 	}
 
 	/**
@@ -94,6 +137,16 @@ final class PackageManifestIntegrationTest extends TestCase {
 	}
 
 	/**
+	 * A timestamp with an impossible numeric calendar date is rejected.
+	 */
+	public function test_packager_rejects_impossible_numeric_manifest_timestamp_override(): void {
+		$result = $this->run_packager( '2026-02-30T12:00:00Z' );
+
+		$this->assertSame( 64, $result['status'] );
+		$this->assertStringContainsString( 'ISO-8601', implode( "\n", $result['output'] ) );
+	}
+
+	/**
 	 * Without an override the manifest uses the source commit timestamp.
 	 */
 	public function test_manifest_defaults_to_source_commit_timestamp(): void {
@@ -132,6 +185,22 @@ final class PackageManifestIntegrationTest extends TestCase {
 		return array(
 			'status' => $status,
 			'output' => $output,
+		);
+	}
+
+	/**
+	 * Lists only the package outputs this integration test can overwrite.
+	 *
+	 * @return array<int,string>
+	 */
+	private function affected_dist_artifacts(): array {
+		$dist    = dirname( __DIR__ ) . '/dist';
+		$archive = $dist . '/mumega-motion-theme-' . self::VERSION . '.zip';
+
+		return array(
+			$archive,
+			$archive . '.sha256',
+			$dist . '/manifest.json',
 		);
 	}
 
