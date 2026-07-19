@@ -102,6 +102,38 @@ function mumega_motion_is_editorial_view() {
 }
 
 /**
+ * Loads the site header without allowing Elementor's unsupported-theme
+ * compatibility layer to intercept editorial-owned requests.
+ *
+ * @return void
+ */
+function mumega_motion_get_header() {
+	if ( mumega_motion_is_editorial_view() ) {
+		get_template_part( 'header' );
+
+		return;
+	}
+
+	get_header();
+}
+
+/**
+ * Loads the site footer without allowing Elementor's unsupported-theme
+ * compatibility layer to intercept editorial-owned requests.
+ *
+ * @return void
+ */
+function mumega_motion_get_footer() {
+	if ( mumega_motion_is_editorial_view() ) {
+		get_template_part( 'footer' );
+
+		return;
+	}
+
+	get_footer();
+}
+
+/**
  * Checks the current content for an explicit progressive-enhancement mount.
  *
  * @return bool

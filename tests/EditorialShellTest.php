@@ -117,6 +117,42 @@ final class EditorialShellTest extends TestCase {
 	}
 
 	/**
+	 * Bypasses Elementor's get_header/get_footer compatibility interception.
+	 */
+	public function test_editorial_shell_loader_uses_theme_files_directly(): void {
+		$GLOBALS['mumega_motion_test_page_template'] = 'page-templates/editorial-home.php';
+
+		ob_start();
+		mumega_motion_get_header();
+		$header = (string) ob_get_clean();
+
+		ob_start();
+		mumega_motion_get_footer();
+		$footer = (string) ob_get_clean();
+
+		$this->assertStringContainsString( '<header class="site-header">', $header );
+		$this->assertStringContainsString( '<footer class="site-footer">', $footer );
+		$this->assertStringNotContainsString( '<!-- get_header -->', $header );
+		$this->assertStringNotContainsString( '<!-- get_footer -->', $footer );
+	}
+
+	/**
+	 * Keeps ordinary pages on Elementor's standard compatibility entrypoints.
+	 */
+	public function test_ordinary_page_shell_loader_uses_standard_entrypoints(): void {
+		ob_start();
+		mumega_motion_get_header();
+		$header = (string) ob_get_clean();
+
+		ob_start();
+		mumega_motion_get_footer();
+		$footer = (string) ob_get_clean();
+
+		$this->assertSame( '<!-- get_header -->', $header );
+		$this->assertSame( '<!-- get_footer -->', $footer );
+	}
+
+	/**
 	 * Keeps the configurable site identity outside the document heading outline.
 	 */
 	public function test_header_site_title_is_not_an_h1(): void {
