@@ -59,6 +59,12 @@ jobs:
       - name: Install JavaScript dependencies
         run: npm ci
 
+      - name: Validate Editorial Contract
+        run: npm run validate:editorial-contract
+
+      - name: Run Editorial Contract tests
+        run: npm run test:editorial-contract
+
       - name: Run JavaScript behavior tests
         run: npm run test:js
 
@@ -120,6 +126,12 @@ jobs:
         run: |
           npm ci
           npm run build
+
+      - name: Validate Editorial Contract
+        run: npm run validate:editorial-contract
+
+      - name: Run Editorial Contract tests
+        run: npm run test:editorial-contract
 
       - name: Check built JavaScript syntax
         run: find build -type f -name '*.js' -print0 | xargs -0 -r -n1 node --check

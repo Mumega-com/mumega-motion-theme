@@ -1,0 +1,58 @@
+name: Editorial correction
+description: Submit evidence for a dated correction and human review.
+title: "[Editorial correction]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form to record correction evidence. A human reviewer decides the resulting editorial change.
+
+  - type: input
+    id: public_url
+    attributes:
+      label: Public URL
+      description: Link to the affected article or page.
+      placeholder: https://mumega.com/example/
+    validations:
+      required: true
+
+  - type: textarea
+    id: previous_claim
+    attributes:
+      label: Previous claim
+      description: Quote or precisely identify the claim that needs correction.
+    validations:
+      required: true
+
+  - type: textarea
+    id: corrected_evidence
+    attributes:
+      label: Corrected evidence
+      description: Provide the corrected finding and primary source URLs or preserved evidence references.
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Explain what readers, decisions, or related content may be affected.
+    validations:
+      required: true
+
+  - type: input
+    id: reviewer
+    attributes:
+      label: Reviewer
+      description: Name the responsible human reviewer or reviewer role.
+    validations:
+      required: true
+
+  - type: input
+    id: correction_date
+    attributes:
+      label: Correction date
+      description: Use YYYY-MM-DD.
+      placeholder: "2026-07-19"
+    validations:
+      required: true

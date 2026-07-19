@@ -75,6 +75,12 @@ if (JSON.stringify(manifest) !== JSON.stringify(expected)) {
 NODE
 
 unzip -Z1 "${DIST_DIR}/${ARCHIVE}" > "${DIST_DIR}/contents.txt"
+if grep -Fq 'mumega-motion-theme/editorial/' "${DIST_DIR}/contents.txt"; then
+	fail 'Package contains private editorial contract files.'
+fi
+if grep -Ei '\.md$' "${DIST_DIR}/contents.txt"; then
+	fail 'Package contains Markdown documentation.'
+fi
 required_runtime_files=(
 	style.css
 	theme.json
@@ -314,7 +320,18 @@ assert_contains 'release.assets.map' "${WORKFLOW}"
 assert_contains 'grep -Ei' "${WORKFLOW}"
 assert_contains "-iname '*.map'" "${ROOT_DIR}/scripts/package-theme.sh"
 assert_contains "-iname '*.md'" "${ROOT_DIR}/scripts/package-theme.sh"
+assert_not_contains 'editorial/' "${ROOT_DIR}/scripts/package-theme.sh"
 assert_contains 'find functions.php index.php header.php footer.php page.php single.php home.php archive.php search.php 404.php page-templates template-parts inc -type f -name' "${WORKFLOW}"
+assert_step_contains 'Validate Editorial Contract' 'npm run validate:editorial-contract'
+assert_step_contains 'Run Editorial Contract tests' 'npm run test:editorial-contract'
+validation_step_count="$(grep -Fc -- '- name: Validate Editorial Contract' "${WORKFLOW}" || true)"
+test_step_count="$(grep -Fc -- '- name: Run Editorial Contract tests' "${WORKFLOW}" || true)"
+validation_command_count="$(grep -Fc -- 'run: npm run validate:editorial-contract' "${WORKFLOW}" || true)"
+test_command_count="$(grep -Fc -- 'run: npm run test:editorial-contract' "${WORKFLOW}" || true)"
+test "${validation_step_count}" -eq 2 || fail 'Verify and release jobs must each validate the editorial contract.'
+test "${test_step_count}" -eq 2 || fail 'Verify and release jobs must each run the editorial contract tests.'
+test "${validation_command_count}" -eq 2 || fail 'Editorial contract validation command must run exactly once in each job.'
+test "${test_command_count}" -eq 2 || fail 'Editorial contract test command must run exactly once in each job.'
 assert_step_contains 'Run JavaScript behavior tests' 'npm run test:js'
 assert_step_contains 'Run PHPUnit and lint shipped PHP' 'vendor/bin/phpunit -c phpunit.xml.dist'
 assert_step_contains 'Verify package layout and manifest' 'expected_top_level_paths='
