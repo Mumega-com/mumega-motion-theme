@@ -20,12 +20,12 @@ final class EditorialHelpersTest extends TestCase {
 	 */
 	protected function setUp(): void {
 		$GLOBALS['mumega_motion_test_filters']            = array();
-		$GLOBALS['mumega_motion_test_posts']             = array();
+		$GLOBALS['mumega_motion_test_posts']              = array();
 		$GLOBALS['mumega_motion_test_generated_excerpts'] = array();
-		$GLOBALS['mumega_motion_test_post_terms']        = array();
-		$GLOBALS['mumega_motion_test_post_tags']         = array();
-		$GLOBALS['mumega_motion_test_options']           = array();
-		$GLOBALS['mumega_motion_test_post_queries']      = array();
+		$GLOBALS['mumega_motion_test_post_terms']         = array();
+		$GLOBALS['mumega_motion_test_post_tags']          = array();
+		$GLOBALS['mumega_motion_test_options']            = array();
+		$GLOBALS['mumega_motion_test_post_queries']       = array();
 		$GLOBALS['mumega_motion_test_get_posts_requests'] = array();
 	}
 
@@ -92,8 +92,20 @@ final class EditorialHelpersTest extends TestCase {
 	 */
 	public function test_primary_category_prefers_first_assigned_category_in_menu_order(): void {
 		$GLOBALS['mumega_motion_test_post_terms'][10]['category'] = array(
-			new WP_Term( array( 'term_id' => 2, 'name' => 'Guides', 'slug' => 'guides' ) ),
-			new WP_Term( array( 'term_id' => 3, 'name' => 'AI', 'slug' => 'ai' ) ),
+			new WP_Term(
+				array(
+					'term_id' => 2,
+					'name'    => 'Guides',
+					'slug'    => 'guides',
+				)
+			),
+			new WP_Term(
+				array(
+					'term_id' => 3,
+					'name'    => 'AI',
+					'slug'    => 'ai',
+				)
+			),
 		);
 
 		$category = mumega_motion_primary_category( 10, array( 3, 2 ) );
@@ -107,9 +119,27 @@ final class EditorialHelpersTest extends TestCase {
 	public function test_primary_category_falls_back_to_alphabetical_non_default_category(): void {
 		$GLOBALS['mumega_motion_test_options']['default_category'] = 1;
 		$GLOBALS['mumega_motion_test_post_terms'][11]['category']  = array(
-			new WP_Term( array( 'term_id' => 5, 'name' => 'Zebra', 'slug' => 'zebra' ) ),
-			new WP_Term( array( 'term_id' => 1, 'name' => 'Uncategorized', 'slug' => 'uncategorized' ) ),
-			new WP_Term( array( 'term_id' => 6, 'name' => 'Alpha', 'slug' => 'alpha' ) ),
+			new WP_Term(
+				array(
+					'term_id' => 5,
+					'name'    => 'Zebra',
+					'slug'    => 'zebra',
+				)
+			),
+			new WP_Term(
+				array(
+					'term_id' => 1,
+					'name'    => 'Uncategorized',
+					'slug'    => 'uncategorized',
+				)
+			),
+			new WP_Term(
+				array(
+					'term_id' => 6,
+					'name'    => 'Alpha',
+					'slug'    => 'alpha',
+				)
+			),
 		);
 
 		$category = mumega_motion_primary_category( 11 );
@@ -146,8 +176,20 @@ final class EditorialHelpersTest extends TestCase {
 	 */
 	public function test_public_entity_tags_exclude_reserved_operational_tags(): void {
 		$GLOBALS['mumega_motion_test_post_tags'][30] = array(
-			new WP_Term( array( 'term_id' => 1, 'name' => 'Affiliate', 'slug' => 'affiliate' ) ),
-			new WP_Term( array( 'term_id' => 2, 'name' => 'OpenAI', 'slug' => 'openai' ) ),
+			new WP_Term(
+				array(
+					'term_id' => 1,
+					'name'    => 'Affiliate',
+					'slug'    => 'affiliate',
+				)
+			),
+			new WP_Term(
+				array(
+					'term_id' => 2,
+					'name'    => 'OpenAI',
+					'slug'    => 'openai',
+				)
+			),
 		);
 
 		$tags = mumega_motion_public_entity_tags( 30 );
@@ -162,24 +204,44 @@ final class EditorialHelpersTest extends TestCase {
 	public function test_operational_tag_slug_filter_can_extend_the_reserved_list(): void {
 		add_filter(
 			'mumega_motion_operational_tag_slugs',
-			static function( $slugs ) {
+			static function ( $slugs ) {
 				return array_merge( $slugs, array( ' sponsored ', 'affiliate', '' ) );
 			}
 		);
 		$GLOBALS['mumega_motion_test_post_tags'][31] = array(
-			new WP_Term( array( 'term_id' => 3, 'name' => 'Sponsored', 'slug' => 'sponsored' ) ),
-			new WP_Term( array( 'term_id' => 4, 'name' => 'Protocol', 'slug' => 'protocol' ) ),
+			new WP_Term(
+				array(
+					'term_id' => 3,
+					'name'    => 'Sponsored',
+					'slug'    => 'sponsored',
+				)
+			),
+			new WP_Term(
+				array(
+					'term_id' => 4,
+					'name'    => 'Protocol',
+					'slug'    => 'protocol',
+				)
+			),
 		);
 
 		$this->assertSame( array( 'affiliate', 'sponsored' ), mumega_motion_operational_tag_slugs() );
-		$this->assertSame( array( 'protocol' ), array_map( static function( $tag ) { return $tag->slug; }, mumega_motion_public_entity_tags( 31 ) ) );
+		$this->assertSame(
+			array( 'protocol' ),
+			array_map(
+				static function ( $tag ) {
+					return $tag->slug;
+				},
+				mumega_motion_public_entity_tags( 31 )
+			)
+		);
 	}
 
 	/**
 	 * Resolves a policy only through the constrained public page convention.
 	 */
 	public function test_affiliate_policy_lookup_requires_a_published_unprotected_page(): void {
-		$policy = new WP_Post(
+		$policy                                       = new WP_Post(
 			array(
 				'ID'            => 40,
 				'post_status'   => 'publish',
@@ -191,11 +253,11 @@ final class EditorialHelpersTest extends TestCase {
 		$this->assertSame( $policy, mumega_motion_affiliate_policy_page() );
 		$this->assertSame(
 			array(
-				'post_type'      => 'page',
-				'name'           => 'affiliate-disclosure',
-				'post_status'    => 'publish',
-				'has_password'   => false,
-				'numberposts'    => 1,
+				'post_type'    => 'page',
+				'name'         => 'affiliate-disclosure',
+				'post_status'  => 'publish',
+				'has_password' => false,
+				'numberposts'  => 1,
 			),
 			$GLOBALS['mumega_motion_test_get_posts_requests'][0]
 		);
@@ -207,7 +269,7 @@ final class EditorialHelpersTest extends TestCase {
 	 * Resolves the newsletter only through its constrained public page query.
 	 */
 	public function test_newsletter_page_lookup_requires_a_published_unprotected_page(): void {
-		$newsletter = new WP_Post(
+		$newsletter                                   = new WP_Post(
 			array(
 				'ID'            => 41,
 				'post_status'   => 'publish',
@@ -234,10 +296,20 @@ final class EditorialHelpersTest extends TestCase {
 	 */
 	public function test_convention_page_lookups_reject_draft_and_password_protected_posts(): void {
 		$GLOBALS['mumega_motion_test_post_queries'][] = array(
-			new WP_Post( array( 'post_status' => 'draft', 'post_password' => '' ) ),
+			new WP_Post(
+				array(
+					'post_status'   => 'draft',
+					'post_password' => '',
+				)
+			),
 		);
 		$GLOBALS['mumega_motion_test_post_queries'][] = array(
-			new WP_Post( array( 'post_status' => 'publish', 'post_password' => 'secret' ) ),
+			new WP_Post(
+				array(
+					'post_status'   => 'publish',
+					'post_password' => 'secret',
+				)
+			),
 		);
 
 		$this->assertNull( mumega_motion_newsletter_page() );

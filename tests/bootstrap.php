@@ -460,6 +460,29 @@ function wp_kses_post( $content ) {
 }
 
 /**
+ * Minimal explicit-allowlist escaping double.
+ *
+ * @param string $content      HTML content.
+ * @param array  $allowed_html Allowed elements and attributes.
+ * @return string
+ */
+function wp_kses( $content, $allowed_html ) {
+	$GLOBALS['mumega_motion_test_wp_kses_calls'][] = array( $content, $allowed_html );
+
+	return (string) $content;
+}
+
+/**
+ * Normalizes a key using the subset needed by token fixtures.
+ *
+ * @param string $key Raw key.
+ * @return string
+ */
+function sanitize_key( $key ) {
+	return strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $key ) );
+}
+
+/**
  * Prints a translated attribute string unchanged in tests.
  *
  * @param string $text   Text to translate.

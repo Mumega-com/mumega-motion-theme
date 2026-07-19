@@ -98,7 +98,7 @@ function mumega_motion_primary_category( $post_id, $menu_category_ids = array() 
 	$categories          = array_values(
 		array_filter(
 			$categories,
-			static function( $category ) use ( $default_category_id ) {
+			static function ( $category ) use ( $default_category_id ) {
 				return $category instanceof WP_Term && (int) $category->term_id !== $default_category_id;
 			}
 		)
@@ -110,7 +110,7 @@ function mumega_motion_primary_category( $post_id, $menu_category_ids = array() 
 
 	usort(
 		$categories,
-		static function( $first, $second ) {
+		static function ( $first, $second ) {
 			$name_comparison = strcasecmp( $first->name, $second->name );
 
 			return 0 !== $name_comparison ? $name_comparison : (int) $first->term_id - (int) $second->term_id;
@@ -141,11 +141,11 @@ function mumega_motion_has_meaningful_modified_date( $post_id ) {
 function mumega_motion_newsletter_page() {
 	$pages = get_posts(
 		array(
-			'post_type'        => 'page',
-			'name'             => 'newsletter',
-			'post_status'      => 'publish',
-			'has_password'     => false,
-			'numberposts'      => 1,
+			'post_type'    => 'page',
+			'name'         => 'newsletter',
+			'post_status'  => 'publish',
+			'has_password' => false,
+			'numberposts'  => 1,
 		)
 	);
 	$page  = empty( $pages ) ? null : $pages[0];
@@ -161,11 +161,11 @@ function mumega_motion_newsletter_page() {
 function mumega_motion_affiliate_policy_page() {
 	$pages = get_posts(
 		array(
-			'post_type'        => 'page',
-			'name'             => 'affiliate-disclosure',
-			'post_status'      => 'publish',
-			'has_password'     => false,
-			'numberposts'      => 1,
+			'post_type'    => 'page',
+			'name'         => 'affiliate-disclosure',
+			'post_status'  => 'publish',
+			'has_password' => false,
+			'numberposts'  => 1,
 		)
 	);
 	$page  = empty( $pages ) ? null : $pages[0];
@@ -214,7 +214,7 @@ function mumega_motion_public_entity_tags( $post_id ) {
 	return array_values(
 		array_filter(
 			$tags,
-			static function( $tag ) use ( $operational_tags ) {
+			static function ( $tag ) use ( $operational_tags ) {
 				return $tag instanceof WP_Term && ! in_array( strtolower( trim( $tag->slug ) ), $operational_tags, true );
 			}
 		)

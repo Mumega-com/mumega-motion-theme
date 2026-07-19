@@ -227,8 +227,15 @@ function mumega_motion_output_figma_tokens_style() {
 	}
 
 	// Every value composing $css was individually whitelisted/rejected in
-	// mumega_motion_build_figma_tokens_css() above — this is not a raw,
-	// unescaped passthrough of option data.
-	echo '<style id="mumega-figma-tokens">' . "\n:root {\n\t" . $css . "\n}\n" . '</style>' . "\n";
+	// mumega_motion_build_figma_tokens_css() above. Keep the style element and
+	// its id on an explicit HTML allowlist without HTML-encoding valid CSS.
+	echo wp_kses(
+		'<style id="mumega-figma-tokens">' . "\n:root {\n\t" . $css . "\n}\n" . '</style>' . "\n",
+		array(
+			'style' => array(
+				'id' => array(),
+			),
+		)
+	);
 }
 add_action( 'wp_head', 'mumega_motion_output_figma_tokens_style' );
