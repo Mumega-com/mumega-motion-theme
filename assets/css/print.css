@@ -14,13 +14,58 @@
 	.site-header__search,
 	.search-form,
 	.subscribe-link,
-	.home-newsletter,
 	.more-from-topic,
 	.post-navigation,
 	.motion-decoration,
 	[data-motion]::before,
 	[data-motion]::after,
 	.footer-navigation {
+		display: none !important;
+	}
+
+	/* Every Task 4-6 homepage module stays readable: headings, article links,
+	   methodology/disclosure/sources text, and the newsletter destination link
+	   remain. Only decorative visual-effect styling is stripped. */
+	.home-intro,
+	.home-briefing,
+	.home-audiences,
+	.home-coverage,
+	.home-guides,
+	.home-methodology,
+	.home-tools,
+	.home-knowledge,
+	.home-newsletter {
+		background: none !important;
+		box-shadow: none !important;
+	}
+
+	.home-methodology__marker {
+		background: none !important;
+		border: 1px solid #000;
+		color: #000;
+	}
+
+	/* .home-newsletter is styled as an inverted dark callout on screen; repaint
+	   it for a printable page instead of hiding the destination link/URL. */
+	.home-newsletter {
+		color: #000 !important;
+		margin-inline: 0;
+	}
+
+	/* .home-newsletter a is lavender on screen (readable on the dark callout);
+	   on paper it must be overridden directly, since the ancestor's color
+	   never wins over a rule that targets the anchor itself. */
+	.home-newsletter a {
+		color: #000 !important;
+		text-decoration: underline;
+	}
+
+	/* The subscribe form is not functional on paper; the surrounding heading,
+	   copy, and any authored links stay visible. */
+	.home-newsletter input,
+	.home-newsletter select,
+	.home-newsletter textarea,
+	.home-newsletter button {
 		display: none !important;
 	}
 

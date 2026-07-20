@@ -24,6 +24,7 @@ final class EditorialHomeTemplateTest extends TestCase {
 		$GLOBALS['mumega_motion_test_postdata_events']           = array();
 		$GLOBALS['mumega_motion_test_options']                   = array();
 		$GLOBALS['mumega_motion_test_posts']                     = array();
+		$GLOBALS['mumega_motion_test_post_thumbnails']           = array();
 		$GLOBALS['mumega_motion_test_post_terms']                = array();
 		$GLOBALS['mumega_motion_test_post_queries']              = array();
 		$GLOBALS['mumega_motion_test_get_posts_requests']        = array();
@@ -33,6 +34,8 @@ final class EditorialHomeTemplateTest extends TestCase {
 		$GLOBALS['mumega_motion_test_nav_menu_locations']        = array();
 		$GLOBALS['mumega_motion_test_nav_menu_objects']          = array();
 		$GLOBALS['mumega_motion_test_nav_menu_items']            = array();
+		$GLOBALS['mumega_motion_test_terms']                     = array();
+		$GLOBALS['mumega_motion_test_term_requests']             = array();
 		$GLOBALS['mumega_motion_test_queried_object_id']         = 0;
 		$GLOBALS['post'] = null;
 	}
@@ -63,27 +66,31 @@ final class EditorialHomeTemplateTest extends TestCase {
 	public function test_home_selection_uses_one_shared_used_id_list(): void {
 		$source             = $this->theme_source( 'page-templates/editorial-home.php' );
 		$selection_contract = <<<'PHP'
-$used_ids    = array();
-$lead        = mumega_motion_select_lead_post( $used_ids );
-$supporting  = mumega_motion_select_supporting_posts( $used_ids, 3 );
-$test_lab    = mumega_motion_select_special_posts( 'test-lab', $used_ids, 1 );
-$rail_groups = mumega_motion_select_rail_groups( $used_ids, 3 );
-$field_notes = mumega_motion_select_special_posts( 'field-notes', $used_ids, 5 );
+$used_ids          = array();
+$briefing           = mumega_motion_select_lead_post( $used_ids );
+$briefing_related   = mumega_motion_select_related_posts( $used_ids );
+$coverage_feature   = mumega_motion_select_coverage_feature( $used_ids );
+$coverage_support   = mumega_motion_select_supporting_posts( $used_ids, 4 );
+$guide_groups       = mumega_motion_select_rail_groups( $used_ids, 4, 2 );
+$tool_posts         = mumega_motion_select_special_posts( 'tools-reviews', $used_ids, 3 );
 PHP;
 
 		$this->assertStringContainsString( $selection_contract, $source );
 	}
 
 	/**
-	 * Keeps the lead as the sole H1 when Newsletter pattern content is embedded.
+	 * Keeps the page-owned intro as the sole H1 when Newsletter pattern content is embedded.
 	 */
 	public function test_embedded_newsletter_pattern_preserves_single_home_h1(): void {
 		$newsletter               = $this->post( 41, 'Newsletter landing page' );
 		$newsletter->post_content = mumega_motion_newsletter_page_pattern_content();
-		$output                   = $this->render_editorial_home(
-			$this->post( 10, 'Lead investigation' ),
-			array(),
-			$newsletter
+
+		$output = $this->render_editorial_home(
+			array(
+				'page'        => $this->post( 80, 'Editorial Desk' ),
+				'briefing'    => array( $this->post( 10, 'Lead investigation' ) ),
+				'newsletter'  => array( $newsletter ),
+			)
 		);
 
 		$this->assertSame( 1, preg_match_all( '/<h1\b/i', $output ) );
@@ -91,53 +98,668 @@ PHP;
 	}
 
 	/**
-	 * Gives the rendered lead sole ownership of the homepage document heading.
+	 * Gives the page-owned intro sole ownership of the homepage H1, ahead of the briefing.
 	 */
-	public function test_lead_heading_is_the_only_home_h1(): void {
+	public function test_home_intro_owns_the_sole_h1_and_precedes_the_briefing(): void {
+		$page              = $this->post( 80, 'Editorial Desk' );
+		$page->post_excerpt = 'A promise about what this desk covers.';
+		$page->post_content = 'Read on for the full mission.';
+
 		$output = $this->render_editorial_home(
-			$this->post( 10, 'Lead investigation' )
+			array(
+				'page'     => $page,
+				'briefing' => array( $this->post( 10, 'Lead investigation' ) ),
+			)
 		);
 
 		$this->assertSame( 1, preg_match_all( '/<h1\b/i', $output ) );
-		$this->assertMatchesRegularExpression( '/<h1\b[^>]*>.*Lead investigation.*<\/h1>/s', $output );
+		$this->assertMatchesRegularExpression( '/<h1\b[^>]*>.*Editorial Desk.*<\/h1>/s', $output );
+		$this->assertDoesNotMatchRegularExpression( '/<h1\b[^>]*>.*Lead investigation.*<\/h1>/s', $output );
+		$this->assertMatchesRegularExpression( '/<h3\b[^>]*>.*Lead investigation.*<\/h3>/s', $output );
+		$this->assertStringContainsString( 'A promise about what this desk covers.', $output );
+		$this->assertStringContainsString( 'Read on for the full mission.', $output );
+
+		$intro_position    = strpos( $output, 'home-intro' );
+		$briefing_position = strpos( $output, 'home-briefing' );
+
+		$this->assertIsInt( $intro_position );
+		$this->assertIsInt( $briefing_position );
+		$this->assertLessThan( $briefing_position, $intro_position );
 	}
 
 	/**
-	 * Preserves a single WordPress-sourced H1 when no post can become the lead.
+	 * Preserves the page promise and offers a useful empty state when no post can brief.
 	 */
-	public function test_empty_editorial_home_uses_page_title_as_sole_h1(): void {
-		$output = $this->render_editorial_home();
+	public function test_missing_briefing_still_shows_the_page_promise_and_an_empty_state(): void {
+		$page              = $this->post( 80, 'Editorial Desk' );
+		$page->post_excerpt = 'A promise about what this desk covers.';
+
+		$output = $this->render_editorial_home( array( 'page' => $page ) );
 
 		$this->assertSame( 1, preg_match_all( '/<h1\b/i', $output ) );
 		$this->assertMatchesRegularExpression( '/<h1\b[^>]*>.*Editorial Desk.*<\/h1>/s', $output );
+		$this->assertStringContainsString( 'A promise about what this desk covers.', $output );
 		$this->assertStringContainsString( 'Nothing found', $output );
 	}
 
 	/**
-	 * Introduces supporting-card H3 titles with an associated section H2.
+	 * Renders the page-owned title, manual excerpt, and filtered block content.
 	 */
-	public function test_supporting_stories_heading_precedes_card_headings(): void {
-		$output = $this->render_editorial_home(
-			$this->post( 10, 'Lead investigation' ),
-			array( $this->post( 11, 'Supporting report' ) )
+	public function test_home_intro_renders_page_title_excerpt_and_content(): void {
+		$page              = $this->post( 80, 'Editorial Desk' );
+		$page->post_excerpt = 'A promise about what this desk covers.';
+		$page->post_content = 'Read on for the full mission.';
+
+		$output = $this->render_template_part(
+			'template-parts/home-intro.php',
+			array( 'page' => $page )
 		);
 
-		$this->assertMatchesRegularExpression(
-			'/<section\b[^>]*aria-labelledby="supporting-stories-heading"[^>]*>.*<h2\b[^>]*id="supporting-stories-heading"[^>]*>\s*Supporting stories\s*<\/h2>.*<h3\b[^>]*>.*Supporting report.*<\/h3>/s',
-			$output
-		);
+		$this->assertSame( 1, preg_match_all( '/<h1\b/i', $output ) );
+		$this->assertMatchesRegularExpression( '/<h1\b[^>]*>.*Editorial Desk.*<\/h1>/s', $output );
+		$this->assertStringContainsString( 'A promise about what this desk covers.', $output );
+		$this->assertStringContainsString( 'Read on for the full mission.', $output );
 	}
 
 	/**
-	 * Declares Motion only when the template will render a bounded mount.
+	 * Renders the guide profile, possessive label, responsive image, and related links.
 	 */
-	public function test_rendered_template_mount_declares_motion_before_the_header(): void {
-		$this->render_editorial_home(
-			$this->post( 10, 'Lead investigation' ),
-			array( $this->post( 11, 'Supporting report' ) )
+	public function test_home_briefing_renders_guide_profile_possessive_label_and_related_links(): void {
+		$guide               = $this->post( 90, 'Jordan Lee' );
+		$guide->post_excerpt = 'Site editor and disclosure lead.';
+		$GLOBALS['mumega_motion_test_post_thumbnails'][90] = true;
+
+		$briefing_post = $this->post( 10, 'Lead investigation' );
+		$related_a     = $this->post( 11, 'Related report one' );
+		$related_b     = $this->post( 12, 'Related report two' );
+
+		$output = $this->render_template_part(
+			'template-parts/home-briefing.php',
+			array(
+				'post'    => $briefing_post,
+				'guide'   => $guide,
+				'related' => array( $related_a, $related_b ),
+			)
 		);
 
-		$this->assertTrue( apply_filters( 'mumega_motion_enqueue_motion', false ) );
+		$this->assertStringContainsString( 'Jordan Lee&#039;s briefing', $output );
+		$this->assertStringContainsString( 'Site editor and disclosure lead.', $output );
+		$this->assertStringContainsString( 'https://example.test/?p=90', $output );
+		$this->assertMatchesRegularExpression( '/<img\b[^>]*srcset="[^"]+"/', $output );
+		$this->assertMatchesRegularExpression( '/<h3\b[^>]*>.*Lead investigation.*<\/h3>/s', $output );
+		$this->assertStringNotContainsString( '<h1', $output );
+		$this->assertStringContainsString( 'Related report one', $output );
+		$this->assertStringContainsString( 'Related report two', $output );
+	}
+
+	/**
+	 * Omits the guide profile cleanly — generic label, no image, no dead link — when absent.
+	 */
+	public function test_home_briefing_without_a_guide_page_omits_the_profile_cleanly(): void {
+		$briefing_post = $this->post( 10, 'Lead investigation' );
+
+		$output = $this->render_template_part(
+			'template-parts/home-briefing.php',
+			array( 'post' => $briefing_post )
+		);
+
+		$this->assertStringContainsString( 'Editor&#039;s briefing', $output );
+		$this->assertStringNotContainsString( '<img', $output );
+		$this->assertStringNotContainsString( 'home-briefing__guide-link', $output );
+		$this->assertMatchesRegularExpression( '/<h3\b[^>]*>.*Lead investigation.*<\/h3>/s', $output );
+	}
+
+	/**
+	 * Falls back to the shared empty state when no post is available to brief.
+	 */
+	public function test_home_briefing_without_a_post_shows_the_useful_empty_state(): void {
+		$output = $this->render_template_part( 'template-parts/home-briefing.php', array() );
+
+		$this->assertStringContainsString( 'Nothing found', $output );
+		$this->assertStringNotContainsString( '<h3', $output );
+	}
+
+	/**
+	 * Renders up to three menu-derived audience pathways behind one labelled heading.
+	 */
+	public function test_home_audiences_renders_pathways_with_one_heading_in_menu_order(): void {
+		$output = $this->render_template_part(
+			'template-parts/home-audiences.php',
+			array(
+				'items' => array(
+					array(
+						'title'       => 'Team leads',
+						'description' => 'Playbooks for people managers.',
+						'url'         => 'https://example.test/audience/team-leads/',
+					),
+					array(
+						'title'       => 'Analysts',
+						'description' => '',
+						'url'         => 'https://example.test/audience/analysts/',
+					),
+					array(
+						'title'       => 'Executives',
+						'description' => 'Board-level briefings.',
+						'url'         => 'https://example.test/audience/executives/',
+					),
+				),
+			)
+		);
+
+		$this->assertSame( 1, preg_match_all( '/<h2\b/i', $output ) );
+		$this->assertStringContainsString( 'Explore by audience', $output );
+		$this->assertSame( 3, substr_count( $output, 'home-audiences__item' ) );
+		$this->assertSame( 3, substr_count( $output, '<a class="home-audiences__link"' ) );
+		$this->assertStringContainsString( 'href="https://example.test/audience/team-leads/"', $output );
+		$this->assertStringContainsString( 'href="https://example.test/audience/analysts/"', $output );
+		$this->assertStringContainsString( 'href="https://example.test/audience/executives/"', $output );
+		$this->assertStringContainsString( 'Playbooks for people managers.', $output );
+		$this->assertStringContainsString( 'Board-level briefings.', $output );
+		$this->assertSame( 2, substr_count( $output, 'home-audiences__description' ) );
+
+		$team_leads_position = strpos( $output, 'Team leads' );
+		$analysts_position   = strpos( $output, 'Analysts' );
+		$executives_position = strpos( $output, 'Executives' );
+
+		$this->assertLessThan( $analysts_position, $team_leads_position );
+		$this->assertLessThan( $executives_position, $analysts_position );
+	}
+
+	/**
+	 * Omits the audiences section entirely when no pathways are configured.
+	 */
+	public function test_home_audiences_with_no_items_renders_nothing(): void {
+		$output = $this->render_template_part( 'template-parts/home-audiences.php', array( 'items' => array() ) );
+
+		$this->assertSame( '', $output );
+	}
+
+	/**
+	 * Renders the one-plus-four coverage grid behind the translatable fallback heading.
+	 */
+	public function test_home_coverage_renders_feature_and_support_grid(): void {
+		$output = $this->render_template_part(
+			'template-parts/home-coverage.php',
+			array(
+				'feature' => $this->post( 21, 'Feature Investigation' ),
+				'support' => array(
+					$this->post( 22, 'Support One' ),
+					$this->post( 23, 'Support Two' ),
+					$this->post( 24, 'Support Three' ),
+					$this->post( 25, 'Support Four' ),
+				),
+			)
+		);
+
+		$this->assertSame( 1, preg_match_all( '/<h2\b/i', $output ) );
+		$this->assertStringContainsString( 'Latest coverage', $output );
+		$this->assertSame( 5, preg_match_all( '/<h3\b/i', $output ) );
+		$this->assertStringContainsString( 'Support One', $output );
+		$this->assertStringContainsString( 'Support Two', $output );
+		$this->assertStringContainsString( 'Support Three', $output );
+		$this->assertStringContainsString( 'Support Four', $output );
+
+		$feature_position = strpos( $output, 'Feature Investigation' );
+		$support_position = strpos( $output, 'Support One' );
+
+		$this->assertLessThan( $support_position, $feature_position );
+	}
+
+	/**
+	 * Omits the empty support wrapper when only the feature card is available.
+	 */
+	public function test_home_coverage_with_feature_only_omits_the_empty_support_wrapper(): void {
+		$output = $this->render_template_part(
+			'template-parts/home-coverage.php',
+			array( 'feature' => $this->post( 21, 'Feature Investigation' ) )
+		);
+
+		$this->assertSame( 1, preg_match_all( '/<h3\b/i', $output ) );
+		$this->assertStringNotContainsString( 'home-coverage__support', $output );
+	}
+
+	/**
+	 * Renders the compact support grid alone when only supporting posts are available.
+	 *
+	 * Guards the `content-card.php` null-post no-op: with no feature post, the feature
+	 * slot must render nothing (no bare `content-card` article) while the support posts
+	 * still render as `content-card--compact` cards beneath the section heading.
+	 */
+	public function test_home_coverage_with_support_only_renders_compact_cards_without_a_feature_card(): void {
+		$output = $this->render_template_part(
+			'template-parts/home-coverage.php',
+			array(
+				'support' => array(
+					$this->post( 22, 'Support One' ),
+					$this->post( 23, 'Support Two' ),
+				),
+			)
+		);
+
+		$this->assertSame( 1, preg_match_all( '/<h2\b/i', $output ) );
+		$this->assertStringContainsString( 'Latest coverage', $output );
+		$this->assertStringContainsString( 'home-coverage__support', $output );
+		$this->assertStringNotContainsString( '<article class="content-card">', $output );
+		$this->assertSame( 2, preg_match_all( '/<article class="content-card content-card--compact">/', $output ) );
+		$this->assertSame( 2, preg_match_all( '/<h3\b/i', $output ) );
+		$this->assertStringContainsString( 'Support One', $output );
+		$this->assertStringContainsString( 'Support Two', $output );
+	}
+
+	/**
+	 * Omits the coverage section entirely when neither the feature nor support posts exist.
+	 */
+	public function test_home_coverage_with_no_feature_and_no_support_renders_nothing(): void {
+		$output = $this->render_template_part( 'template-parts/home-coverage.php', array() );
+
+		$this->assertSame( '', $output );
+	}
+
+	/**
+	 * Renders complete two-post field-guide groups with category title, description and link.
+	 */
+	public function test_home_guides_renders_complete_groups_with_category_details_in_order(): void {
+		$GLOBALS['mumega_motion_test_terms'][5] = new WP_Term(
+			array(
+				'term_id'     => 5,
+				'name'        => 'Deep Dives',
+				'description' => 'Long-form investigations.',
+			)
+		);
+		$GLOBALS['mumega_motion_test_terms'][6] = new WP_Term(
+			array(
+				'term_id'     => 6,
+				'name'        => 'Quick Takes',
+				'description' => '',
+			)
+		);
+
+		$output = $this->render_template_part(
+			'template-parts/home-guides.php',
+			array(
+				'groups' => array(
+					array(
+						'term_id' => 5,
+						'posts'   => array( $this->post( 30, 'Deep Dive One' ), $this->post( 31, 'Deep Dive Two' ) ),
+					),
+					array(
+						'term_id' => 6,
+						'posts'   => array( $this->post( 32, 'Quick Take One' ), $this->post( 33, 'Quick Take Two' ) ),
+					),
+				),
+			)
+		);
+
+		$this->assertSame( 1, preg_match_all( '/<h2\b/i', $output ) );
+		$this->assertStringContainsString( 'Field guides', $output );
+		$this->assertSame( 4, preg_match_all( '/<h3\b/i', $output ) );
+		$this->assertStringContainsString( 'Deep Dives', $output );
+		$this->assertStringContainsString( 'https://example.test/category/5/', $output );
+		$this->assertStringContainsString( 'Long-form investigations.', $output );
+		$this->assertStringContainsString( 'Quick Takes', $output );
+		$this->assertSame( 1, substr_count( $output, 'home-guides__group-description' ) );
+		$this->assertStringContainsString( 'Deep Dive One', $output );
+		$this->assertStringContainsString( 'Deep Dive Two', $output );
+		$this->assertStringContainsString( 'Quick Take One', $output );
+		$this->assertStringContainsString( 'Quick Take Two', $output );
+
+		$deep_dives_position  = strpos( $output, 'Deep Dives' );
+		$quick_takes_position = strpos( $output, 'Quick Takes' );
+
+		$this->assertLessThan( $quick_takes_position, $deep_dives_position );
+	}
+
+	/**
+	 * Skips a group whose category term cannot be resolved without breaking sibling groups.
+	 */
+	public function test_home_guides_skips_a_group_with_an_unresolvable_term(): void {
+		$GLOBALS['mumega_motion_test_terms'][6] = new WP_Term(
+			array(
+				'term_id' => 6,
+				'name'    => 'Quick Takes',
+			)
+		);
+
+		$output = $this->render_template_part(
+			'template-parts/home-guides.php',
+			array(
+				'groups' => array(
+					array(
+						'term_id' => 99,
+						'posts'   => array( $this->post( 30, 'Deep Dive One' ), $this->post( 31, 'Deep Dive Two' ) ),
+					),
+					array(
+						'term_id' => 6,
+						'posts'   => array( $this->post( 32, 'Quick Take One' ), $this->post( 33, 'Quick Take Two' ) ),
+					),
+				),
+			)
+		);
+
+		$this->assertStringNotContainsString( 'Deep Dive One', $output );
+		$this->assertStringContainsString( 'Quick Take One', $output );
+	}
+
+	/**
+	 * Omits the guides section entirely when no complete groups are configured.
+	 */
+	public function test_home_guides_with_no_groups_renders_nothing(): void {
+		$output = $this->render_template_part( 'template-parts/home-guides.php', array( 'groups' => array() ) );
+
+		$this->assertSame( '', $output );
+	}
+
+	/**
+	 * Places pathways, coverage and guides between the briefing and the newsletter in source
+	 * order, and never repeats the briefing post inside either module.
+	 */
+	public function test_home_pathways_coverage_and_guides_render_in_order_without_repeating_the_briefing_post(): void {
+		$GLOBALS['mumega_motion_test_nav_menu_locations']['audiences'] = 31;
+		$GLOBALS['mumega_motion_test_nav_menu_objects'][31]            = new WP_Term( array( 'term_id' => 31 ) );
+		$GLOBALS['mumega_motion_test_nav_menu_items'][31]              = array(
+			(object) array(
+				'title'       => 'Team leads',
+				'description' => 'Playbooks for people managers.',
+				'url'         => 'https://example.test/audience/team-leads/',
+			),
+		);
+
+		$GLOBALS['mumega_motion_test_nav_menu_locations']['primary'] = 50;
+		$GLOBALS['mumega_motion_test_nav_menu_objects'][50]           = new WP_Term( array( 'term_id' => 50 ) );
+		$GLOBALS['mumega_motion_test_nav_menu_items'][50]             = array(
+			(object) array(
+				'type'      => 'taxonomy',
+				'object'    => 'category',
+				'object_id' => 7,
+			),
+		);
+		$GLOBALS['mumega_motion_test_terms'][7] = new WP_Term(
+			array(
+				'term_id'     => 7,
+				'name'        => 'Field Category',
+				'description' => 'A category description.',
+			)
+		);
+
+		$output = $this->render_editorial_home(
+			array(
+				'briefing'         => array( $this->post( 10, 'Lead investigation' ) ),
+				'coverage_feature' => array( $this->post( 21, 'Feature Investigation' ) ),
+				'coverage_support' => array( $this->post( 22, 'Support One' ) ),
+				'guide_groups'     => array(
+					array( $this->post( 60, 'Guide Post One' ), $this->post( 61, 'Guide Post Two' ) ),
+				),
+				'newsletter'       => array( $this->post( 41, 'Newsletter landing page' ) ),
+			)
+		);
+
+		$briefing_position   = strpos( $output, 'home-briefing' );
+		$audiences_position  = strpos( $output, 'home-audiences' );
+		$coverage_position   = strpos( $output, 'home-coverage' );
+		$guides_position     = strpos( $output, 'home-guides' );
+		$newsletter_position = strpos( $output, 'home-newsletter' );
+
+		foreach ( array( $briefing_position, $audiences_position, $coverage_position, $guides_position, $newsletter_position ) as $position ) {
+			$this->assertIsInt( $position );
+		}
+
+		$this->assertLessThan( $audiences_position, $briefing_position );
+		$this->assertLessThan( $coverage_position, $audiences_position );
+		$this->assertLessThan( $guides_position, $coverage_position );
+		$this->assertLessThan( $newsletter_position, $guides_position );
+
+		$this->assertStringContainsString( 'Feature Investigation', $output );
+		$this->assertStringContainsString( 'Guide Post One', $output );
+
+		$coverage_and_guides = substr( $output, $coverage_position, $newsletter_position - $coverage_position );
+		$this->assertStringNotContainsString( 'Lead investigation', $coverage_and_guides );
+	}
+
+	/**
+	 * Renders the methodology page's title, excerpt, permalink and the theme's fixed
+	 * Install/Connect/Verify/Recover vocabulary plus the Tested on WordPress marker.
+	 */
+	public function test_home_methodology_renders_page_link_excerpt_and_fixed_vocabulary(): void {
+		$methodology               = $this->post( 70, 'How we test WordPress plugins' );
+		$methodology->post_excerpt = 'Every review follows the same repeatable steps.';
+
+		$output = $this->render_template_part(
+			'template-parts/home-methodology.php',
+			array( 'page' => $methodology )
+		);
+
+		$this->assertSame( 1, preg_match_all( '/<h2\b/i', $output ) );
+		$this->assertStringContainsString( 'How we test WordPress plugins', $output );
+		$this->assertStringContainsString( 'Every review follows the same repeatable steps.', $output );
+		$this->assertStringContainsString( 'href="https://example.test/?p=70"', $output );
+		$this->assertStringContainsString( 'Install', $output );
+		$this->assertStringContainsString( 'Connect', $output );
+		$this->assertStringContainsString( 'Verify', $output );
+		$this->assertStringContainsString( 'Recover', $output );
+		$this->assertStringContainsString( 'Tested on WordPress', $output );
+	}
+
+	/**
+	 * Omits the methodology module, its fixed vocabulary and its marker cleanly when no
+	 * editorial-methodology page exists.
+	 */
+	public function test_home_methodology_without_a_page_renders_nothing(): void {
+		$output = $this->render_template_part( 'template-parts/home-methodology.php', array() );
+
+		$this->assertSame( '', $output );
+		$this->assertStringNotContainsString( 'Tested on WordPress', $output );
+	}
+
+	/**
+	 * Renders up to three tool-intelligence cards using real category labels.
+	 */
+	public function test_home_tools_renders_up_to_three_unused_posts(): void {
+		$output = $this->render_template_part(
+			'template-parts/home-tools.php',
+			array(
+				'posts' => array(
+					$this->post( 50, 'Backup Plugin Field Test' ),
+					$this->post( 51, 'Caching Plugin Field Test' ),
+					$this->post( 52, 'Security Plugin Field Test' ),
+				),
+			)
+		);
+
+		$this->assertSame( 1, preg_match_all( '/<h2\b/i', $output ) );
+		$this->assertStringContainsString( 'Tool intelligence', $output );
+		$this->assertSame( 3, preg_match_all( '/<h3\b/i', $output ) );
+		$this->assertStringContainsString( 'Backup Plugin Field Test', $output );
+		$this->assertStringContainsString( 'Caching Plugin Field Test', $output );
+		$this->assertStringContainsString( 'Security Plugin Field Test', $output );
+		$this->assertStringNotContainsString( 'score', strtolower( $output ) );
+		$this->assertStringNotContainsString( 'rank', strtolower( $output ) );
+		$this->assertStringNotContainsString( 'affiliate', strtolower( $output ) );
+	}
+
+	/**
+	 * Caps the tool-intelligence module at three cards even when more posts are supplied.
+	 */
+	public function test_home_tools_caps_at_three_posts(): void {
+		$output = $this->render_template_part(
+			'template-parts/home-tools.php',
+			array(
+				'posts' => array(
+					$this->post( 50, 'Tool One' ),
+					$this->post( 51, 'Tool Two' ),
+					$this->post( 52, 'Tool Three' ),
+					$this->post( 53, 'Tool Four' ),
+				),
+			)
+		);
+
+		$this->assertSame( 3, preg_match_all( '/<h3\b/i', $output ) );
+		$this->assertStringNotContainsString( 'Tool Four', $output );
+	}
+
+	/**
+	 * Omits the tool-intelligence module entirely when fewer than two eligible posts exist.
+	 */
+	public function test_home_tools_with_fewer_than_two_posts_renders_nothing(): void {
+		$output_with_one  = $this->render_template_part(
+			'template-parts/home-tools.php',
+			array( 'posts' => array( $this->post( 50, 'Solo Tool Review' ) ) )
+		);
+		$output_with_none = $this->render_template_part( 'template-parts/home-tools.php', array( 'posts' => array() ) );
+
+		$this->assertSame( '', $output_with_one );
+		$this->assertSame( '', $output_with_none );
+	}
+
+	/**
+	 * Renders the knowledge-map page's title, excerpt, featured media and permalink.
+	 */
+	public function test_home_knowledge_renders_page_title_excerpt_media_and_url(): void {
+		$knowledge_page                                    = $this->post( 60, 'How our topics connect' );
+		$knowledge_page->post_excerpt                      = 'A map of how our guides and reports relate.';
+		$GLOBALS['mumega_motion_test_post_thumbnails'][60] = true;
+
+		$output = $this->render_template_part(
+			'template-parts/home-knowledge.php',
+			array( 'page' => $knowledge_page )
+		);
+
+		$this->assertSame( 1, preg_match_all( '/<h2\b/i', $output ) );
+		$this->assertStringContainsString( 'How our topics connect', $output );
+		$this->assertStringContainsString( 'A map of how our guides and reports relate.', $output );
+		$this->assertStringContainsString( 'href="https://example.test/?p=60"', $output );
+		$this->assertMatchesRegularExpression( '/<img\b[^>]*srcset="[^"]+"/', $output );
+	}
+
+	/**
+	 * Renders the knowledge module without an image when the page has no featured media.
+	 */
+	public function test_home_knowledge_without_featured_media_omits_the_image(): void {
+		$knowledge_page = $this->post( 60, 'How our topics connect' );
+
+		$output = $this->render_template_part(
+			'template-parts/home-knowledge.php',
+			array( 'page' => $knowledge_page )
+		);
+
+		$this->assertStringNotContainsString( '<img', $output );
+		$this->assertStringContainsString( 'How our topics connect', $output );
+	}
+
+	/**
+	 * Omits the knowledge module cleanly, without a stray heading, when no knowledge-map
+	 * page exists.
+	 */
+	public function test_home_knowledge_without_a_page_renders_nothing(): void {
+		$output = $this->render_template_part( 'template-parts/home-knowledge.php', array() );
+
+		$this->assertSame( '', $output );
+	}
+
+	/**
+	 * Places methodology, tools and knowledge between guides and the newsletter in
+	 * rendered source order, completing the full lower-homepage sequence.
+	 */
+	public function test_home_methodology_tools_and_knowledge_render_between_guides_and_newsletter(): void {
+		$GLOBALS['mumega_motion_test_nav_menu_locations']['primary'] = 50;
+		$GLOBALS['mumega_motion_test_nav_menu_objects'][50]           = new WP_Term( array( 'term_id' => 50 ) );
+		$GLOBALS['mumega_motion_test_nav_menu_items'][50]             = array(
+			(object) array(
+				'type'      => 'taxonomy',
+				'object'    => 'category',
+				'object_id' => 7,
+			),
+		);
+		$GLOBALS['mumega_motion_test_terms'][7] = new WP_Term(
+			array(
+				'term_id'     => 7,
+				'name'        => 'Field Category',
+				'description' => 'A category description.',
+			)
+		);
+
+		$methodology               = $this->post( 70, 'How we test WordPress plugins' );
+		$methodology->post_excerpt = 'Every review follows the same repeatable steps.';
+
+		$knowledge_page               = $this->post( 71, 'How our topics connect' );
+		$knowledge_page->post_excerpt = 'A map of how our guides and reports relate.';
+
+		$output = $this->render_editorial_home(
+			array(
+				'briefing'      => array( $this->post( 10, 'Lead investigation' ) ),
+				'guide_groups'  => array(
+					array( $this->post( 60, 'Guide Post One' ), $this->post( 61, 'Guide Post Two' ) ),
+				),
+				'tools'         => array(
+					$this->post( 50, 'Backup Plugin Field Test' ),
+					$this->post( 51, 'Caching Plugin Field Test' ),
+				),
+				'methodology'   => array( $methodology ),
+				'knowledge_map' => array( $knowledge_page ),
+				'newsletter'    => array( $this->post( 41, 'Newsletter landing page' ) ),
+			)
+		);
+
+		$guides_position      = strpos( $output, 'home-guides' );
+		$methodology_position = strpos( $output, 'home-methodology' );
+		$tools_position       = strpos( $output, 'home-tools' );
+		$knowledge_position   = strpos( $output, 'home-knowledge' );
+		$newsletter_position  = strpos( $output, 'home-newsletter' );
+
+		foreach ( array( $guides_position, $methodology_position, $tools_position, $knowledge_position, $newsletter_position ) as $position ) {
+			$this->assertIsInt( $position );
+		}
+
+		$this->assertLessThan( $methodology_position, $guides_position );
+		$this->assertLessThan( $tools_position, $methodology_position );
+		$this->assertLessThan( $knowledge_position, $tools_position );
+		$this->assertLessThan( $newsletter_position, $knowledge_position );
+
+		$this->assertStringContainsString( 'Guide Post One', $output );
+		$this->assertStringContainsString( 'How we test WordPress plugins', $output );
+		$this->assertStringContainsString( 'Backup Plugin Field Test', $output );
+		$this->assertStringContainsString( 'How our topics connect', $output );
+	}
+
+	/**
+	 * Leaves no methodology, tools or knowledge markers or headings on the full homepage
+	 * when their backing pages and categories are absent — the same honest-omission
+	 * convention as the guides and coverage modules.
+	 */
+	public function test_home_methodology_tools_and_knowledge_omit_cleanly_when_absent(): void {
+		$output = $this->render_editorial_home(
+			array(
+				'briefing'   => array( $this->post( 10, 'Lead investigation' ) ),
+				'newsletter' => array( $this->post( 41, 'Newsletter landing page' ) ),
+			)
+		);
+
+		$this->assertStringNotContainsString( 'home-methodology', $output );
+		$this->assertStringNotContainsString( 'home-tools', $output );
+		$this->assertStringNotContainsString( 'home-knowledge', $output );
+		$this->assertStringNotContainsString( 'Tested on WordPress', $output );
+		$this->assertStringNotContainsString( 'Tool intelligence', $output );
+		$this->assertStringContainsString( 'home-newsletter', $output );
+	}
+
+	/**
+	 * Keeps the new methodology, tools and knowledge template-part calls positioned
+	 * before the newsletter section's exact non-Motion wrapper in source order.
+	 */
+	public function test_home_methodology_tools_and_knowledge_precede_the_newsletter_section_in_source(): void {
+		$source = $this->theme_source( 'page-templates/editorial-home.php' );
+
+		$methodology_position = strpos( $source, 'template-parts/home-methodology' );
+		$tools_position       = strpos( $source, 'template-parts/home-tools' );
+		$knowledge_position   = strpos( $source, 'template-parts/home-knowledge' );
+		$newsletter_position  = strpos( $source, '<section class="home-newsletter">' );
+
+		foreach ( array( $methodology_position, $tools_position, $knowledge_position, $newsletter_position ) as $position ) {
+			$this->assertIsInt( $position );
+		}
+
+		$this->assertLessThan( $tools_position, $methodology_position );
+		$this->assertLessThan( $knowledge_position, $tools_position );
+		$this->assertLessThan( $newsletter_position, $knowledge_position );
 	}
 
 	/**
@@ -147,6 +769,18 @@ PHP;
 		$source = $this->theme_source( 'page-templates/editorial-home.php' );
 
 		$this->assertStringContainsString( '<section class="home-newsletter">', $source );
+	}
+
+	/**
+	 * Delegates newsletter content filtering to the shared restoration helper.
+	 */
+	public function test_newsletter_delegates_content_rendering_to_shared_helper(): void {
+		$source = $this->theme_source( 'template-parts/newsletter.php' );
+
+		$this->assertStringContainsString( 'mumega_motion_render_post_content( $newsletter_post )', $source );
+		$this->assertStringNotContainsString( 'setup_postdata(', $source );
+		$this->assertStringNotContainsString( 'wp_reset_postdata(', $source );
+		$this->assertStringNotContainsString( "apply_filters( 'the_content'", $source );
 	}
 
 	/**
@@ -230,22 +864,63 @@ PHP;
 	/**
 	 * Renders the full Editorial Home with deterministic query results.
 	 *
-	 * @param WP_Post|null $lead       Optional lead post.
-	 * @param array        $supporting Supporting posts.
-	 * @param WP_Post|null $newsletter Optional newsletter page.
+	 * Each `get_posts()` result queues in the exact order the template resolves
+	 * its data: briefing lead, related pair, coverage feature, coverage support,
+	 * one result per matched rail-group category (only consumed when a `primary`
+	 * nav menu fixture supplies matching category items), the tool-intelligence
+	 * posts (only consumed when the `tools` override is explicitly supplied,
+	 * mirroring `tools-reviews` category resolution), the editorial guide page,
+	 * the methodology page, the knowledge map page, and finally the newsletter
+	 * page.
+	 *
+	 * @param array $overrides Named query-result overrides.
 	 * @return string
 	 */
-	private function render_editorial_home( $lead = null, $supporting = array(), $newsletter = null ): string {
-		$page = $this->post( 80, 'Editorial Desk' );
+	private function render_editorial_home( array $overrides = array() ): string {
+		$defaults = array(
+			'page'             => $this->post( 80, 'Editorial Desk' ),
+			'briefing'         => array(),
+			'related'          => array(),
+			'coverage_feature' => array(),
+			'coverage_support' => array(),
+			'guide_groups'     => array(),
+			'guide'            => array(),
+			'tools'            => array(),
+			'methodology'      => array(),
+			'knowledge_map'    => array(),
+			'newsletter'       => array(),
+		);
+		$config = array_merge( $defaults, $overrides );
+		$page   = $config['page'];
 
-		$GLOBALS['post']                                 = $page;
-		$GLOBALS['mumega_motion_test_current_post']      = $page;
-		$GLOBALS['mumega_motion_test_queried_object_id'] = 80;
-		$GLOBALS['mumega_motion_test_posts'][80]         = $page;
-		$GLOBALS['mumega_motion_test_post_queries']      = array(
-			$lead instanceof WP_Post ? array( $lead ) : array(),
-			$supporting,
-			$newsletter instanceof WP_Post ? array( $newsletter ) : array(),
+		$GLOBALS['post']                                  = $page;
+		$GLOBALS['mumega_motion_test_current_post']       = $page;
+		$GLOBALS['mumega_motion_test_queried_object_id']  = $page->ID;
+		$GLOBALS['mumega_motion_test_posts'][ $page->ID ] = $page;
+
+		$post_queries = array_merge(
+			array(
+				$config['briefing'],
+				$config['related'],
+				$config['coverage_feature'],
+				$config['coverage_support'],
+			),
+			array_values( $config['guide_groups'] )
+		);
+
+		if ( array_key_exists( 'tools', $overrides ) ) {
+			$GLOBALS['mumega_motion_test_categories_by_slug']['tools-reviews'] = new WP_Term( array( 'term_id' => 9 ) );
+			$post_queries[] = $config['tools'];
+		}
+
+		$GLOBALS['mumega_motion_test_post_queries'] = array_merge(
+			$post_queries,
+			array(
+				$config['guide'],
+				$config['methodology'],
+				$config['knowledge_map'],
+				$config['newsletter'],
+			)
 		);
 
 		ob_start();

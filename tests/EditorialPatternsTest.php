@@ -30,9 +30,9 @@ final class EditorialPatternsTest extends TestCase {
 	}
 
 	/**
-	 * Registers the single editorial category and six stable pattern slugs.
+	 * Registers the single editorial category and twelve stable pattern slugs.
 	 */
-	public function test_registers_one_editorial_category_and_exactly_six_patterns(): void {
+	public function test_registers_one_editorial_category_and_exactly_twelve_patterns(): void {
 		$this->assertFileExists( dirname( __DIR__ ) . '/inc/editorial-patterns.php' );
 		$this->assertStringContainsString(
 			'/inc/editorial-patterns.php',
@@ -50,6 +50,12 @@ final class EditorialPatternsTest extends TestCase {
 				'mumega-motion/affiliate-disclosure',
 				'mumega-motion/correction-note',
 				'mumega-motion/newsletter-page',
+				'mumega-motion/explainer',
+				'mumega-motion/practical-guide',
+				'mumega-motion/test-report',
+				'mumega-motion/comparison-review',
+				'mumega-motion/news-briefing',
+				'mumega-motion/analysis-opinion',
 			),
 			array_keys( $GLOBALS['mumega_motion_test_patterns'] )
 		);
@@ -133,6 +139,160 @@ final class EditorialPatternsTest extends TestCase {
 	 */
 	public function test_newsletter_page_pattern_contains_no_page_level_h1(): void {
 		$content = $this->pattern_content( 'mumega-motion/newsletter-page' );
+
+		$this->assertStringNotContainsString( '<h1', $content );
+		$this->assertStringNotContainsString( '"level":1', $content );
+	}
+
+	/**
+	 * Gives an explainer every required section from the approved design and no page-level H1.
+	 */
+	public function test_explainer_has_required_sections_and_no_h1(): void {
+		$content = $this->pattern_content( 'mumega-motion/explainer' );
+
+		foreach (
+			array(
+				'Direct answer',
+				'Why it matters to the primary audience',
+				'How it works',
+				'Concrete WordPress example',
+				'Boundaries and common misconceptions',
+				'What to do next',
+				'Sources and updates',
+			) as $heading
+		) {
+			$this->assertStringContainsString( $heading, $content );
+		}
+
+		$this->assertStringNotContainsString( '<h1', $content );
+		$this->assertStringNotContainsString( '"level":1', $content );
+	}
+
+	/**
+	 * Gives a practical guide every required section from the approved design and no page-level H1.
+	 */
+	public function test_practical_guide_has_required_sections_and_no_h1(): void {
+		$content = $this->pattern_content( 'mumega-motion/practical-guide' );
+
+		foreach (
+			array(
+				'Outcome and suitability',
+				'Prerequisites and permissions',
+				'Tested versions and date',
+				'Ordered procedure',
+				'Verification steps',
+				'Failure modes',
+				'Rollback or recovery',
+				'Security and data considerations',
+				'Sources and updates',
+			) as $heading
+		) {
+			$this->assertStringContainsString( $heading, $content );
+		}
+
+		$this->assertStringNotContainsString( '<h1', $content );
+		$this->assertStringNotContainsString( '"level":1', $content );
+	}
+
+	/**
+	 * Gives a test report every required section from the approved design and no page-level H1.
+	 */
+	public function test_test_report_has_required_sections_and_no_h1(): void {
+		$content = $this->pattern_content( 'mumega-motion/test-report' );
+
+		foreach (
+			array(
+				'Question and hypothesis',
+				'Environment and versions',
+				'Procedure',
+				'Observations and artifacts',
+				'Results',
+				'Failures and anomalies',
+				'Limitations and reproducibility',
+				'Conclusion bounded to the evidence',
+				'Sources, corrections and retest trigger',
+			) as $heading
+		) {
+			$this->assertStringContainsString( $heading, $content );
+		}
+
+		$this->assertStringNotContainsString( '<h1', $content );
+		$this->assertStringNotContainsString( '"level":1', $content );
+	}
+
+	/**
+	 * Gives a comparison review every required section from the approved design and no page-level H1.
+	 */
+	public function test_comparison_review_has_required_sections_and_no_h1(): void {
+		$content = $this->pattern_content( 'mumega-motion/comparison-review' );
+
+		foreach (
+			array(
+				'Decision and audience',
+				'Inclusion and exclusion criteria',
+				'Tested versions, access and commercial relationships',
+				'Comparable evidence table',
+				'Findings by decision criterion',
+				'Best fit and poor fit for each option',
+				'Limitations',
+				'Independent conclusion',
+				'Affiliate disclosure when applicable',
+				'Sources and update trigger',
+			) as $heading
+		) {
+			$this->assertStringContainsString( $heading, $content );
+		}
+
+		$this->assertStringContainsString( '<!-- wp:table', $content );
+
+		$this->assertStringNotContainsString( '<h1', $content );
+		$this->assertStringNotContainsString( '"level":1', $content );
+	}
+
+	/**
+	 * Gives a news briefing every required section from the approved design and no page-level H1.
+	 */
+	public function test_news_briefing_has_required_sections_and_no_h1(): void {
+		$content = $this->pattern_content( 'mumega-motion/news-briefing' );
+
+		foreach (
+			array(
+				'What changed',
+				'Primary announcement or artifact',
+				'Who is affected',
+				'Why it matters now',
+				'What readers should do',
+				'What remains unknown',
+				'Connection to a durable topic page',
+				'Sources and dated update note',
+			) as $heading
+		) {
+			$this->assertStringContainsString( $heading, $content );
+		}
+
+		$this->assertStringNotContainsString( '<h1', $content );
+		$this->assertStringNotContainsString( '"level":1', $content );
+	}
+
+	/**
+	 * Gives an analysis or opinion piece every required section from the approved design and no page-level H1.
+	 */
+	public function test_analysis_opinion_has_required_sections_and_no_h1(): void {
+		$content = $this->pattern_content( 'mumega-motion/analysis-opinion' );
+
+		foreach (
+			array(
+				'Thesis',
+				'Evidence',
+				'Strongest counterargument',
+				'Analysis separating facts from inference',
+				'Implications for the primary audience',
+				'Conditions that would change the conclusion',
+				'Sources and author disclosure',
+			) as $heading
+		) {
+			$this->assertStringContainsString( $heading, $content );
+		}
 
 		$this->assertStringNotContainsString( '<h1', $content );
 		$this->assertStringNotContainsString( '"level":1', $content );
@@ -246,6 +406,117 @@ final class EditorialPatternsTest extends TestCase {
 			'Stay informed with reporting delivered to your inbox.',
 			'By subscribing, you agree to receive email updates.',
 			'Insert your site\'s existing newsletter form block here.',
+			'Direct answer',
+			'State the direct answer to the reader\'s question in the first sentence.',
+			'Why it matters to the primary audience',
+			'Explain why this matters to the primary audience for this topic.',
+			'How it works',
+			'Describe the underlying mechanism or process in plain language.',
+			'Concrete WordPress example',
+			'Provide a concrete WordPress example that illustrates the explanation.',
+			'Boundaries and common misconceptions',
+			'Add a boundary or edge case where this explanation no longer applies.',
+			'Add a common misconception and correct it.',
+			'What to do next',
+			'Add the next recommended action for the reader.',
+			'Sources and updates',
+			'Add sources, documentation, or references.',
+			'Record material updates to this explanation here.',
+			'Outcome and suitability',
+			'State the outcome this guide produces and who it is suitable for.',
+			'Prerequisites and permissions',
+			'Add a required prerequisite.',
+			'Add the WordPress role or capability needed.',
+			'Tested versions and date',
+			'Record the WordPress, plugin, and theme versions tested, and the test date.',
+			'Ordered procedure',
+			'Add the first step.',
+			'Add the next step.',
+			'Verification steps',
+			'Add a step that confirms the procedure succeeded.',
+			'Failure modes',
+			'Add a way this procedure can fail.',
+			'Rollback or recovery',
+			'Describe how to undo this procedure or recover from a failed attempt.',
+			'Security and data considerations',
+			'Note security implications and any data handled by this procedure.',
+			'Add sources or documentation referenced.',
+			'Question and hypothesis',
+			'State the question this test answers and the hypothesis being evaluated.',
+			'Environment and versions',
+			'Record the hardware, software, and versions used during testing.',
+			'Observations and artifacts',
+			'Add an observation recorded during testing.',
+			'Link to a supporting artifact such as a screenshot or log.',
+			'Report the measured results.',
+			'Failures and anomalies',
+			'Add a failure or anomaly observed during testing.',
+			'Limitations and reproducibility',
+			'Note constraints on reproducing this test and its results.',
+			'Conclusion bounded to the evidence',
+			'State a conclusion that does not exceed what the evidence supports.',
+			'Sources, corrections and retest trigger',
+			'Add sources or documents referenced.',
+			'Add the condition that would trigger a retest.',
+			'Decision and audience',
+			'State the decision this review helps the reader make and who it is for.',
+			'Inclusion and exclusion criteria',
+			'Add a criterion an option must meet for inclusion.',
+			'Add a criterion that excludes an option.',
+			'Tested versions, access and commercial relationships',
+			'Record the versions tested, how access was obtained, and any commercial relationship with each vendor. Link official documentation, pricing, terms, and changelogs for each compared product.',
+			'Do not label a product "tested" unless it was directly tested.',
+			'Comparable evidence table',
+			'Option',
+			'Criterion',
+			'Evidence',
+			'Directly tested',
+			'Add an option.',
+			'Add the criterion assessed.',
+			'Add supporting evidence.',
+			'State whether this option was directly tested.',
+			'Findings by decision criterion',
+			'Add a finding for one decision criterion.',
+			'Best fit and poor fit for each option',
+			'Add the best-fit use case for an option.',
+			'Add the poor-fit use case for an option.',
+			'Independent conclusion',
+			'State a conclusion independent of any commercial relationship disclosed above.',
+			'Affiliate disclosure when applicable',
+			'If this review contains affiliate links, disclose that relationship here; otherwise state that none exists.',
+			'Sources and update trigger',
+			'Add the condition that would trigger an update to this comparison.',
+			'What changed',
+			'State what changed in one or two sentences.',
+			'Primary announcement or artifact',
+			'Link to or describe the primary announcement or artifact this briefing covers.',
+			'Who is affected',
+			'Add a group of users or sites affected.',
+			'Why it matters now',
+			'Explain why this change matters at this moment.',
+			'What readers should do',
+			'Add a recommended action for readers.',
+			'What remains unknown',
+			'Add a question that remains unanswered.',
+			'Connection to a durable topic page',
+			'Link to the durable topic page this briefing relates to.',
+			'Sources and dated update note',
+			'Add sources for this briefing.',
+			'Record the date and nature of any update to this briefing.',
+			'Thesis',
+			'State the thesis in one or two sentences.',
+			'Add a piece of supporting evidence.',
+			'Strongest counterargument',
+			'State the strongest argument against this thesis.',
+			'Analysis separating facts from inference',
+			'Separate what is established fact from what is the author\'s inference.',
+			'Implications for the primary audience',
+			'Explain what this means for the primary audience.',
+			'Conditions that would change the conclusion',
+			'Add a condition that would change this conclusion.',
+			'Sources and author disclosure',
+			'Add sources referenced.',
+			'Disclose the author\'s relevant affiliations or interests.',
 		);
 
 		$translations = array();

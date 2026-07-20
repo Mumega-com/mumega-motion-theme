@@ -46,6 +46,7 @@ mumega_motion_methodology_page(): ?WP_Post
 mumega_motion_knowledge_map_page(): ?WP_Post
 mumega_motion_render_post_content( $post ): string
 mumega_motion_audience_menu_items( $limit = 3 ): array
+mumega_motion_select_related_posts( &$used_ids ): array
 mumega_motion_select_coverage_feature( &$used_ids ): ?WP_Post
 mumega_motion_select_rail_groups( &$used_ids, $limit = 3, $posts_per_group = 3 ): array
 ```
@@ -133,6 +134,8 @@ git commit -m "feat: add editorial profile conventions"
 Add tests proving:
 
 - the sticky briefing is selected first and commits its ID;
+- `mumega_motion_select_related_posts()` commits only an exact pair of valid, unused, non-Release posts;
+- an underfilled related query returns `[]` without reserving its candidate, allowing that post to fall through to coverage;
 - `mumega_motion_select_coverage_feature()` selects the newest eligible non-Release unused post and commits it;
 - two related, one feature and four support posts contain seven unique IDs;
 - `mumega_motion_select_rail_groups( $used, 4, 2 )` commits only complete two-post groups;
@@ -142,13 +145,17 @@ Add tests proving:
 - [ ] **Step 2: Run focused tests**
 
 Run: `vendor/bin/phpunit -c phpunit.xml.dist tests/EditorialQueriesTest.php`
-Expected: FAIL for missing coverage function and third rail parameter.
+Expected: FAIL for missing related/coverage functions and third rail parameter.
 
-- [ ] **Step 3: Add `mumega_motion_select_coverage_feature()`**
+- [ ] **Step 3: Add `mumega_motion_select_related_posts()`**
+
+Query the same non-Release eligible candidates as the fallback lead with `numberposts => 2`. Commit both IDs only when the result contains exactly two valid, distinct, unused `WP_Post` values. Return `[]` without mutating IDs for an underfill or invalid pair so a valid candidate can remain eligible for coverage. Homepage orchestration must use this exact transactional selector for briefing-related links; do not emulate it with a limit-specific call to the generic supporting selector.
+
+- [ ] **Step 4: Add `mumega_motion_select_coverage_feature()`**
 
 Use the same non-Release fallback constraints as the non-sticky lead path, with `numberposts => 1` and the supplied used IDs. Return `null` without mutating IDs when empty.
 
-- [ ] **Step 4: Generalize rail groups**
+- [ ] **Step 5: Generalize rail groups**
 
 Change the signature to:
 
@@ -158,7 +165,7 @@ function mumega_motion_select_rail_groups( &$used_ids, $limit = 3, $posts_per_gr
 
 Clamp both numbers to zero or greater, return early for zero, query exactly `$posts_per_group`, and commit a candidate only when the count matches. Update `mumega_motion_select_rail_categories()` to call the default three-post behavior.
 
-- [ ] **Step 5: Verify and commit**
+- [ ] **Step 6: Verify and commit**
 
 Run: `vendor/bin/phpunit -c phpunit.xml.dist tests/EditorialQueriesTest.php`
 Expected: PASS.
@@ -243,7 +250,7 @@ Use:
 ```php
 $used_ids          = array();
 $briefing           = mumega_motion_select_lead_post( $used_ids );
-$briefing_related   = mumega_motion_select_supporting_posts( $used_ids, 2 );
+$briefing_related   = mumega_motion_select_related_posts( $used_ids );
 $coverage_feature   = mumega_motion_select_coverage_feature( $used_ids );
 $coverage_support   = mumega_motion_select_supporting_posts( $used_ids, 4 );
 $guide_groups       = mumega_motion_select_rail_groups( $used_ids, 4, 2 );

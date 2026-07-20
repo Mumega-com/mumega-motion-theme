@@ -17,8 +17,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 function mumega_motion_setup() {
 	register_nav_menus(
 		array(
-			'primary' => __( 'Primary Navigation', 'mumega-motion' ),
-			'footer'  => __( 'Footer Navigation', 'mumega-motion' ),
+			'primary'   => __( 'Primary Navigation', 'mumega-motion' ),
+			'footer'    => __( 'Footer Navigation', 'mumega-motion' ),
+			'audiences' => __( 'Audience Pathways', 'mumega-motion' ),
 		)
 	);
 

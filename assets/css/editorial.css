@@ -10,6 +10,10 @@ body {
 	--editorial-accent-ink: var(--wp--preset--color--lavender-ink, #6545a4);
 	--editorial-rule: var(--wp--preset--color--rule, #cbc4b8);
 	--editorial-white: var(--wp--preset--color--white, #fff);
+	--editorial-navy: var(--wp--preset--color--navy, #1b2a4a);
+	--editorial-teal: var(--wp--preset--color--teal, #0f6a63);
+	--editorial-cobalt: var(--wp--preset--color--cobalt, #2454a6);
+	--editorial-amber: var(--wp--preset--color--amber, #8a5a12);
 	--editorial-control-border: #70685d;
 	--editorial-dark: #121824;
 	--editorial-serif: var(--wp--preset--font-family--editorial-serif, "Iowan Old Style", Baskerville, "Times New Roman", serif);
@@ -575,6 +579,243 @@ label {
 	color: var(--editorial-lavender);
 }
 
+/* Editorial Home v2: intro, briefing, audiences, coverage, guides, methodology, tools, knowledge. */
+.home-intro__title {
+	font-family: var(--editorial-serif);
+	font-size: clamp(2.5rem, 7vw, 5.5rem);
+	font-weight: 500;
+	letter-spacing: -0.04em;
+	line-height: 1.03;
+	margin: 0;
+}
+
+.home-intro__excerpt {
+	font-size: clamp(1.1rem, 2.5vw, 1.35rem);
+	line-height: 1.55;
+	margin-top: 1rem;
+}
+
+.home-intro__content > :first-child {
+	margin-top: 0;
+}
+
+.home-briefing__label {
+	color: var(--editorial-accent-ink);
+	font-size: 0.8rem;
+	font-weight: 750;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.home-briefing__guide {
+	align-items: center;
+	border-top: 1px solid var(--editorial-navy);
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: minmax(0, 4rem) minmax(0, 1fr);
+	padding-block: 1rem;
+}
+
+.home-briefing__guide-image {
+	border-radius: 50%;
+	display: block;
+	height: 4rem;
+	object-fit: cover;
+	width: 4rem;
+}
+
+.home-briefing__guide-name {
+	font-weight: 700;
+	margin: 0;
+}
+
+.home-briefing__guide-role {
+	color: var(--editorial-muted);
+	font-size: 0.85rem;
+	margin: 0;
+}
+
+.home-briefing__guide-link {
+	align-items: center;
+	display: inline-flex;
+	font-size: 0.8rem;
+	font-weight: 700;
+	min-height: 44px;
+	text-decoration: underline;
+	text-underline-offset: 0.25em;
+}
+
+.home-briefing__post {
+	border-top: 1px solid var(--editorial-rule);
+	display: grid;
+	gap: 0.8rem;
+	padding-top: 1.25rem;
+}
+
+.home-briefing__title {
+	font-family: var(--editorial-serif);
+	font-size: clamp(1.5rem, 3.5vw, 2.25rem);
+	font-weight: 500;
+	line-height: 1.1;
+	margin: 0;
+}
+
+.home-briefing__title a {
+	text-decoration: none;
+}
+
+.home-briefing__summary {
+	margin: 0;
+}
+
+.home-briefing__related {
+	display: grid;
+	gap: 0.6rem;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.home-briefing__related a {
+	align-items: center;
+	display: inline-flex;
+	min-height: 44px;
+}
+
+/* Audience pathways: CSS Grid card layout at every viewport. */
+.home-audiences__list {
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: minmax(0, 1fr);
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.home-audiences__link {
+	align-items: start;
+	border: 1px solid var(--editorial-navy);
+	display: grid;
+	gap: 0.4rem;
+	min-height: 44px;
+	padding: 1.25rem;
+	text-decoration: none;
+}
+
+.home-audiences__title {
+	font-weight: 700;
+}
+
+.home-audiences__description {
+	color: var(--editorial-muted);
+	font-size: 0.9rem;
+}
+
+/* Latest coverage: one feature card plus a CSS Grid of supporting cards. */
+.home-coverage__grid {
+	display: grid;
+	gap: clamp(1.5rem, 4vw, 3rem);
+}
+
+.home-coverage__support {
+	display: grid;
+	gap: 1.25rem;
+}
+
+/* Field guides: CSS Grid of up to four complete groups. */
+.home-guides__list {
+	display: grid;
+	gap: clamp(2rem, 5vw, 3rem);
+	grid-template-columns: minmax(0, 1fr);
+}
+
+.home-guides__group-category a {
+	align-items: center;
+	color: var(--editorial-amber);
+	display: inline-flex;
+	font-weight: 700;
+	min-height: 44px;
+	text-decoration: none;
+}
+
+.home-guides__group-description {
+	color: var(--editorial-muted);
+	font-size: 0.9rem;
+}
+
+.home-guides__group-posts {
+	display: grid;
+	gap: 1rem;
+	margin-top: 1rem;
+}
+
+/* Methodology / trust module. */
+.home-methodology__excerpt {
+	font-size: clamp(1.05rem, 2vw, 1.25rem);
+	line-height: 1.55;
+}
+
+.home-methodology__steps {
+	display: grid;
+	gap: 0.75rem;
+	grid-template-columns: minmax(0, 1fr);
+	list-style: none;
+	margin: 1.5rem 0;
+	padding: 0;
+}
+
+.home-methodology__step {
+	border-top: 1px solid var(--editorial-rule);
+	font-weight: 700;
+	padding-top: 0.75rem;
+}
+
+.home-methodology__marker {
+	background: var(--editorial-teal);
+	color: var(--editorial-white);
+	display: inline-block;
+	font-size: 0.8rem;
+	font-weight: 750;
+	letter-spacing: 0.04em;
+	padding: 0.5rem 0.85rem;
+	text-transform: uppercase;
+}
+
+/* Tool intelligence: CSS Grid of compact cards; cobalt marks technical content. */
+.home-tools {
+	border-left: 0.35rem solid var(--editorial-cobalt);
+	padding-left: 1.25rem;
+}
+
+.home-tools__grid {
+	display: grid;
+	gap: 1.5rem;
+	grid-template-columns: minmax(0, 1fr);
+}
+
+/* Knowledge continuity. */
+.home-knowledge {
+	display: grid;
+	gap: clamp(1.5rem, 4vw, 3rem);
+}
+
+.home-knowledge__media {
+	background: var(--editorial-lavender);
+	display: block;
+	overflow: hidden;
+}
+
+.home-knowledge__image {
+	display: block;
+	height: 100%;
+	object-fit: cover;
+	width: 100%;
+}
+
+.home-knowledge__excerpt {
+	color: var(--editorial-muted);
+}
+
 /* Native article and knowledge-listing templates. */
 .single-article,
 .article-entry {
@@ -780,6 +1021,16 @@ label {
 	}
 }
 
+/* 768px: audience pathways move from a single column to a flexible,
+   auto-fitting CSS Grid — naturally producing a two-plus-one layout
+   at in-between widths without a hardcoded column count. */
+@media (min-width: 48rem) {
+
+	.home-audiences__list {
+		grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+	}
+}
+
 /* 800px: exact 7/5 lead desk while preserving source order. */
 @media (min-width: 800px) {
 
@@ -800,7 +1051,16 @@ label {
 		padding-top: 0;
 	}
 
-	.editorial-home > :not(.lead-story):not(.home-supporting) {
+	.editorial-home > .home-intro {
+		align-self: start;
+		grid-column: span 7;
+	}
+
+	.editorial-home > .home-briefing {
+		grid-column: span 5;
+	}
+
+	.editorial-home > :not(.lead-story):not(.home-supporting):not(.home-intro):not(.home-briefing) {
 		grid-column: 1 / -1;
 	}
 
@@ -837,6 +1097,19 @@ label {
 		align-items: center;
 		grid-template-columns: minmax(0, 7fr) minmax(16rem, 5fr);
 	}
+
+	.home-coverage__grid {
+		align-items: start;
+		grid-template-columns: minmax(0, 7fr) minmax(16rem, 5fr);
+	}
+
+	.home-guides__list {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.home-tools__grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
 }
 
 @media (min-width: 64rem) {
@@ -860,6 +1133,14 @@ label {
 	.field-notes__list .content-card--compact:first-child {
 		border-left: 0;
 		padding-left: 0;
+	}
+}
+
+/* 1440px: field guides reach their full four-column rail. */
+@media (min-width: 90rem) {
+
+	.home-guides__list {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
 	}
 }
 

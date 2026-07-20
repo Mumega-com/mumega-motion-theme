@@ -158,6 +158,47 @@ function mumega_motion_select_lead_post( &$used_ids ) {
 }
 
 /**
+ * Selects a complete pair of related stories as one transaction.
+ *
+ * Underfilled or invalid results leave the shared exclusion list unchanged so
+ * their valid candidates can remain eligible for later homepage modules.
+ *
+ * @param array $used_ids Post identifiers already rendered.
+ * @return array
+ */
+function mumega_motion_select_related_posts( &$used_ids ) {
+	$overrides  = array( 'numberposts' => 2 );
+	$release_id = mumega_motion_releases_category_id();
+
+	if ( $release_id > 0 ) {
+		$overrides['category__not_in'] = array( $release_id );
+	}
+
+	$posts = get_posts( mumega_motion_base_post_query_args( $overrides, $used_ids ) );
+
+	if ( 2 !== count( $posts ) ) {
+		return array();
+	}
+
+	$candidate_ids = array();
+	$excluded_ids  = array_values( array_unique( array_map( 'intval', $used_ids ) ) );
+
+	foreach ( $posts as $post ) {
+		$post_id = $post instanceof WP_Post ? (int) $post->ID : 0;
+
+		if ( $post_id <= 0 || in_array( $post_id, $excluded_ids, true ) || in_array( $post_id, $candidate_ids, true ) ) {
+			return array();
+		}
+
+		$candidate_ids[] = $post_id;
+	}
+
+	$used_ids = array_merge( $used_ids, $candidate_ids );
+
+	return array_values( $posts );
+}
+
+/**
  * Selects newest supporting stories while preserving lead exclusions.
  *
  * @param array $used_ids Post identifiers already rendered.
@@ -182,6 +223,31 @@ function mumega_motion_select_supporting_posts( &$used_ids, $limit = 3 ) {
 }
 
 /**
+ * Selects the newest eligible unused post for the coverage feature.
+ *
+ * @param array $used_ids Post identifiers already rendered.
+ * @return WP_Post|null
+ */
+function mumega_motion_select_coverage_feature( &$used_ids ) {
+	$overrides  = array( 'numberposts' => 1 );
+	$release_id = mumega_motion_releases_category_id();
+
+	if ( $release_id > 0 ) {
+		$overrides['category__not_in'] = array( $release_id );
+	}
+
+	$posts = get_posts( mumega_motion_base_post_query_args( $overrides, $used_ids ) );
+
+	if ( empty( $posts ) || ! $posts[0] instanceof WP_Post ) {
+		return null;
+	}
+
+	mumega_motion_add_used_post_ids( array( $posts[0] ), $used_ids );
+
+	return $posts[0];
+}
+
+/**
  * Selects categories able to fill a complete three-post topic rail.
  *
  * @param array $used_ids Post identifiers already rendered.
@@ -189,7 +255,7 @@ function mumega_motion_select_supporting_posts( &$used_ids, $limit = 3 ) {
  * @return array
  */
 function mumega_motion_select_rail_categories( $used_ids, $limit = 3 ) {
-	$groups = mumega_motion_select_rail_groups( $used_ids, $limit );
+	$groups = mumega_motion_select_rail_groups( $used_ids, $limit, 3 );
 
 	return array_map(
 		static function ( $group ) {
@@ -202,18 +268,20 @@ function mumega_motion_select_rail_categories( $used_ids, $limit = 3 ) {
 /**
  * Selects complete topic-rail groups in menu order as one transaction.
  *
- * Candidate IDs are committed only after the category fills all three rail
- * slots. Each later category therefore sees posts reserved by earlier complete
+ * Candidate IDs are committed only after the category fills every requested
+ * slot. Each later category therefore sees posts reserved by earlier complete
  * groups, while an underfilled candidate leaves no IDs behind.
  *
- * @param array $used_ids Post identifiers already rendered.
- * @param int   $limit    Maximum number of rails.
+ * @param array $used_ids       Post identifiers already rendered.
+ * @param int   $limit          Maximum number of rails.
+ * @param int   $posts_per_group Required posts in each rail.
  * @return array
  */
-function mumega_motion_select_rail_groups( &$used_ids, $limit = 3 ) {
-	$limit = max( 0, (int) $limit );
+function mumega_motion_select_rail_groups( &$used_ids, $limit = 3, $posts_per_group = 3 ) {
+	$limit           = max( 0, (int) $limit );
+	$posts_per_group = max( 0, (int) $posts_per_group );
 
-	if ( 0 === $limit ) {
+	if ( 0 === $limit || 0 === $posts_per_group ) {
 		return array();
 	}
 
@@ -221,9 +289,9 @@ function mumega_motion_select_rail_groups( &$used_ids, $limit = 3 ) {
 
 	foreach ( mumega_motion_menu_category_ids() as $term_id ) {
 		$candidate_used_ids = $used_ids;
-		$posts              = mumega_motion_select_category_posts( $term_id, $candidate_used_ids, 3 );
+		$posts              = mumega_motion_select_category_posts( $term_id, $candidate_used_ids, $posts_per_group );
 
-		if ( 3 !== count( $posts ) ) {
+		if ( count( $posts ) !== $posts_per_group ) {
 			continue;
 		}
 

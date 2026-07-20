@@ -11,26 +11,12 @@ if ( ! $newsletter_post ) {
 	return;
 }
 
-global $post;
-
-$previous_post = $post;
-// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- The content filter requires the newsletter as WordPress's current global post.
-$post = $newsletter_post;
-setup_postdata( $post );
+$newsletter_content = mumega_motion_render_post_content( $newsletter_post );
 ?>
 
 <div class="home-newsletter__inner">
-	<h2 class="home-newsletter__title"><?php echo esc_html( get_the_title( $post ) ); ?></h2>
+	<h2 class="home-newsletter__title"><?php echo esc_html( get_the_title( $newsletter_post ) ); ?></h2>
 	<div class="home-newsletter__content">
-		<?php echo apply_filters( 'the_content', $post->post_content ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Native block and form markup. ?>
+		<?php echo $newsletter_content; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Native block and form markup filtered by the shared content helper. ?>
 	</div>
 </div>
-
-<?php
-wp_reset_postdata();
-// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Explicitly restore the homepage post after the temporary newsletter context.
-$post = $previous_post;
-
-if ( $previous_post instanceof WP_Post ) {
-	setup_postdata( $previous_post );
-}

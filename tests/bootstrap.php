@@ -37,6 +37,7 @@ $GLOBALS['mumega_motion_test_copy_count']       = 0;
 $GLOBALS['mumega_motion_test_copy_after_file']  = null;
 $GLOBALS['mumega_motion_test_salt']             = 'mumega-motion-test-secret';
 $GLOBALS['mumega_motion_test_posts']            = array();
+$GLOBALS['mumega_motion_test_post_thumbnails']  = array();
 $GLOBALS['mumega_motion_test_generated_excerpts'] = array();
 $GLOBALS['mumega_motion_test_post_terms']       = array();
 $GLOBALS['mumega_motion_test_post_tags']        = array();
@@ -45,6 +46,8 @@ $GLOBALS['mumega_motion_test_post_queries']     = array();
 $GLOBALS['mumega_motion_test_get_posts_requests'] = array();
 $GLOBALS['mumega_motion_test_categories_by_slug'] = array();
 $GLOBALS['mumega_motion_test_category_by_slug_requests'] = array();
+$GLOBALS['mumega_motion_test_terms']            = array();
+$GLOBALS['mumega_motion_test_term_requests']    = array();
 $GLOBALS['mumega_motion_test_categories']       = array();
 $GLOBALS['mumega_motion_test_get_categories_requests'] = array();
 $GLOBALS['mumega_motion_test_nav_menu_items']   = array();
@@ -76,6 +79,9 @@ $GLOBALS['mumega_motion_test_nav_menu_markup']  = '<ul class="menu"><li><a href=
 $GLOBALS['mumega_motion_test_loop_posts']       = array();
 $GLOBALS['mumega_motion_test_loop_index']       = 0;
 $GLOBALS['mumega_motion_test_current_post']     = null;
+$GLOBALS['mumega_motion_test_main_query_post']  = null;
+$GLOBALS['mumega_motion_test_setup_postdata_exceptions'] = array();
+$GLOBALS['mumega_motion_test_reset_postdata_exception']  = null;
 $GLOBALS['mumega_motion_test_elementor_edit_mode'] = '';
 $GLOBALS['mumega_motion_test_elementor_location_output'] = array();
 $GLOBALS['mumega_motion_test_postdata_events']  = array();
@@ -486,6 +492,36 @@ function sanitize_key( $key ) {
 }
 
 /**
+ * Normalizes a title using the subset needed by page-slug fixtures.
+ *
+ * @param string $title Raw title.
+ * @return string
+ */
+function sanitize_title( $title ) {
+	$title = strtolower( trim( (string) $title ) );
+	$title = preg_replace( '/[^a-z0-9\s\-]/', '', $title );
+	$title = preg_replace( '/[\s\-]+/', '-', $title );
+
+	return trim( $title, '-' );
+}
+
+/**
+ * Validates an absolute HTTP(S) URL for audience-menu fixtures.
+ *
+ * @param string $url Candidate URL.
+ * @return string|false
+ */
+function wp_http_validate_url( $url ) {
+	if ( ! is_string( $url ) || false === filter_var( $url, FILTER_VALIDATE_URL ) ) {
+		return false;
+	}
+
+	$scheme = parse_url( $url, PHP_URL_SCHEME );
+
+	return in_array( strtolower( (string) $scheme ), array( 'http', 'https' ), true ) ? $url : false;
+}
+
+/**
  * Prints a translated attribute string unchanged in tests.
  *
  * @param string $text   Text to translate.
@@ -847,11 +883,22 @@ function the_post() {
 }
 
 /**
- * Returns the configured current post.
+ * Returns a configured post value by object, identifier, or the current post.
  *
+ * @param WP_Post|int|null $post Post value or identifier.
  * @return WP_Post|null
  */
-function get_post() {
+function get_post( $post = null ) {
+	if ( $post instanceof WP_Post ) {
+		return $post;
+	}
+
+	if ( is_numeric( $post ) ) {
+		return isset( $GLOBALS['mumega_motion_test_posts'][ (int) $post ] )
+			? $GLOBALS['mumega_motion_test_posts'][ (int) $post ]
+			: null;
+	}
+
 	return $GLOBALS['mumega_motion_test_current_post'];
 }
 
@@ -896,13 +943,61 @@ function get_the_title( $post = null ) {
 }
 
 /**
- * Reports that rendered test posts do not have featured images by default.
+ * Reports whether a configured test post has a featured image assigned.
  *
  * @param WP_Post|int|null $post Post value or identifier.
  * @return bool
  */
-function has_post_thumbnail( $post = null ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
-	return false;
+function has_post_thumbnail( $post = null ) {
+	if ( is_numeric( $post ) ) {
+		$post = isset( $GLOBALS['mumega_motion_test_posts'][ (int) $post ] )
+			? $GLOBALS['mumega_motion_test_posts'][ (int) $post ]
+			: null;
+	}
+
+	if ( ! $post instanceof WP_Post ) {
+		$post = $GLOBALS['mumega_motion_test_current_post'];
+	}
+
+	return $post instanceof WP_Post && ! empty( $GLOBALS['mumega_motion_test_post_thumbnails'][ $post->ID ] );
+}
+
+/**
+ * Returns deterministic responsive image markup for a configured thumbnail.
+ *
+ * @param WP_Post|int|null $post Post value or identifier.
+ * @param string|array     $size Registered image size.
+ * @param string|array     $attr Additional image attributes.
+ * @return string
+ */
+function get_the_post_thumbnail( $post = null, $size = 'post-thumbnail', $attr = '' ) {
+	if ( is_numeric( $post ) ) {
+		$post = isset( $GLOBALS['mumega_motion_test_posts'][ (int) $post ] )
+			? $GLOBALS['mumega_motion_test_posts'][ (int) $post ]
+			: null;
+	}
+
+	if ( ! $post instanceof WP_Post ) {
+		$post = $GLOBALS['mumega_motion_test_current_post'];
+	}
+
+	if ( ! $post instanceof WP_Post || empty( $GLOBALS['mumega_motion_test_post_thumbnails'][ $post->ID ] ) ) {
+		return '';
+	}
+
+	$attr        = is_array( $attr ) ? $attr : array();
+	$size_class  = sanitize_key( is_array( $size ) ? implode( 'x', $size ) : (string) $size );
+	$classes     = 'attachment-' . $size_class . ' size-' . $size_class;
+
+	if ( ! empty( $attr['class'] ) ) {
+		$classes .= ' ' . $attr['class'];
+	}
+
+	return sprintf(
+		'<img src="https://example.test/uploads/thumb-%1$d.jpg" srcset="https://example.test/uploads/thumb-%1$d.jpg 600w, https://example.test/uploads/thumb-%1$d-2x.jpg 1200w" sizes="(max-width: 600px) 100vw, 600px" class="%2$s" alt="" />',
+		(int) $post->ID,
+		esc_attr( $classes )
+	);
 }
 
 /**
@@ -1044,6 +1139,31 @@ function get_template_part( $slug, $name = null, $args = array() ) {
 }
 
 /**
+ * Populates the canonical globals changed by WP_Query::setup_postdata().
+ *
+ * @param WP_Post $post Post value.
+ * @return void
+ */
+function mumega_motion_test_populate_postdata_globals( $post ) {
+	$post_date = (string) $post->post_date;
+	$pages     = false !== strpos( $post->post_content, '<!--nextpage-->' )
+		? explode( '<!--nextpage-->', $post->post_content )
+		: array( $post->post_content );
+
+	$GLOBALS['id']           = (int) $post->ID;
+	$GLOBALS['authordata']   = (object) array( 'ID' => (int) $post->post_author );
+	$GLOBALS['currentday']   = '' !== $post_date && '0000-00-00 00:00:00' !== $post_date
+		? sprintf( '%s.%s.%s', substr( $post_date, 8, 2 ), substr( $post_date, 5, 2 ), substr( $post_date, 2, 2 ) )
+		: false;
+	$GLOBALS['currentmonth'] = '' !== $post_date && '0000-00-00 00:00:00' !== $post_date ? substr( $post_date, 5, 2 ) : false;
+	$GLOBALS['page']         = 1;
+	$GLOBALS['pages']        = $pages;
+	$GLOBALS['multipage']    = count( $pages ) > 1 ? 1 : 0;
+	$GLOBALS['more']         = 0;
+	$GLOBALS['numpages']     = count( $pages );
+}
+
+/**
  * Sets up a post as the current template context and records the transition.
  *
  * @param WP_Post $post Post value.
@@ -1052,6 +1172,11 @@ function get_template_part( $slug, $name = null, $args = array() ) {
 function setup_postdata( $post ) {
 	$GLOBALS['mumega_motion_test_postdata_events'][] = array( 'setup', (int) $post->ID );
 	$GLOBALS['mumega_motion_test_current_post']       = $post;
+	mumega_motion_test_populate_postdata_globals( $post );
+
+	if ( isset( $GLOBALS['mumega_motion_test_setup_postdata_exceptions'][ (int) $post->ID ] ) ) {
+		throw $GLOBALS['mumega_motion_test_setup_postdata_exceptions'][ (int) $post->ID ];
+	}
 
 	return true;
 }
@@ -1063,6 +1188,16 @@ function setup_postdata( $post ) {
  */
 function wp_reset_postdata() {
 	$GLOBALS['mumega_motion_test_postdata_events'][] = array( 'reset' );
+
+	if ( $GLOBALS['mumega_motion_test_main_query_post'] instanceof WP_Post ) {
+		$GLOBALS['post']                            = $GLOBALS['mumega_motion_test_main_query_post'];
+		$GLOBALS['mumega_motion_test_current_post'] = $GLOBALS['mumega_motion_test_main_query_post'];
+		mumega_motion_test_populate_postdata_globals( $GLOBALS['mumega_motion_test_main_query_post'] );
+	}
+
+	if ( $GLOBALS['mumega_motion_test_reset_postdata_exception'] instanceof Throwable ) {
+		throw $GLOBALS['mumega_motion_test_reset_postdata_exception'];
+	}
 }
 
 /**
@@ -1367,6 +1502,24 @@ function get_category_by_slug( $slug ) {
 	return isset( $GLOBALS['mumega_motion_test_categories_by_slug'][ $slug ] )
 		? $GLOBALS['mumega_motion_test_categories_by_slug'][ $slug ]
 		: false;
+}
+
+/**
+ * Retrieves a configured taxonomy term by identifier.
+ *
+ * @param int    $term_id  Term identifier.
+ * @param string $taxonomy Taxonomy name.
+ * @return WP_Term|null
+ */
+function get_term( $term_id, $taxonomy = '' ) {
+	$GLOBALS['mumega_motion_test_term_requests'][] = array(
+		'term_id'  => (int) $term_id,
+		'taxonomy' => $taxonomy,
+	);
+
+	return isset( $GLOBALS['mumega_motion_test_terms'][ (int) $term_id ] )
+		? $GLOBALS['mumega_motion_test_terms'][ (int) $term_id ]
+		: null;
 }
 
 /**
