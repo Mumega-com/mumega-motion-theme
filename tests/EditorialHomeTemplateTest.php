@@ -763,6 +763,126 @@ PHP;
 	}
 
 	/**
+	 * Renders all nine homepage sections in one pass with every section's data
+	 * fixture populated simultaneously — the individual per-section tests above
+	 * each leave most sections empty, so none of them can catch a cross-section
+	 * interaction (an ID collision in the shared $used_ids list, a stray global
+	 * left over from an earlier section's render, a heading count that only
+	 * goes wrong once every module is present at once). This is the one test
+	 * that exercises the real, fully-populated homepage.
+	 */
+	public function test_all_nine_homepage_sections_render_together_without_interference(): void {
+		$GLOBALS['mumega_motion_test_nav_menu_locations']['audiences'] = 31;
+		$GLOBALS['mumega_motion_test_nav_menu_objects'][31]            = new WP_Term( array( 'term_id' => 31 ) );
+		$GLOBALS['mumega_motion_test_nav_menu_items'][31]              = array(
+			(object) array(
+				'title'       => 'Team leads',
+				'description' => 'Playbooks for people managers.',
+				'url'         => 'https://example.test/audience/team-leads/',
+			),
+		);
+
+		$GLOBALS['mumega_motion_test_nav_menu_locations']['primary'] = 50;
+		$GLOBALS['mumega_motion_test_nav_menu_objects'][50]           = new WP_Term( array( 'term_id' => 50 ) );
+		$GLOBALS['mumega_motion_test_nav_menu_items'][50]             = array(
+			(object) array(
+				'type'      => 'taxonomy',
+				'object'    => 'category',
+				'object_id' => 7,
+			),
+		);
+		$GLOBALS['mumega_motion_test_terms'][7] = new WP_Term(
+			array(
+				'term_id'     => 7,
+				'name'        => 'Field Category',
+				'description' => 'A category description.',
+			)
+		);
+
+		$page               = $this->post( 80, 'Editorial Desk' );
+		$page->post_excerpt = 'A promise about what this desk covers.';
+		$page->post_content = 'Read on for the full mission.';
+
+		$guide               = $this->post( 90, 'Jordan Lee' );
+		$guide->post_excerpt = 'Site editor and disclosure lead.';
+
+		$methodology               = $this->post( 70, 'How we test WordPress plugins' );
+		$methodology->post_excerpt = 'Every review follows the same repeatable steps.';
+
+		$knowledge_page               = $this->post( 71, 'How our topics connect' );
+		$knowledge_page->post_excerpt = 'A map of how our guides and reports relate.';
+
+		$output = $this->render_editorial_home(
+			array(
+				'page'             => $page,
+				'briefing'         => array( $this->post( 10, 'Lead investigation' ) ),
+				'related'          => array( $this->post( 11, 'Related report one' ), $this->post( 12, 'Related report two' ) ),
+				'guide'            => array( $guide ),
+				'coverage_feature' => array( $this->post( 21, 'Feature Investigation' ) ),
+				'coverage_support' => array( $this->post( 22, 'Support One' ) ),
+				'guide_groups'     => array(
+					array( $this->post( 60, 'Guide Post One' ), $this->post( 61, 'Guide Post Two' ) ),
+				),
+				'tools'            => array(
+					$this->post( 50, 'Backup Plugin Field Test' ),
+					$this->post( 51, 'Caching Plugin Field Test' ),
+				),
+				'methodology'      => array( $methodology ),
+				'knowledge_map'    => array( $knowledge_page ),
+				'newsletter'       => array( $this->post( 41, 'Newsletter landing page' ) ),
+			)
+		);
+
+		$positions = array(
+			'home-intro'       => strpos( $output, 'home-intro' ),
+			'home-briefing'    => strpos( $output, 'home-briefing' ),
+			'home-audiences'   => strpos( $output, 'home-audiences' ),
+			'home-coverage'    => strpos( $output, 'home-coverage' ),
+			'home-guides'      => strpos( $output, 'home-guides' ),
+			'home-methodology' => strpos( $output, 'home-methodology' ),
+			'home-tools'       => strpos( $output, 'home-tools' ),
+			'home-knowledge'   => strpos( $output, 'home-knowledge' ),
+			'home-newsletter'  => strpos( $output, 'home-newsletter' ),
+		);
+
+		foreach ( $positions as $section => $position ) {
+			$this->assertIsInt( $position, $section . ' marker is missing from the fully-populated homepage' );
+		}
+
+		$ordered = array_values( $positions );
+		for ( $i = 1, $count = count( $ordered ); $i < $count; $i++ ) {
+			$this->assertLessThan(
+				$ordered[ $i ],
+				$ordered[ $i - 1 ],
+				array_keys( $positions )[ $i - 1 ] . ' must precede ' . array_keys( $positions )[ $i ]
+			);
+		}
+
+		// One representative, section-exclusive string per module confirms real
+		// content rendered — not just an empty wrapper landing at the right spot.
+		$this->assertStringContainsString( 'Editorial Desk', $output );
+		$this->assertStringContainsString( 'Lead investigation', $output );
+		$this->assertStringContainsString( 'Related report one', $output );
+		$this->assertStringContainsString( 'Related report two', $output );
+		$this->assertStringContainsString( 'Team leads', $output );
+		$this->assertStringContainsString( 'Feature Investigation', $output );
+		$this->assertStringContainsString( 'Support One', $output );
+		$this->assertStringContainsString( 'Guide Post One', $output );
+		$this->assertStringContainsString( 'How we test WordPress plugins', $output );
+		$this->assertStringContainsString( 'Backup Plugin Field Test', $output );
+		$this->assertStringContainsString( 'How our topics connect', $output );
+		$this->assertStringContainsString( 'Newsletter landing page', $output );
+
+		// The page-owned intro keeps the sole <h1> even with every module present.
+		$this->assertSame( 1, preg_match_all( '/<h1\b/i', $output ) );
+
+		// The shared $used_ids exclusion list must hold across all nine modules at
+		// once: the briefing lead post (10) is deliberately reused nowhere else.
+		$after_briefing = substr( $output, $positions['home-audiences'] );
+		$this->assertStringNotContainsString( 'Lead investigation', $after_briefing );
+	}
+
+	/**
 	 * Leaves interactive plugin forms outside React-owned Motion mounts.
 	 */
 	public function test_newsletter_section_is_not_a_motion_mount(): void {

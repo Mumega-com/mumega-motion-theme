@@ -123,7 +123,7 @@ describe( 'editorial CSS contracts', () => {
 		expect(
 			computedDeclaration(
 				editorialRoot,
-				'.editorial-home > .lead-story',
+				'.editorial-home > .home-intro',
 				'grid-column',
 				media
 			)
@@ -131,7 +131,7 @@ describe( 'editorial CSS contracts', () => {
 		expect(
 			computedDeclaration(
 				editorialRoot,
-				'.editorial-home > .home-supporting',
+				'.editorial-home > .home-briefing',
 				'grid-column',
 				media
 			)
@@ -140,8 +140,8 @@ describe( 'editorial CSS contracts', () => {
 		expect( mediaAppliesAt( media, 800 ) ).toBe( true );
 
 		for ( const selector of [
-			'.editorial-home > .lead-story',
-			'.editorial-home > .home-supporting',
+			'.editorial-home > .home-intro',
+			'.editorial-home > .home-briefing',
 		] ) {
 			expect(
 				computedDeclaration( editorialRoot, selector, 'order', media )
