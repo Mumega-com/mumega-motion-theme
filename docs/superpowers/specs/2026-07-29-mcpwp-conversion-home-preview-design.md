@@ -193,6 +193,8 @@ Offer **Explore Agency Mode** as a visually subordinate secondary path.
 
 Use the approved MCPWP V2 concept as the visual source of truth:
 
+![Approved production ASTER hero portrait](assets/2026-07-29-aster-product-hero.png)
+
 - warm ivory paper background
 - ink navy structure and footer
 - editorial serif headlines
@@ -204,6 +206,11 @@ Use the approved MCPWP V2 concept as the visual source of truth:
 - thin editorial rules and low-elevation cards
 
 ASTER uses the approved porcelain and smoked-glass lens head, luminous eyes, violet temple nodes, and navy-and-ivory tailoring.
+
+The approved production hero source is
+`assets/2026-07-29-aster-product-hero.png`. The implementation may create
+optimized WebP or AVIF derivatives and responsive crops from this source, but
+must not replace ASTER's identity or alter the three-node temple mark.
 
 The page avoids generic SaaS gradients, glassmorphism, excessive rounded cards, fake dashboards, stock photography, emoji icons, and decorative motion.
 
