@@ -174,8 +174,8 @@ git commit -m "style: add MCPWP product homepage system"
 - Create: `tests/McpwpProductHomeContentTest.php`
 
 **Interfaces:**
-- Consumes: WordPress page content and ASTER media URL replacement token.
-- Produces: one importable content document using `{{ASTER_URL}}`.
+- Consumes: WordPress page content and an ASTER media attachment-ID replacement token.
+- Produces: one importable content document using `{{ASTER_ID}}` so WordPress can render responsive image markup.
 
 - [ ] **Step 1: Write failing content-contract tests**
 
@@ -185,7 +185,7 @@ Require:
 $this->assertSame( 1, substr_count( $content, '<h1' ) );
 $this->assertStringContainsString( 'Install free from WordPress.org', $content );
 $this->assertStringContainsString( 'https://wordpress.org/plugins/mumega-mcp/', $content );
-$this->assertStringContainsString( '{{ASTER_URL}}', $content );
+$this->assertStringContainsString( '{{ASTER_ID}}', $content );
 $this->assertStringContainsString( 'Claude', $content );
 $this->assertStringContainsString( 'ChatGPT', $content );
 $this->assertStringContainsString( 'Gemini', $content );
@@ -267,11 +267,11 @@ Over SSH, record the current active theme, page count, and existing page IDs. Do
 
 - [ ] **Step 4: Install the theme package and ASTER media on staging**
 
-Copy the package and image to the existing VPS staging host, install/activate the theme, import ASTER into Media Library, and record its attachment URL.
+Copy the package and image to the existing VPS staging host, install/activate the theme, import ASTER into Media Library, and record its numeric attachment ID.
 
 - [ ] **Step 5: Create the preview page**
 
-Replace `{{ASTER_URL}}` in a temporary copy of the content, then create or update exactly one page:
+Replace `{{ASTER_ID}}` in a temporary copy of the content with the numeric WordPress attachment ID, then create or update exactly one page. The theme shortcode must render the attachment with WordPress-generated `srcset` and `sizes` attributes:
 
 - title: `MCPWP Home Preview`
 - slug: `mcpwp-home-preview`
