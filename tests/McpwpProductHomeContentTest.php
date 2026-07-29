@@ -66,10 +66,10 @@ final class McpwpProductHomeContentTest extends TestCase {
 		$content = $this->content();
 
 		$guides = array(
-			'https://mcpwp.net/what-is-wordpress-mcp-server/'                => 'What is WordPress MCP?',
-			'https://mcpwp.net/secure-wordpress-mcp-api-keys-scopes/'       => 'How do scoped permissions work?',
-			'https://mcpwp.net/connect-chatgpt-to-wordpress/'               => 'Which AI client should a team use?',
-			'https://mcpwp.net/agency-wordpress-ai-operations-playbook/'    => 'How should an agency review and recover changes?',
+			'https://mcpwp.net/what-is-wordpress-mcp-server/'          => 'What is WordPress MCP?',
+			'https://mcpwp.net/secure-wordpress-mcp-api-keys-scopes/' => 'How do scoped permissions work?',
+			'#client-choice'                                          => 'Which AI client should a team use?',
+			'#agency-recovery'                                        => 'How should an agency review and recover changes?',
 		);
 
 		foreach ( $guides as $url => $topic ) {
@@ -78,6 +78,35 @@ final class McpwpProductHomeContentTest extends TestCase {
 		}
 
 		$this->assertStringNotContainsString( '/?p=', $content );
+	}
+
+	/**
+	 * Keeps client-choice guidance current, read-first, and free of universal rankings.
+	 */
+	public function test_product_home_client_choice_uses_truthful_on_page_guidance(): void {
+		$content = $this->content();
+
+		$this->assertStringContainsString( '<details id="client-choice">', $content );
+		$this->assertStringContainsString( 'Begin with the AI client your team has already approved.', $content );
+		$this->assertStringContainsString( 'Confirm current MCPWP compatibility in the installed plugin.', $content );
+		$this->assertStringContainsString( 'Start with read-only access.', $content );
+		$this->assertStringContainsString( 'No one client is universally best.', $content );
+		$this->assertStringNotContainsString( 'https://mcpwp.net/connect-chatgpt-to-wordpress/', $content );
+	}
+
+	/**
+	 * Keeps agency recovery guidance bounded to one site and real WordPress recovery controls.
+	 */
+	public function test_product_home_agency_recovery_uses_truthful_on_page_guidance(): void {
+		$content = $this->content();
+
+		$this->assertStringContainsString( '<details id="agency-recovery">', $content );
+		$this->assertStringContainsString( 'Isolate one site.', $content );
+		$this->assertStringContainsString( 'Review the intended actions.', $content );
+		$this->assertStringContainsString( 'Create a draft.', $content );
+		$this->assertStringContainsString( 'Verify the activity record.', $content );
+		$this->assertStringContainsString( 'Use WordPress revisions and backups for recovery.', $content );
+		$this->assertStringNotContainsString( 'https://mcpwp.net/agency-wordpress-ai-operations-playbook/', $content );
 	}
 
 	/**
