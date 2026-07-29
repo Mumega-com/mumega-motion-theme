@@ -315,16 +315,22 @@
 	padding: clamp(1rem, 2vw, 1.5rem);
 }
 
+.mcpwp-product-home__workflow .mcpwp-product-home__card:nth-child(2),
+.mcpwp-product-home .mcpwp-product-workflow .mcpwp-product-home__card:nth-child(2),
 .mcpwp-product-home__workflow .mcpwp-product-card:nth-child(2),
 .mcpwp-product-home .mcpwp-product-workflow .mcpwp-product-card:nth-child(2) {
 	border-top: 4px solid var(--mcpwp-cobalt);
 }
 
+.mcpwp-product-home__workflow .mcpwp-product-home__card:nth-child(3),
+.mcpwp-product-home .mcpwp-product-workflow .mcpwp-product-home__card:nth-child(3),
 .mcpwp-product-home__workflow .mcpwp-product-card:nth-child(3),
 .mcpwp-product-home .mcpwp-product-workflow .mcpwp-product-card:nth-child(3) {
 	border-top: 4px solid var(--mcpwp-amber);
 }
 
+.mcpwp-product-home__workflow .mcpwp-product-home__card:nth-child(4),
+.mcpwp-product-home .mcpwp-product-workflow .mcpwp-product-home__card:nth-child(4),
 .mcpwp-product-home__workflow .mcpwp-product-card:nth-child(4),
 .mcpwp-product-home .mcpwp-product-workflow .mcpwp-product-card:nth-child(4) {
 	border-top: 4px solid var(--mcpwp-teal);
@@ -416,6 +422,7 @@
 	font-family: var(--mcpwp-serif);
 	font-size: 1.25rem;
 	line-height: 1.2;
+	min-height: 2.75rem;
 	padding-top: 1rem;
 }
 
