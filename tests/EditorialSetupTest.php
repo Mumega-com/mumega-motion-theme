@@ -11,6 +11,8 @@ if ( file_exists( dirname( __DIR__ ) . '/inc/editorial-setup.php' ) ) {
 	require_once dirname( __DIR__ ) . '/inc/editorial-setup.php';
 }
 
+$GLOBALS['mumega_motion_test_setup_filters'] = $GLOBALS['mumega_motion_test_filters'];
+
 /**
  * Exercises theme capabilities and opt-in editorial assets.
  */
@@ -43,7 +45,7 @@ final class EditorialSetupTest extends TestCase {
 
 		$GLOBALS['mumega_motion_test_posts'] = array();
 
-		$GLOBALS['mumega_motion_test_filters'] = array();
+		$GLOBALS['mumega_motion_test_filters'] = $GLOBALS['mumega_motion_test_setup_filters'];
 
 		$GLOBALS['mumega_motion_test_elementor_locations'] = array();
 
@@ -192,6 +194,26 @@ final class EditorialSetupTest extends TestCase {
 				),
 			),
 			$GLOBALS['mumega_motion_test_enqueued_styles']
+		);
+	}
+
+	/**
+	 * Keeps preview product-home pages out of search results until promotion.
+	 */
+	public function test_product_home_robots_filter_is_scoped_to_the_product_home_template(): void {
+		$robots = array( 'max-image-preview' => 'large' );
+
+		$this->assertSame( $robots, apply_filters( 'wp_robots', $robots ) );
+
+		$GLOBALS['mumega_motion_test_page_template'] = 'page-templates/product-home.php';
+
+		$this->assertSame(
+			array(
+				'max-image-preview' => 'large',
+				'noindex'           => true,
+				'nofollow'          => true,
+			),
+			apply_filters( 'wp_robots', $robots )
 		);
 	}
 
