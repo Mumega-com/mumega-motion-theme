@@ -46,6 +46,41 @@ final class McpwpProductHomeContentTest extends TestCase {
 	}
 
 	/**
+	 * Keeps product navigation destinations distinct and truthful.
+	 */
+	public function test_product_home_navigation_uses_meaningful_destinations(): void {
+		$content = $this->content();
+
+		$this->assertStringContainsString( '<a href="#product">Product</a>', $content );
+		$this->assertStringContainsString( '<a href="#workflow">How it works</a>', $content );
+		$this->assertStringContainsString( '<a href="#agency">Agency</a>', $content );
+		$this->assertStringContainsString( '<a href="#guides">Guides</a>', $content );
+		$this->assertStringContainsString( '<a href="https://mcpwp.net/pricing/">Pricing</a>', $content );
+		$this->assertStringNotContainsString( '<a href="#agency">Pricing</a>', $content );
+	}
+
+	/**
+	 * Keeps all four durable guide questions attached to their canonical published resources.
+	 */
+	public function test_product_home_guides_cover_each_durable_topic_with_a_canonical_link(): void {
+		$content = $this->content();
+
+		$guides = array(
+			'https://mcpwp.net/what-is-wordpress-mcp-server/'                => 'What is WordPress MCP?',
+			'https://mcpwp.net/secure-wordpress-mcp-api-keys-scopes/'       => 'How do scoped permissions work?',
+			'https://mcpwp.net/connect-chatgpt-to-wordpress/'               => 'Which AI client should a team use?',
+			'https://mcpwp.net/agency-wordpress-ai-operations-playbook/'    => 'How should an agency review and recover changes?',
+		);
+
+		foreach ( $guides as $url => $topic ) {
+			$this->assertStringContainsString( 'href="' . $url . '"', $content );
+			$this->assertStringContainsString( $topic, $content );
+		}
+
+		$this->assertStringNotContainsString( '/?p=', $content );
+	}
+
+	/**
 	 * Prevents legacy endpoints, fabricated social proof, and an unverified directory version claim.
 	 */
 	public function test_product_home_content_rejects_legacy_and_unverified_claims(): void {
