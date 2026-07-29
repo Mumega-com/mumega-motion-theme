@@ -143,6 +143,9 @@ final class EditorialSetupTest extends TestCase {
 		$GLOBALS['mumega_motion_test_page_template'] = 'page-templates/editorial-home.php';
 		$this->assertTrue( mumega_motion_is_editorial_view() );
 
+		$GLOBALS['mumega_motion_test_page_template'] = 'page-templates/product-home.php';
+		$this->assertTrue( mumega_motion_is_editorial_view() );
+
 		foreach ( array( 'is_singular', 'is_home', 'is_archive', 'is_search', 'is_404' ) as $conditional ) {
 			$GLOBALS['mumega_motion_test_page_template'] = '';
 			$GLOBALS['mumega_motion_test_conditionals']  = array( $conditional => true );
