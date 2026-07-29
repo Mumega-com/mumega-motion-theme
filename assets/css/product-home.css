@@ -1,0 +1,493 @@
+/*
+ * MCPWP product-home visual system.
+ *
+ * All page-specific presentation stays below this root so ordinary editorial
+ * and Elementor pages retain their existing rendering contract.
+ */
+.mcpwp-product-home {
+	--mcpwp-paper: #f7f3ea;
+	--mcpwp-ink-navy: #17233d;
+	--mcpwp-violet: #6545a4;
+	--mcpwp-violet-wash: #e5def6;
+	--mcpwp-teal: #0f6a63;
+	--mcpwp-cobalt: #2454a6;
+	--mcpwp-amber: #8a5a12;
+	--mcpwp-rule: #cbc4b8;
+	--mcpwp-muted: #5f5b55;
+	--mcpwp-white: #fff;
+	--mcpwp-serif: var(--editorial-serif, "Iowan Old Style", Baskerville, "Times New Roman", serif);
+	--mcpwp-sans: var(--editorial-sans, Inter, ui-sans-serif, system-ui, sans-serif);
+	background: var(--mcpwp-paper);
+	color: var(--mcpwp-ink-navy);
+	font-family: var(--mcpwp-sans);
+	margin-inline: calc(50% - 50vw);
+	max-width: none;
+	overflow: clip;
+	padding: 0;
+}
+
+.mcpwp-product-home *,
+.mcpwp-product-home *::before,
+.mcpwp-product-home *::after {
+	box-sizing: border-box;
+}
+
+.mcpwp-product-home :where(h1, h2, h3, p, ul, ol, figure) {
+	margin-top: 0;
+}
+
+.mcpwp-product-home :where(h1, h2, h3) {
+	color: var(--mcpwp-ink-navy);
+	font-family: var(--mcpwp-serif);
+	line-height: 1.04;
+}
+
+.mcpwp-product-home h1 {
+	font-size: clamp(2.65rem, 6.4vw, 5.5rem);
+	font-weight: 500;
+	letter-spacing: -0.055em;
+	max-width: 12ch;
+}
+
+.mcpwp-product-home h2 {
+	font-size: clamp(2rem, 4vw, 3.75rem);
+	font-weight: 500;
+	letter-spacing: -0.045em;
+	max-width: 17ch;
+}
+
+.mcpwp-product-home h3 {
+	font-size: clamp(1.3rem, 2vw, 1.65rem);
+	font-weight: 650;
+	letter-spacing: -0.025em;
+}
+
+.mcpwp-product-home p,
+.mcpwp-product-home li {
+	line-height: 1.62;
+}
+
+.mcpwp-product-home a {
+	color: inherit;
+	text-decoration-thickness: 0.08em;
+	text-underline-offset: 0.18em;
+}
+
+.mcpwp-product-home a:hover {
+	color: var(--mcpwp-violet);
+}
+
+.mcpwp-product-home :focus-visible {
+	border-radius: 0;
+	outline: 3px solid var(--mcpwp-paper);
+	outline-offset: 2px;
+	box-shadow: 0 0 0 6px var(--mcpwp-violet);
+}
+
+.mcpwp-product-home__band,
+.mcpwp-product-home section,
+.mcpwp-product-home > header,
+.mcpwp-product-home > footer {
+	margin-inline: auto;
+	max-width: 80rem;
+	padding-inline: clamp(1.25rem, 4vw, 4rem);
+}
+
+.mcpwp-product-home section,
+.mcpwp-product-home > footer {
+	border-top: 1px solid var(--mcpwp-rule);
+	padding-block: clamp(3.5rem, 8vw, 7.5rem);
+}
+
+.mcpwp-product-home__eyebrow,
+.mcpwp-product-home .eyebrow {
+	color: var(--mcpwp-violet);
+	font-size: 0.75rem;
+	font-weight: 800;
+	letter-spacing: 0.12em;
+	margin-bottom: 1rem;
+	text-transform: uppercase;
+}
+
+.mcpwp-product-home__lede,
+.mcpwp-product-home .lede {
+	color: var(--mcpwp-muted);
+	font-size: clamp(1.08rem, 1.8vw, 1.32rem);
+	max-width: 42rem;
+}
+
+/* Header and primary conversion path. */
+.mcpwp-product-home__header,
+.mcpwp-product-home .mcpwp-product-header {
+	align-items: center;
+	border-bottom: 1px solid var(--mcpwp-rule);
+	display: flex;
+	gap: 1rem;
+	justify-content: space-between;
+	min-height: 5rem;
+	padding-block: 0.75rem;
+}
+
+.mcpwp-product-home__nav,
+.mcpwp-product-home .mcpwp-product-nav {
+	display: flex;
+	flex-wrap: wrap;
+	font-size: 0.78rem;
+	font-weight: 800;
+	gap: clamp(0.8rem, 2vw, 1.5rem);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.mcpwp-product-home__nav a,
+.mcpwp-product-home .mcpwp-product-nav a {
+	min-height: 2.75rem;
+	display: inline-flex;
+	align-items: center;
+	text-decoration: none;
+}
+
+.mcpwp-product-hero,
+.mcpwp-product-home__hero {
+	display: grid;
+	gap: clamp(2rem, 5vw, 5rem);
+	grid-template-columns: minmax(0, 1.38fr) minmax(18rem, 1fr);
+	padding-block: clamp(3rem, 7vw, 7rem);
+}
+
+.mcpwp-product-hero__copy,
+.mcpwp-product-home__hero-copy {
+	align-self: center;
+}
+
+.mcpwp-product-hero__actions,
+.mcpwp-product-home__actions,
+.mcpwp-product-home .wp-block-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.8rem;
+	margin-block: 1.75rem;
+}
+
+.mcpwp-product-home .mcpwp-product-button,
+.mcpwp-product-home .wp-block-button__link {
+	align-items: center;
+	background: var(--mcpwp-violet);
+	border: 2px solid var(--mcpwp-violet);
+	border-radius: 0;
+	color: var(--mcpwp-white);
+	display: inline-flex;
+	font-size: 0.9rem;
+	font-weight: 800;
+	justify-content: center;
+	line-height: 1.15;
+	min-height: 2.75rem;
+	padding: 0.68rem 1rem;
+	text-align: center;
+	text-decoration: none;
+}
+
+.mcpwp-product-home .mcpwp-product-button:hover,
+.mcpwp-product-home .wp-block-button__link:hover {
+	background: var(--mcpwp-ink-navy);
+	border-color: var(--mcpwp-ink-navy);
+	color: var(--mcpwp-white);
+}
+
+.mcpwp-product-home .mcpwp-product-button--secondary,
+.mcpwp-product-home .is-style-outline .wp-block-button__link {
+	background: transparent;
+	border-color: var(--mcpwp-cobalt);
+	color: var(--mcpwp-cobalt);
+}
+
+.mcpwp-product-home .mcpwp-product-button--secondary:hover,
+.mcpwp-product-home .is-style-outline .wp-block-button__link:hover {
+	background: var(--mcpwp-cobalt);
+	color: var(--mcpwp-white);
+}
+
+.mcpwp-product-home__trust,
+.mcpwp-product-home .mcpwp-product-trust {
+	border-left: 3px solid var(--mcpwp-teal);
+	color: var(--mcpwp-muted);
+	font-size: 0.94rem;
+	max-width: 40rem;
+	padding-left: 0.9rem;
+}
+
+.mcpwp-product-hero__briefing,
+.mcpwp-product-home__briefing {
+	background: var(--mcpwp-ink-navy);
+	color: var(--mcpwp-white);
+	padding: clamp(1.25rem, 3vw, 2.5rem);
+	position: relative;
+}
+
+.mcpwp-product-hero__briefing :where(h2, h3, p, li),
+.mcpwp-product-home__briefing :where(h2, h3, p, li) {
+	color: inherit;
+}
+
+.mcpwp-product-hero__portrait,
+.mcpwp-product-home__portrait {
+	display: block;
+	margin: 0 0 1.25rem auto;
+	max-width: min(100%, 20rem);
+	width: 100%;
+}
+
+.mcpwp-product-home__steps,
+.mcpwp-product-home .mcpwp-product-steps {
+	counter-reset: mcpwp-step;
+	list-style: none;
+	margin: 1.5rem 0 0;
+	padding: 0;
+}
+
+.mcpwp-product-home__steps li,
+.mcpwp-product-home .mcpwp-product-steps li {
+	border-top: 1px solid rgba(255, 255, 255, 0.34);
+	counter-increment: mcpwp-step;
+	display: grid;
+	font-weight: 750;
+	gap: 0.8rem;
+	grid-template-columns: 1.8rem 1fr;
+	padding-block: 0.7rem;
+}
+
+.mcpwp-product-home__steps li::before,
+.mcpwp-product-home .mcpwp-product-steps li::before {
+	color: var(--mcpwp-violet-wash);
+	content: "0" counter(mcpwp-step);
+	font-family: var(--mcpwp-serif);
+	font-size: 1.1rem;
+}
+
+/* Proof, workflow, edition comparison, and editorial modules. */
+.mcpwp-product-home__compatibility,
+.mcpwp-product-home .mcpwp-product-compatibility {
+	background: var(--mcpwp-violet-wash);
+	border-top: 1px solid var(--mcpwp-rule);
+	border-bottom: 1px solid var(--mcpwp-rule);
+	padding-block: 1rem;
+}
+
+.mcpwp-product-home__compatibility ul,
+.mcpwp-product-home .mcpwp-product-compatibility ul {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	font-size: 0.86rem;
+	font-weight: 800;
+	gap: 0.7rem clamp(1rem, 3vw, 2.5rem);
+	justify-content: space-between;
+	letter-spacing: 0.04em;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	text-transform: uppercase;
+}
+
+.mcpwp-product-home__section-heading,
+.mcpwp-product-home .mcpwp-product-section-heading {
+	display: grid;
+	gap: 1.5rem;
+	grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+	margin-bottom: clamp(2rem, 4vw, 4rem);
+}
+
+.mcpwp-product-home__workflow,
+.mcpwp-product-home .mcpwp-product-workflow,
+.mcpwp-product-home__cards,
+.mcpwp-product-home .mcpwp-product-cards {
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.mcpwp-product-home__card,
+.mcpwp-product-home .mcpwp-product-card,
+.mcpwp-product-home details {
+	background: var(--mcpwp-white);
+	border: 1px solid var(--mcpwp-rule);
+	box-shadow: 0 0.25rem 0 rgba(23, 35, 61, 0.06);
+	padding: clamp(1rem, 2vw, 1.5rem);
+}
+
+.mcpwp-product-home__workflow .mcpwp-product-card:nth-child(2),
+.mcpwp-product-home .mcpwp-product-workflow .mcpwp-product-card:nth-child(2) {
+	border-top: 4px solid var(--mcpwp-cobalt);
+}
+
+.mcpwp-product-home__workflow .mcpwp-product-card:nth-child(3),
+.mcpwp-product-home .mcpwp-product-workflow .mcpwp-product-card:nth-child(3) {
+	border-top: 4px solid var(--mcpwp-amber);
+}
+
+.mcpwp-product-home__workflow .mcpwp-product-card:nth-child(4),
+.mcpwp-product-home .mcpwp-product-workflow .mcpwp-product-card:nth-child(4) {
+	border-top: 4px solid var(--mcpwp-teal);
+}
+
+.mcpwp-product-home details {
+	margin-top: 1rem;
+}
+
+.mcpwp-product-home summary {
+	cursor: pointer;
+	font-weight: 800;
+	min-height: 2.75rem;
+	padding: 0.4rem 0;
+}
+
+.mcpwp-product-home__connection,
+.mcpwp-product-home .mcpwp-product-connection {
+	background: var(--mcpwp-ink-navy);
+	color: var(--mcpwp-white);
+}
+
+.mcpwp-product-home__connection :where(h2, h3, p, li),
+.mcpwp-product-home .mcpwp-product-connection :where(h2, h3, p, li) {
+	color: inherit;
+}
+
+.mcpwp-product-home__connection ol,
+.mcpwp-product-home .mcpwp-product-connection ol {
+	columns: 2;
+	gap: clamp(2rem, 6vw, 6rem);
+	margin-bottom: 0;
+	padding-left: 1.3rem;
+}
+
+.mcpwp-product-home__comparison,
+.mcpwp-product-home .mcpwp-product-comparison {
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mcpwp-product-home__comparison > *,
+.mcpwp-product-home .mcpwp-product-comparison > * {
+	border: 1px solid var(--mcpwp-rule);
+	padding: clamp(1.25rem, 3vw, 2.25rem);
+}
+
+.mcpwp-product-home__comparison > :last-child,
+.mcpwp-product-home .mcpwp-product-comparison > :last-child {
+	background: var(--mcpwp-ink-navy);
+	border-color: var(--mcpwp-ink-navy);
+	color: var(--mcpwp-white);
+}
+
+.mcpwp-product-home__comparison > :last-child :where(h2, h3, p, li),
+.mcpwp-product-home .mcpwp-product-comparison > :last-child :where(h2, h3, p, li) {
+	color: inherit;
+}
+
+.mcpwp-product-home__method,
+.mcpwp-product-home .mcpwp-product-method {
+	border-left: 0.35rem solid var(--mcpwp-teal);
+	padding-left: clamp(1rem, 3vw, 2.5rem);
+}
+
+.mcpwp-product-home__method ul,
+.mcpwp-product-home .mcpwp-product-method ul {
+	display: grid;
+	font-weight: 800;
+	gap: 0.75rem;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	list-style: none;
+	margin: 2rem 0 0;
+	padding: 0;
+}
+
+.mcpwp-product-home__guides,
+.mcpwp-product-home .mcpwp-product-guides {
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.mcpwp-product-home__guides a,
+.mcpwp-product-home .mcpwp-product-guides a {
+	border-top: 3px solid var(--mcpwp-cobalt);
+	display: block;
+	font-family: var(--mcpwp-serif);
+	font-size: 1.25rem;
+	line-height: 1.2;
+	padding-top: 1rem;
+}
+
+.mcpwp-product-home__final-cta,
+.mcpwp-product-home .mcpwp-product-final-cta {
+	background: var(--mcpwp-violet-wash);
+	border-block: 1px solid var(--mcpwp-rule);
+	text-align: center;
+}
+
+.mcpwp-product-home__final-cta h2,
+.mcpwp-product-home .mcpwp-product-final-cta h2 {
+	margin-inline: auto;
+}
+
+@media (max-width: 64rem) {
+	.mcpwp-product-home__workflow,
+	.mcpwp-product-home .mcpwp-product-workflow,
+	.mcpwp-product-home__cards,
+	.mcpwp-product-home .mcpwp-product-cards {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 48rem) {
+	.mcpwp-product-home {
+		margin-inline: 0;
+	}
+
+	.mcpwp-product-home__header,
+	.mcpwp-product-home .mcpwp-product-header,
+	.mcpwp-product-hero,
+	.mcpwp-product-home__hero,
+	.mcpwp-product-home__section-heading,
+	.mcpwp-product-home .mcpwp-product-section-heading,
+	.mcpwp-product-home__comparison,
+	.mcpwp-product-home .mcpwp-product-comparison,
+	.mcpwp-product-home__workflow,
+	.mcpwp-product-home .mcpwp-product-workflow,
+	.mcpwp-product-home__cards,
+	.mcpwp-product-home .mcpwp-product-cards,
+	.mcpwp-product-home__guides,
+	.mcpwp-product-home .mcpwp-product-guides,
+	.mcpwp-product-home__method ul,
+	.mcpwp-product-home .mcpwp-product-method ul {
+		grid-template-columns: 1fr;
+	}
+
+	.mcpwp-product-home__header,
+	.mcpwp-product-home .mcpwp-product-header {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+
+	.mcpwp-product-home__nav,
+	.mcpwp-product-home .mcpwp-product-nav {
+		justify-content: flex-start;
+	}
+
+	.mcpwp-product-home__connection ol,
+	.mcpwp-product-home .mcpwp-product-connection ol {
+		columns: 1;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.mcpwp-product-home *,
+	.mcpwp-product-home *::before,
+	.mcpwp-product-home *::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		scroll-behavior: auto !important;
+		transition-duration: 0.01ms !important;
+	}
+}

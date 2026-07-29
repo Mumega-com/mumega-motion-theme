@@ -172,6 +172,28 @@ function mumega_motion_enqueue_editorial_styles() {
 add_action( 'wp_enqueue_scripts', 'mumega_motion_enqueue_editorial_styles' );
 
 /**
+ * Enqueues the visual system owned by the product-home page template.
+ *
+ * @return void
+ */
+function mumega_motion_enqueue_product_home_styles() {
+	if ( ! is_page_template( 'page-templates/product-home.php' ) ) {
+		return;
+	}
+
+	$version = wp_get_theme()->get( 'Version' );
+	$uri     = get_template_directory_uri() . '/assets/css/';
+
+	wp_enqueue_style(
+		'mumega-motion-product-home',
+		$uri . 'product-home.css',
+		array( 'mumega-motion-editorial' ),
+		$version
+	);
+}
+add_action( 'wp_enqueue_scripts', 'mumega_motion_enqueue_product_home_styles' );
+
+/**
  * Identifies an asset registered by Elementor or Elementor Pro.
  *
  * @param string $handle     Registered asset handle.

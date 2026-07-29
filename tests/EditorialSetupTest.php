@@ -173,6 +173,29 @@ final class EditorialSetupTest extends TestCase {
 	}
 
 	/**
+	 * Loads the product-home presentation layer only for its assigned template.
+	 */
+	public function test_product_home_styles_are_scoped_to_the_product_home_template(): void {
+		mumega_motion_enqueue_product_home_styles();
+		$this->assertSame( array(), $GLOBALS['mumega_motion_test_enqueued_styles'] );
+
+		$GLOBALS['mumega_motion_test_page_template'] = 'page-templates/product-home.php';
+		mumega_motion_enqueue_product_home_styles();
+
+		$this->assertSame(
+			array(
+				'mumega-motion-product-home' => array(
+					'src'   => 'https://example.test/wp-content/themes/mumega-motion/assets/css/product-home.css',
+					'deps'  => array( 'mumega-motion-editorial' ),
+					'ver'   => '0.1.0',
+					'media' => 'all',
+				),
+			),
+			$GLOBALS['mumega_motion_test_enqueued_styles']
+		);
+	}
+
+	/**
 	 * Removes Elementor shell assets only from routes owned by the editorial system.
 	 */
 	public function test_editorial_views_remove_elementor_shell_assets_without_touching_other_assets(): void {
