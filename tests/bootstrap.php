@@ -20,6 +20,7 @@ if ( ! defined( 'DAY_IN_SECONDS' ) ) {
 
 $GLOBALS['mumega_motion_test_filters']          = array();
 $GLOBALS['mumega_motion_test_actions']          = array();
+$GLOBALS['mumega_motion_test_shortcodes']       = array();
 $GLOBALS['mumega_motion_test_translations']     = array();
 $GLOBALS['mumega_motion_test_pattern_categories'] = array();
 $GLOBALS['mumega_motion_test_patterns']         = array();
@@ -64,6 +65,7 @@ $GLOBALS['mumega_motion_test_dequeued_styles']  = array();
 $GLOBALS['mumega_motion_test_dequeued_scripts'] = array();
 $GLOBALS['mumega_motion_test_conditionals']     = array();
 $GLOBALS['mumega_motion_test_page_template']    = '';
+$GLOBALS['mumega_motion_test_page_templates']   = array();
 $GLOBALS['mumega_motion_test_queried_object_id'] = 0;
 $GLOBALS['mumega_motion_test_queried_object']   = null;
 $GLOBALS['mumega_motion_test_search_query']     = '';
@@ -85,6 +87,8 @@ $GLOBALS['mumega_motion_test_reset_postdata_exception']  = null;
 $GLOBALS['mumega_motion_test_elementor_edit_mode'] = '';
 $GLOBALS['mumega_motion_test_elementor_location_output'] = array();
 $GLOBALS['mumega_motion_test_postdata_events']  = array();
+$GLOBALS['mumega_motion_test_attachment_image_requests'] = array();
+$GLOBALS['mumega_motion_test_search_form_calls'] = 0;
 
 /**
  * Minimal post value used by editorial helper tests.
@@ -822,8 +826,63 @@ function wp_nav_menu( $args = array() ) {
  *
  * @return void
  */
-function get_search_form() {
-	echo '<form role="search" class="search-form"><label>Search<input type="search"></label></form>';
+function get_search_form( $args = null ) {
+	$GLOBALS['mumega_motion_test_search_form_calls']++;
+	$markup = '<form role="search" class="search-form"><label>Search<input type="search" class="search-field"></label><button type="submit" class="search-submit">Search</button></form>';
+
+	if ( false === $args ) {
+		return $markup;
+	}
+
+	echo $markup; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Native search-form fixture.
+}
+
+/**
+ * Registers a shortcode callback for assertions.
+ *
+ * @param string   $tag      Shortcode tag.
+ * @param callable $callback Shortcode callback.
+ * @return void
+ */
+function add_shortcode( $tag, $callback ) {
+	$GLOBALS['mumega_motion_test_shortcodes'][ $tag ] = $callback;
+}
+
+/**
+ * Merges shortcode attributes with defaults.
+ *
+ * @param array  $pairs Defaults.
+ * @param array  $atts  Supplied attributes.
+ * @param string $tag   Shortcode tag.
+ * @return array
+ */
+function shortcode_atts( $pairs, $atts, $tag = '' ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
+	return array_merge( $pairs, (array) $atts );
+}
+
+/**
+ * Returns deterministic responsive attachment markup.
+ *
+ * @param int          $attachment_id Attachment ID.
+ * @param string|array $size          Requested image size.
+ * @param bool         $icon          Whether an icon was requested.
+ * @param array        $attr          Image attributes.
+ * @return string
+ */
+function wp_get_attachment_image( $attachment_id, $size = 'thumbnail', $icon = false, $attr = array() ) {
+	$GLOBALS['mumega_motion_test_attachment_image_requests'][] = array(
+		'attachment_id' => (int) $attachment_id,
+		'size'          => $size,
+		'icon'          => $icon,
+		'attr'          => $attr,
+	);
+
+	return sprintf(
+		'<img src="https://example.test/uploads/aster-768x1280.jpg" srcset="https://example.test/uploads/aster-300x500.jpg 300w, https://example.test/uploads/aster-768x1280.jpg 768w" sizes="%1$s" class="%2$s" alt="%3$s" />',
+		esc_attr( isset( $attr['sizes'] ) ? $attr['sizes'] : '' ),
+		esc_attr( isset( $attr['class'] ) ? $attr['class'] : '' ),
+		esc_attr( isset( $attr['alt'] ) ? $attr['alt'] : '' )
+	);
 }
 
 /**
@@ -1361,6 +1420,20 @@ function is_404() {
  */
 function is_page_template( $template = '' ) {
 	return $template === $GLOBALS['mumega_motion_test_page_template'];
+}
+
+/**
+ * Returns a configured page template assignment.
+ *
+ * @param int $post_id Post ID.
+ * @return string
+ */
+function get_page_template_slug( $post_id = null ) {
+	$post_id = null === $post_id ? get_queried_object_id() : (int) $post_id;
+
+	return isset( $GLOBALS['mumega_motion_test_page_templates'][ $post_id ] )
+		? $GLOBALS['mumega_motion_test_page_templates'][ $post_id ]
+		: '';
 }
 
 /**

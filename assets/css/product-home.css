@@ -126,6 +126,7 @@
 	align-items: center;
 	border-bottom: 1px solid var(--mcpwp-rule);
 	display: flex;
+	flex-wrap: wrap;
 	gap: 1rem;
 	justify-content: space-between;
 	min-height: 5rem;
@@ -149,6 +150,24 @@
 	display: inline-flex;
 	align-items: center;
 	text-decoration: none;
+}
+
+.mcpwp-product-home__search {
+	flex: 0 1 12rem;
+}
+
+.mcpwp-product-home__search .search-form,
+.mcpwp-product-home__search label {
+	width: 100%;
+}
+
+.mcpwp-product-home__search .search-field {
+	min-height: 2.75rem;
+	width: 100%;
+}
+
+.mcpwp-product-home__search .search-submit {
+	min-height: 2.75rem;
 }
 
 .mcpwp-product-hero,
@@ -395,6 +414,18 @@
 	color: inherit;
 }
 
+.mcpwp-product-home__comparison > :last-child .mcpwp-product-button--secondary,
+.mcpwp-product-home .mcpwp-product-comparison > :last-child .mcpwp-product-button--secondary {
+	border-color: var(--mcpwp-white);
+	color: var(--mcpwp-white);
+}
+
+.mcpwp-product-home__comparison > :last-child .mcpwp-product-button--secondary:hover,
+.mcpwp-product-home .mcpwp-product-comparison > :last-child .mcpwp-product-button--secondary:hover {
+	background: var(--mcpwp-white);
+	color: var(--mcpwp-ink-navy);
+}
+
 .mcpwp-product-home__method,
 .mcpwp-product-home .mcpwp-product-method {
 	border-left: 0.35rem solid var(--mcpwp-teal);
@@ -446,12 +477,16 @@
 	.mcpwp-product-home__workflow,
 	.mcpwp-product-home .mcpwp-product-workflow,
 	.mcpwp-product-home__cards,
-	.mcpwp-product-home .mcpwp-product-cards {
+	.mcpwp-product-home .mcpwp-product-cards,
+	.mcpwp-product-home__guides,
+	.mcpwp-product-home .mcpwp-product-guides,
+	.mcpwp-product-home__method ul,
+	.mcpwp-product-home .mcpwp-product-method ul {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 }
 
-@media (max-width: 48rem) {
+@media (max-width: 47.9375rem) {
 	.mcpwp-product-home {
 		margin-inline: 0;
 	}
@@ -484,6 +519,11 @@
 	.mcpwp-product-home__nav,
 	.mcpwp-product-home .mcpwp-product-nav {
 		justify-content: flex-start;
+	}
+
+	.mcpwp-product-home__search {
+		flex-basis: 100%;
+		width: 100%;
 	}
 
 	.mcpwp-product-home__connection ol,

@@ -12,7 +12,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class McpwpProductHomeContentTest extends TestCase {
 	/**
-	 * Keeps the primary install path, ASTER media token, and supported clients intact.
+	 * Keeps the primary install path, ASTER attachment token, and supported clients intact.
 	 */
 	public function test_product_home_content_has_the_approved_conversion_contract(): void {
 		$content = $this->content();
@@ -20,7 +20,7 @@ final class McpwpProductHomeContentTest extends TestCase {
 		$this->assertSame( 1, substr_count( $content, '<h1' ) );
 		$this->assertStringContainsString( 'Install free from WordPress.org', $content );
 		$this->assertStringContainsString( 'https://wordpress.org/plugins/mumega-mcp/', $content );
-		$this->assertStringContainsString( '{{ASTER_URL}}', $content );
+		$this->assertStringContainsString( '{{ASTER_ID}}', $content );
 		$this->assertStringContainsString( 'Claude', $content );
 		$this->assertStringContainsString( 'ChatGPT', $content );
 		$this->assertStringContainsString( 'Gemini', $content );
@@ -37,12 +37,49 @@ final class McpwpProductHomeContentTest extends TestCase {
 
 		$this->assertSame( 1, substr_count( $content, 'class="mcpwp-product-home"' ) );
 		$this->assertStringContainsString( '<header class="mcpwp-product-home__header">', $content );
+		$this->assertSame( 1, substr_count( $content, '[mumega_product_search]' ) );
 		$this->assertStringContainsString( '<section id="workflow"', $content );
 		$this->assertStringContainsString( '<section id="first-connection"', $content );
 		$this->assertStringContainsString( '<section id="agency"', $content );
 		$this->assertStringContainsString( '<section id="guides"', $content );
 		$this->assertStringContainsString( '<svg', $content );
 		$this->assertStringNotContainsString( '<script', strtolower( $content ) );
+	}
+
+	/**
+	 * Keeps free-edition positioning scope- and draft-first while naming paid approval gates.
+	 */
+	public function test_product_home_content_keeps_honest_edition_boundaries(): void {
+		$content = $this->content();
+
+		$this->assertStringContainsString( 'scoped access, draft-first workflows, and a visible activity history', $content );
+		$this->assertStringContainsString( 'Scoped access. Draft-first work. Visible activity for review and recovery.', $content );
+		$this->assertStringContainsString( 'Human approval gates are part of Agency Mode’s paid governance.', $content );
+		$this->assertStringContainsString( 'The free edition stays scope- and draft-first.', $content );
+		$this->assertStringNotContainsString( 'scoped permissions, approvals, and a visible activity history', $content );
+		$this->assertStringNotContainsString( 'Approval before risk.', $content );
+	}
+
+	/**
+	 * Uses WordPress attachment rendering instead of a full-size raw ASTER image.
+	 */
+	public function test_product_home_content_delegates_aster_to_responsive_attachment_markup(): void {
+		$content = $this->content();
+
+		$this->assertStringContainsString( '[mumega_product_aster_image id="{{ASTER_ID}}"]', $content );
+		$this->assertStringNotContainsString( '<img class="mcpwp-product-home__portrait"', $content );
+		$this->assertStringNotContainsString( '{{ASTER_URL}}', $content );
+	}
+
+	/**
+	 * Points both conversion-oriented Agency links to the actual Agency destination.
+	 */
+	public function test_product_home_agency_ctas_use_the_agency_destination(): void {
+		$content = $this->content();
+
+		$this->assertSame( 2, substr_count( $content, 'href="https://mcpwp.net/agencies/"' ) );
+		$this->assertStringContainsString( '>Explore Agency Mode</a>', $content );
+		$this->assertStringNotContainsString( 'href="#agency-recovery">Review the operating approach</a>', $content );
 	}
 
 	/**
@@ -66,10 +103,10 @@ final class McpwpProductHomeContentTest extends TestCase {
 		$content = $this->content();
 
 		$guides = array(
-			'https://mcpwp.net/what-is-wordpress-mcp-server/'          => 'What is WordPress MCP?',
+			'https://mcpwp.net/what-is-wordpress-mcp-server/' => 'What is WordPress MCP?',
 			'https://mcpwp.net/secure-wordpress-mcp-api-keys-scopes/' => 'How do scoped permissions work?',
-			'#client-choice'                                          => 'Which AI client should a team use?',
-			'#agency-recovery'                                        => 'How should an agency review and recover changes?',
+			'#client-choice'   => 'Which AI client should a team use?',
+			'#agency-recovery' => 'How should an agency review and recover changes?',
 		);
 
 		foreach ( $guides as $url => $topic ) {

@@ -11,7 +11,8 @@ if ( file_exists( dirname( __DIR__ ) . '/inc/editorial-setup.php' ) ) {
 	require_once dirname( __DIR__ ) . '/inc/editorial-setup.php';
 }
 
-$GLOBALS['mumega_motion_test_setup_filters'] = $GLOBALS['mumega_motion_test_filters'];
+$GLOBALS['mumega_motion_test_setup_filters']    = $GLOBALS['mumega_motion_test_filters'];
+$GLOBALS['mumega_motion_test_setup_shortcodes'] = $GLOBALS['mumega_motion_test_shortcodes'];
 
 /**
  * Exercises theme capabilities and opt-in editorial assets.
@@ -41,6 +42,8 @@ final class EditorialSetupTest extends TestCase {
 
 		$GLOBALS['mumega_motion_test_page_template'] = '';
 
+		$GLOBALS['mumega_motion_test_page_templates'] = array();
+
 		$GLOBALS['mumega_motion_test_queried_object_id'] = 0;
 
 		$GLOBALS['mumega_motion_test_posts'] = array();
@@ -49,7 +52,15 @@ final class EditorialSetupTest extends TestCase {
 
 		$GLOBALS['mumega_motion_test_get_posts_requests'] = array();
 
+		$GLOBALS['mumega_motion_test_options'] = array();
+
 		$GLOBALS['mumega_motion_test_filters'] = $GLOBALS['mumega_motion_test_setup_filters'];
+
+		$GLOBALS['mumega_motion_test_shortcodes'] = $GLOBALS['mumega_motion_test_setup_shortcodes'];
+
+		$GLOBALS['mumega_motion_test_attachment_image_requests'] = array();
+
+		$GLOBALS['mumega_motion_test_search_form_calls'] = 0;
 
 		$GLOBALS['mumega_motion_test_elementor_locations'] = array();
 
@@ -202,6 +213,56 @@ final class EditorialSetupTest extends TestCase {
 	}
 
 	/**
+	 * Renders the product-header search through WordPress's native form function.
+	 */
+	public function test_product_search_shortcode_returns_one_native_search_form(): void {
+		$this->assertArrayHasKey( 'mumega_product_search', $GLOBALS['mumega_motion_test_shortcodes'] );
+
+		if ( ! isset( $GLOBALS['mumega_motion_test_shortcodes']['mumega_product_search'] ) ) {
+			return;
+		}
+
+		$markup = call_user_func( $GLOBALS['mumega_motion_test_shortcodes']['mumega_product_search'] );
+
+		$this->assertSame( 1, substr_count( $markup, 'role="search"' ) );
+		$this->assertStringContainsString( 'class="search-form"', $markup );
+		$this->assertSame( 1, $GLOBALS['mumega_motion_test_search_form_calls'] );
+	}
+
+	/**
+	 * Renders ASTER through WordPress's responsive attachment boundary.
+	 */
+	public function test_product_aster_shortcode_requests_economic_responsive_markup(): void {
+		$this->assertArrayHasKey( 'mumega_product_aster_image', $GLOBALS['mumega_motion_test_shortcodes'] );
+
+		if ( ! isset( $GLOBALS['mumega_motion_test_shortcodes']['mumega_product_aster_image'] ) ) {
+			return;
+		}
+
+		$markup = call_user_func(
+			$GLOBALS['mumega_motion_test_shortcodes']['mumega_product_aster_image'],
+			array( 'id' => '28' )
+		);
+
+		$this->assertStringContainsString( 'srcset="', $markup );
+		$this->assertStringContainsString( 'sizes="(max-width: 47.9375rem) calc(100vw - 2.5rem), 20rem"', $markup );
+		$this->assertSame(
+			array(
+				'attachment_id' => 28,
+				'size'          => 'large',
+				'icon'          => false,
+				'attr'          => array(
+					'class'   => 'mcpwp-product-home__portrait',
+					'alt'     => 'ASTER, MCPWP’s AI Research Editor',
+					'loading' => 'eager',
+					'sizes'   => '(max-width: 47.9375rem) calc(100vw - 2.5rem), 20rem',
+				),
+			),
+			$GLOBALS['mumega_motion_test_attachment_image_requests'][0]
+		);
+	}
+
+	/**
 	 * Keeps preview product-home pages out of search results until promotion.
 	 */
 	public function test_product_home_robots_filter_is_scoped_to_the_product_home_template(): void {
@@ -219,6 +280,14 @@ final class EditorialSetupTest extends TestCase {
 			),
 			apply_filters( 'wp_robots', $robots )
 		);
+
+		$GLOBALS['mumega_motion_test_options']           = array(
+			'show_on_front' => 'page',
+			'page_on_front' => 42,
+		);
+		$GLOBALS['mumega_motion_test_queried_object_id'] = 42;
+
+		$this->assertSame( $robots, apply_filters( 'wp_robots', $robots ) );
 	}
 
 	/**
@@ -253,6 +322,49 @@ final class EditorialSetupTest extends TestCase {
 			),
 			$GLOBALS['mumega_motion_test_get_posts_requests'][0]
 		);
+
+		$GLOBALS['mumega_motion_test_post_queries'][] = array( 29, 31 );
+		$GLOBALS['mumega_motion_test_options']        = array(
+			'show_on_front' => 'page',
+			'page_on_front' => 29,
+		);
+
+		$this->assertSame(
+			array( 'post__not_in' => array( 8, 31 ) ),
+			apply_filters( 'wp_sitemaps_posts_query_args', $article_args, 'page' )
+		);
+	}
+
+	/**
+	 * Applies the same preview-only exclusion to Yoast and Rank Math sitemaps.
+	 */
+	public function test_seo_plugin_sitemap_filters_exclude_only_unpromoted_product_home_pages(): void {
+		$GLOBALS['mumega_motion_test_post_queries'][] = array( 29, 31 );
+
+		$this->assertSame(
+			array( 7, 29, 31 ),
+			apply_filters( 'wpseo_exclude_from_sitemap_by_post_ids', array( 7 ) )
+		);
+
+		$GLOBALS['mumega_motion_test_page_templates'][29] = 'page-templates/product-home.php';
+		$post = new WP_Post( array( 'ID' => 29 ) );
+		$url  = array( 'loc' => 'https://example.test/mcpwp-home-preview/' );
+
+		$rank_math_entry = apply_filters( 'rank_math/sitemap/entry', $url, 'post', $post ); // phpcs:ignore WordPress.NamingConventions.ValidHookName.UseUnderscores -- Rank Math's documented hook uses slashes.
+		$this->assertFalse( $rank_math_entry );
+
+		$GLOBALS['mumega_motion_test_options'] = array(
+			'show_on_front' => 'page',
+			'page_on_front' => 29,
+		);
+
+		$GLOBALS['mumega_motion_test_post_queries'][] = array( 29, 31 );
+		$this->assertSame(
+			array( 7, 31 ),
+			apply_filters( 'wpseo_exclude_from_sitemap_by_post_ids', array( 7 ) )
+		);
+		$rank_math_entry = apply_filters( 'rank_math/sitemap/entry', $url, 'post', $post ); // phpcs:ignore WordPress.NamingConventions.ValidHookName.UseUnderscores -- Rank Math's documented hook uses slashes.
+		$this->assertSame( $url, $rank_math_entry );
 	}
 
 	/**
