@@ -1,5 +1,9 @@
 # MCPWP editorial homepage V2
 
+> **Implemented visual design.** The homepage remains the publication surface;
+> the approved market-aware commercial strategy and content wheel now live in
+> [`../../CONTENT-OPERATING-SYSTEM.md`](../../CONTENT-OPERATING-SYSTEM.md).
+
 **Date:** 2026-07-19
 **Status:** Approved visual direction; implementation pending owner review of this contract
 **Repository:** `Mumega-com/mumega-motion-theme`
