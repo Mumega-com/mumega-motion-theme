@@ -212,6 +212,43 @@ function mumega_motion_filter_product_home_robots( $robots ) {
 add_filter( 'wp_robots', 'mumega_motion_filter_product_home_robots' );
 
 /**
+ * Keeps preview product-home pages out of WordPress core sitemaps.
+ *
+ * @param array  $args      Query arguments for the sitemap provider.
+ * @param string $post_type Post type handled by the sitemap provider.
+ * @return array Filtered sitemap query arguments.
+ */
+function mumega_motion_exclude_product_home_sitemap_pages( $args, $post_type ) {
+	if ( 'page' !== $post_type ) {
+		return $args;
+	}
+
+	$preview_ids = get_posts(
+		array(
+			'post_type'              => 'page',
+			'post_status'            => 'publish',
+			'fields'                 => 'ids',
+			'numberposts'            => -1,
+			'meta_key'               => '_wp_page_template', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- The template assignment is the exclusion contract.
+			'meta_value'             => 'page-templates/product-home.php', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- The template assignment is the exclusion contract.
+			'no_found_rows'          => true,
+			'update_post_meta_cache' => false,
+			'update_post_term_cache' => false,
+		)
+	);
+
+	if ( empty( $preview_ids ) ) {
+		return $args;
+	}
+
+	$excluded_ids         = isset( $args['post__not_in'] ) && is_array( $args['post__not_in'] ) ? $args['post__not_in'] : array();
+	$args['post__not_in'] = array_values( array_unique( array_merge( $excluded_ids, array_map( 'intval', $preview_ids ) ) ) );
+
+	return $args;
+}
+add_filter( 'wp_sitemaps_posts_query_args', 'mumega_motion_exclude_product_home_sitemap_pages', 10, 2 );
+
+/**
  * Identifies an asset registered by Elementor or Elementor Pro.
  *
  * @param string $handle     Registered asset handle.

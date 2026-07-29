@@ -45,6 +45,10 @@ final class EditorialSetupTest extends TestCase {
 
 		$GLOBALS['mumega_motion_test_posts'] = array();
 
+		$GLOBALS['mumega_motion_test_post_queries'] = array();
+
+		$GLOBALS['mumega_motion_test_get_posts_requests'] = array();
+
 		$GLOBALS['mumega_motion_test_filters'] = $GLOBALS['mumega_motion_test_setup_filters'];
 
 		$GLOBALS['mumega_motion_test_elementor_locations'] = array();
@@ -214,6 +218,40 @@ final class EditorialSetupTest extends TestCase {
 				'nofollow'          => true,
 			),
 			apply_filters( 'wp_robots', $robots )
+		);
+	}
+
+	/**
+	 * Excludes product-home previews from page sitemaps without altering other post types.
+	 */
+	public function test_product_home_pages_are_excluded_only_from_page_sitemaps(): void {
+		$article_args = array( 'post__not_in' => array( 8 ) );
+
+		$this->assertSame(
+			$article_args,
+			apply_filters( 'wp_sitemaps_posts_query_args', $article_args, 'post' )
+		);
+		$this->assertSame( array(), $GLOBALS['mumega_motion_test_get_posts_requests'] );
+
+		$GLOBALS['mumega_motion_test_post_queries'][] = array( 29, 31 );
+
+		$this->assertSame(
+			array( 'post__not_in' => array( 8, 29, 31 ) ),
+			apply_filters( 'wp_sitemaps_posts_query_args', $article_args, 'page' )
+		);
+		$this->assertSame(
+			array(
+				'post_type'              => 'page',
+				'post_status'            => 'publish',
+				'fields'                 => 'ids',
+				'numberposts'            => -1,
+				'meta_key'               => '_wp_page_template', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- The template assignment is the exclusion contract.
+				'meta_value'             => 'page-templates/product-home.php', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- The template assignment is the exclusion contract.
+				'no_found_rows'          => true,
+				'update_post_meta_cache' => false,
+				'update_post_term_cache' => false,
+			),
+			$GLOBALS['mumega_motion_test_get_posts_requests'][0]
 		);
 	}
 
