@@ -50,6 +50,23 @@ final class ProductHomeVisualSystemTest extends TestCase {
 	}
 
 	/**
+	 * Hides the generic shell header without hiding headers on ordinary pages.
+	 */
+	public function test_generic_header_hide_rule_is_scoped_to_the_product_home_template(): void {
+		$css = file_get_contents( dirname( __DIR__ ) . '/assets/css/product-home.css' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Tests inspect the local theme asset.
+
+		$this->assertIsString( $css );
+		$this->assertMatchesRegularExpression(
+			'/\.page-template-product-home\s+\.site-header\s*\{[^}]*display:\s*none;/s',
+			$css
+		);
+		$this->assertDoesNotMatchRegularExpression(
+			'/(?:^|})\s*\.site-header\s*\{[^}]*display:\s*none;/s',
+			$css
+		);
+	}
+
+	/**
 	 * Keeps the workflow's status accents when BEM cards are used without concise aliases.
 	 */
 	public function test_product_home_bem_workflow_cards_receive_each_status_accent(): void {
@@ -57,7 +74,13 @@ final class ProductHomeVisualSystemTest extends TestCase {
 
 		$this->assertIsString( $css );
 
-		foreach ( array( 2 => '--mcpwp-cobalt', 3 => '--mcpwp-amber', 4 => '--mcpwp-teal' ) as $step => $accent ) {
+		foreach (
+			array(
+				2 => '--mcpwp-cobalt',
+				3 => '--mcpwp-amber',
+				4 => '--mcpwp-teal',
+			) as $step => $accent
+		) {
 			$this->assertMatchesRegularExpression(
 				'/\.mcpwp-product-home__workflow \.mcpwp-product-home__card:nth-child\(' . $step . '\),\s*\.mcpwp-product-home \.mcpwp-product-workflow \.mcpwp-product-home__card:nth-child\(' . $step . '\)[^{]*\{[^}]*border-top:\s*4px solid var\(' . preg_quote( $accent, '/' ) . '\);/s',
 				$css

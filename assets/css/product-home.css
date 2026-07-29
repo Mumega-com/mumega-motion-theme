@@ -4,6 +4,10 @@
  * All page-specific presentation stays below this root so ordinary editorial
  * and Elementor pages retain their existing rendering contract.
  */
+.page-template-product-home .site-header {
+	display: none;
+}
+
 .mcpwp-product-home {
 	--mcpwp-paper: #f7f3ea;
 	--mcpwp-ink-navy: #17233d;
