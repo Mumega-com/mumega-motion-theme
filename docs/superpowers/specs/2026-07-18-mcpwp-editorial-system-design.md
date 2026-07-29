@@ -1,5 +1,11 @@
 # MCPWP editorial system for Mumega Motion
 
+> **Historical architecture design.** The rendering and WordPress-content
+> decisions in this document remain relevant. Its newsletter-first launch
+> conversion objective is superseded by the approved commercial publication
+> strategy in [`../../CONTENT-OPERATING-SYSTEM.md`](../../CONTENT-OPERATING-SYSTEM.md).
+> Start at [`../../../TRUTH.md`](../../../TRUTH.md).
+
 **Date:** 2026-07-18  
 **Status:** Approved; implementation contract amended for WordPress-native knowledge publishing
 **Repository:** `Mumega-com/mumega-motion-theme`  

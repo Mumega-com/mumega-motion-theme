@@ -3,6 +3,10 @@
 WordPress theme with React/[Motion](https://motion.dev) (formerly Framer Motion) animations, built
 as progressive enhancement over real, server-rendered content — not a headless rebuild.
 
+For MCPWP publication work, start with **[`TRUTH.md`](TRUTH.md)**. It links the
+market-aware content strategy, implemented editorial contract, WordPress source
+of truth, analytics, and Mupot operating boundaries without duplicating them.
+
 ## Why this approach
 
 WordPress's actual advantage over building on a custom stack is its RBAC and 60k-plugin ecosystem, not
@@ -49,6 +53,13 @@ For custom Gutenberg blocks or hand-authored components, import `FadeIn` or `Sta
 `src/components/` instead of the attribute-driven auto-mount.
 
 ## Reusable editorial system
+
+The publication's commercial mission, market-sensing loop, content wheel,
+partnership model, conversion paths, cadence, and measurement contract live in
+[`docs/CONTENT-OPERATING-SYSTEM.md`](docs/CONTENT-OPERATING-SYSTEM.md). The
+strict implemented editorial workflow remains under [`editorial/`](editorial/);
+the operating strategy does not grant agents additional WordPress or
+publication authority.
 
 The Editorial Home is an opt-in, server-rendered page template. Installing or
 updating the theme does not replace the site's current homepage: the theme does

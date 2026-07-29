@@ -1,5 +1,11 @@
 # Mumega Motion Agentic Editorial System
 
+> **Implemented contract design.** This document explains the strict editorial
+> contract. Market sensing, partnerships, commercial conversion, cadence, and
+> measurement now live in
+> [`../../CONTENT-OPERATING-SYSTEM.md`](../../CONTENT-OPERATING-SYSTEM.md).
+> Those operating goals do not expand the permissions defined here.
+
 **Date:** 2026-07-19
 **Status:** Approved design; written contract pending owner review
 **Repository:** `Mumega-com/mumega-motion-theme`
