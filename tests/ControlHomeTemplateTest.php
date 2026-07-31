@@ -47,7 +47,9 @@ final class ControlHomeTemplateTest extends TestCase {
 		$original_filters = isset( $GLOBALS['mumega_motion_test_filters']['the_content'] )
 			? $GLOBALS['mumega_motion_test_filters']['the_content']
 			: null;
-		$original_post    = $GLOBALS['mumega_motion_test_current_post'];
+		$original_post      = $GLOBALS['mumega_motion_test_current_post'];
+		$had_wp_filter      = array_key_exists( 'wp_filter', $GLOBALS );
+		$original_wp_filter = $had_wp_filter ? $GLOBALS['wp_filter'] : null;
 
 		try {
 			$GLOBALS['mumega_motion_test_filters']['the_content'] = array();
@@ -58,7 +60,21 @@ final class ControlHomeTemplateTest extends TestCase {
 				)
 			);
 
+			add_filter(
+				'the_content',
+				static function ( $content ) {
+					return 'before(' . $content . ')';
+				},
+				10
+			);
 			add_filter( 'the_content', 'wpautop', 10 );
+			add_filter(
+				'the_content',
+				static function ( $content ) {
+					return $content . ':after';
+				},
+				10
+			);
 			add_filter(
 				'the_content',
 				static function ( $content ) {
@@ -67,17 +83,31 @@ final class ControlHomeTemplateTest extends TestCase {
 				20
 			);
 
+			$test_hook            = new stdClass();
+			$test_hook->callbacks =& $GLOBALS['mumega_motion_test_filters']['the_content'];
+			$GLOBALS['wp_filter']  = array( 'the_content' => $test_hook );
+
 			ob_start();
 			mumega_motion_the_control_home_content();
 			$output = ob_get_clean();
 
 			$this->assertSame(
-				'<div data-layout="control-home">Source HTML</div><!-- retained-filter -->',
+				'before(<div data-layout="control-home">Source HTML</div>):after<!-- retained-filter -->',
 				$output
 			);
 			$this->assertSame( 10, has_filter( 'the_content', 'wpautop' ) );
+			$this->assertSame(
+				'<p class="test-wpautop">before(Second render)</p>:after<!-- retained-filter -->',
+				apply_filters( 'the_content', 'Second render' )
+			);
 		} finally {
 			$GLOBALS['mumega_motion_test_current_post'] = $original_post;
+
+			if ( $had_wp_filter ) {
+				$GLOBALS['wp_filter'] = $original_wp_filter;
+			} else {
+				unset( $GLOBALS['wp_filter'] );
+			}
 
 			if ( null === $original_filters ) {
 				unset( $GLOBALS['mumega_motion_test_filters']['the_content'] );

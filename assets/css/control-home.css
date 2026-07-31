@@ -261,7 +261,7 @@
 	border: 1px solid var(--mcpwp-rule);
 	box-shadow: 0 1.8rem 5rem rgba(22, 34, 59, 0.09);
 	isolation: isolate;
-	min-height: 37rem;
+	min-height: 0;
 	overflow: hidden;
 	position: relative;
 }
@@ -325,15 +325,15 @@
 	color: var(--mcpwp-white);
 	display: flex;
 	flex-direction: column;
-	height: 10.5rem;
+	height: clamp(8rem, 11vw, 10.5rem);
 	justify-content: center;
 	left: 50%;
 	padding: 1rem;
 	position: absolute;
 	text-align: center;
-	top: 51.8%;
+	top: 49%;
 	transform: translate(-50%, -50%);
-	width: 10.5rem;
+	width: clamp(8rem, 11vw, 10.5rem);
 	z-index: 2;
 }
 
@@ -447,7 +447,7 @@
 	bottom: 1.4rem;
 	color: var(--mcpwp-white);
 	left: 1.4rem;
-	max-width: min(18rem, 36%);
+	max-width: min(18rem, 32%);
 	padding: 1rem 1.1rem;
 	position: absolute;
 	z-index: 4;
@@ -719,6 +719,13 @@
 	font-size: 0.8rem;
 	font-weight: 850;
 	margin-bottom: 0;
+}
+
+.mcpwp-control-home__route-action a,
+.mcpwp-control-home__text-link {
+	align-items: center;
+	display: inline-flex;
+	min-height: 2.75rem;
 }
 
 .mcpwp-control-home__route-action a::after,
@@ -1129,6 +1136,12 @@
 		width: 100%;
 	}
 
+	.mcpwp-control-plane__core {
+		height: 10.5rem;
+		top: 51.8%;
+		width: 10.5rem;
+	}
+
 	.mcpwp-control-home__route {
 		grid-template-columns: minmax(5rem, 0.25fr) minmax(18rem, 1.25fr) minmax(11rem, 0.65fr);
 	}
@@ -1212,9 +1225,10 @@
 	}
 
 	.mcpwp-control-home__nav {
-		overflow-x: auto;
-		padding-bottom: 0.25rem;
-		white-space: nowrap;
+		flex-wrap: wrap;
+		gap: 0.25rem 1rem;
+		overflow-x: visible;
+		white-space: normal;
 	}
 
 	.mcpwp-control-home__hero {

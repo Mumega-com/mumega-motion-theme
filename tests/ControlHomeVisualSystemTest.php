@@ -78,6 +78,8 @@ final class ControlHomeVisualSystemTest extends TestCase {
 				'.mcpwp-control-plane__path',
 				'.mcpwp-control-home__header-action',
 				'.mcpwp-control-home__button',
+				'.mcpwp-control-home__route-action a',
+				'.mcpwp-control-home__text-link',
 			) as $selector
 		) {
 			$this->assertMatchesRegularExpression(
@@ -100,6 +102,40 @@ final class ControlHomeVisualSystemTest extends TestCase {
 		);
 		$this->assertStringContainsString( 'min-width: 0;', $css );
 		$this->assertStringContainsString( 'overflow-wrap: anywhere;', $css );
+	}
+
+	/**
+	 * Catches a narrow header that hides navigation labels behind horizontal scrolling.
+	 */
+	public function test_mobile_navigation_wraps_without_horizontal_scrolling(): void {
+		$css = $this->stylesheet();
+
+		$this->assertMatchesRegularExpression(
+			'/@media \(max-width:\s*47\.9375rem\)[^{]*\{.*?\.mcpwp-control-home__nav\s*\{[^}]*flex-wrap:\s*wrap;[^}]*overflow-x:\s*visible;[^}]*white-space:\s*normal;/s',
+			$css
+		);
+		$this->assertStringNotContainsString( 'overflow-x: auto;', $css );
+		$this->assertStringNotContainsString( 'white-space: nowrap;', $css );
+	}
+
+	/**
+	 * Catches fixed graph dimensions that force the right route outside its desktop grid track.
+	 */
+	public function test_desktop_graph_can_shrink_without_overlapping_its_nodes(): void {
+		$css = $this->stylesheet();
+
+		$this->assertMatchesRegularExpression(
+			'/\.mcpwp-control-plane\s*\{[^}]*min-height:\s*0;/s',
+			$css
+		);
+		$this->assertMatchesRegularExpression(
+			'/\.mcpwp-control-plane__core\s*\{[^}]*height:\s*clamp\(8rem,\s*11vw,\s*10\.5rem\);[^}]*top:\s*49%;[^}]*width:\s*clamp\(8rem,\s*11vw,\s*10\.5rem\);/s',
+			$css
+		);
+		$this->assertMatchesRegularExpression(
+			'/\.mcpwp-control-plane__summary\s*\{[^}]*max-width:\s*min\(18rem,\s*32%\);/s',
+			$css
+		);
 	}
 
 	/**

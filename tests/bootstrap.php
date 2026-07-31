@@ -645,6 +645,7 @@ function wp_footer() {
  */
 function add_filter( $hook_name, $callback, $priority = 10, $accepted_args = 1 ) {
 	$GLOBALS['mumega_motion_test_filters'][ $hook_name ][ (int) $priority ][] = array(
+		'function'      => $callback,
 		'callback'      => $callback,
 		'accepted_args' => (int) $accepted_args,
 	);

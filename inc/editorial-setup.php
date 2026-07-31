@@ -220,13 +220,26 @@ add_action( 'wp_enqueue_scripts', 'mumega_motion_enqueue_control_home_styles' );
  * Renders the source-controlled control homepage without wpautop mutations.
  *
  * Every other `the_content` filter remains active. The standard automatic
- * paragraph callback is restored immediately so no later content render in
- * the request inherits this template-specific exception.
+ * paragraph callback is restored immediately at its original same-priority
+ * position so no later render inherits this template-specific exception.
  *
  * @return void
  */
 function mumega_motion_the_control_home_content() {
+	global $wp_filter;
+
 	$wpautop_priority = has_filter( 'the_content', 'wpautop' );
+	$priority_callbacks = null;
+
+	if (
+		false !== $wpautop_priority &&
+		isset( $wp_filter['the_content'] ) &&
+		is_object( $wp_filter['the_content'] ) &&
+		isset( $wp_filter['the_content']->callbacks[ (int) $wpautop_priority ] ) &&
+		is_array( $wp_filter['the_content']->callbacks[ (int) $wpautop_priority ] )
+	) {
+		$priority_callbacks = $wp_filter['the_content']->callbacks[ (int) $wpautop_priority ];
+	}
 
 	if ( false !== $wpautop_priority ) {
 		remove_filter( 'the_content', 'wpautop', $wpautop_priority );
@@ -237,6 +250,47 @@ function mumega_motion_the_control_home_content() {
 	} finally {
 		if ( false !== $wpautop_priority ) {
 			add_filter( 'the_content', 'wpautop', $wpautop_priority );
+
+			if (
+				is_array( $priority_callbacks ) &&
+				isset( $wp_filter['the_content'] ) &&
+				is_object( $wp_filter['the_content'] ) &&
+				isset( $wp_filter['the_content']->callbacks[ (int) $wpautop_priority ] ) &&
+				is_array( $wp_filter['the_content']->callbacks[ (int) $wpautop_priority ] )
+			) {
+				$current_callbacks = $wp_filter['the_content']->callbacks[ (int) $wpautop_priority ];
+				$ordered_callbacks = array();
+				$used_callback_ids = array();
+
+				foreach ( $priority_callbacks as $original_registration ) {
+					if ( ! is_array( $original_registration ) || ! array_key_exists( 'function', $original_registration ) ) {
+						continue;
+					}
+
+					foreach ( $current_callbacks as $callback_id => $current_registration ) {
+						if (
+							isset( $used_callback_ids[ $callback_id ] ) ||
+							! is_array( $current_registration ) ||
+							! array_key_exists( 'function', $current_registration ) ||
+							$current_registration['function'] !== $original_registration['function']
+						) {
+							continue;
+						}
+
+						$ordered_callbacks[ $callback_id ] = $original_registration;
+						$used_callback_ids[ $callback_id ] = true;
+						break;
+					}
+				}
+
+				foreach ( $current_callbacks as $callback_id => $current_registration ) {
+					if ( ! isset( $used_callback_ids[ $callback_id ] ) ) {
+						$ordered_callbacks[ $callback_id ] = $current_registration;
+					}
+				}
+
+				$wp_filter['the_content']->callbacks[ (int) $wpautop_priority ] = $ordered_callbacks;
+			}
 		}
 	}
 }

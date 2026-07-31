@@ -74,6 +74,8 @@ final class McpwpControlHomeContentTest extends TestCase {
 		$this->assertStringContainsString( 'https://wordpress.org/plugins/mumega-mcp/', $content );
 		$this->assertStringContainsString( 'https://mcpwp.net/pricing/', $content );
 		$this->assertStringContainsString( 'https://mcpwp.net/agencies/', $content );
+		$this->assertStringContainsString( 'https://mcpwp.net/privacy/', $content );
+		$this->assertStringNotContainsString( 'https://mcpwp.net/privacy-policy/', $content );
 		$this->assertStringContainsString( '>Free<', $content );
 		$this->assertStringContainsString( '>Pro<', $content );
 		$this->assertStringContainsString( '>Agency<', $content );
