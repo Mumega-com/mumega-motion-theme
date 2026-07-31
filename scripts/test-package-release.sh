@@ -98,8 +98,12 @@ required_runtime_files=(
 	build/index.asset.php
 	assets/css/editorial.css
 	assets/css/print.css
+	assets/css/product-home.css
+	assets/css/control-home.css
 	page-templates/editorial-page.php
 	page-templates/editorial-home.php
+	page-templates/product-home.php
+	page-templates/control-home.php
 	template-parts/article-meta.php
 	template-parts/content-card-compact.php
 	template-parts/content-card.php
@@ -112,7 +116,6 @@ required_runtime_files=(
 	template-parts/home-knowledge.php
 	template-parts/home-methodology.php
 	template-parts/home-tools.php
-	template-parts/lead-story.php
 	template-parts/newsletter.php
 	template-parts/section-heading.php
 	inc/editorial-helpers.php

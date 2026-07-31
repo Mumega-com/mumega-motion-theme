@@ -23,6 +23,7 @@ import { act } from 'react';
 import { createRoot as createReactRoot } from 'react-dom/client';
 import {
 	mountFadeInNode,
+	mountControlPlaneNode,
 	mountMotionIslands,
 	parseMotionNumber,
 	shouldReduceMotion,
@@ -98,6 +99,108 @@ describe( 'editorial Motion islands', () => {
 		] );
 	} );
 
+	test( 'mounts only an explicit MCPWP control-plane marker', () => {
+		document.body.innerHTML = `
+			<section id="control" data-mcpwp-control-plane>
+				<a href="#operate" data-mcpwp-intent="operate" data-mcpwp-summary="Operate safely" data-mcpwp-action-label="Start" data-mcpwp-action-href="/start" data-mcpwp-accent="violet" data-mcpwp-event="homepage_intent_selected"><strong>Operate</strong></a>
+				<aside data-mcpwp-control-summary><p><strong>Choose a path</strong></p><p>Fallback summary</p></aside>
+			</section>
+			<section id="lookalike" data-motion="control-plane">Static lookalike</section>
+		`;
+		const recorder = createRootRecorder();
+
+		expect( mountMotionIslands( document, recorder.createRoot ) ).toBe( 1 );
+		expect( recorder.mountedNodes ).toEqual( [
+			document.getElementById( 'control' ),
+		] );
+	} );
+
+	test( 'selects a server-defined intent without forcing anchor navigation', async () => {
+		window.history.replaceState( null, '', '/' );
+		document.body.innerHTML = `
+			<section id="control" class="mcpwp-control-plane" data-mcpwp-control-plane>
+				<nav>
+					<a href="#operate" data-mcpwp-intent="operate" data-mcpwp-summary="Operate safely" data-mcpwp-action-label="Start one site" data-mcpwp-action-href="/start" data-mcpwp-accent="violet" data-mcpwp-event="homepage_intent_selected"><strong>Operate</strong></a>
+					<a href="#scale" data-mcpwp-intent="scale" data-mcpwp-summary="Scale safely" data-mcpwp-action-label="See agency" data-mcpwp-action-href="/agency" data-mcpwp-accent="teal" data-mcpwp-event="homepage_intent_selected"><strong>Scale</strong></a>
+					<a href="#understand" data-mcpwp-intent="understand" data-mcpwp-summary="Understand first" data-mcpwp-action-label="Read the guide" data-mcpwp-action-href="/guide" data-mcpwp-accent="cobalt" data-mcpwp-event="homepage_intent_selected"><strong>Understand</strong></a>
+				</nav>
+				<aside data-mcpwp-control-summary aria-live="polite">
+					<p class="mcpwp-control-home__eyebrow">CURRENT ROUTE</p>
+					<p><strong>Choose the work first.</strong></p>
+					<p>Every path keeps WordPress central.</p>
+				</aside>
+			</section>
+		`;
+		const control = document.getElementById( 'control' );
+		const intentEvents = [];
+		let reactRoot;
+		const previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+		globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+		control.addEventListener( 'mcpwp:intent-selected', ( event ) => {
+			intentEvents.push( event.detail );
+		} );
+
+		try {
+			await act( async () => {
+				expect(
+					mountControlPlaneNode( control, ( node ) => {
+						reactRoot = createReactRoot( node );
+						return reactRoot;
+					} )
+				).toBe( true );
+			} );
+
+			expect( control.textContent ).toContain( 'Choose the work first.' );
+
+			const scale = control.querySelector( '[data-mcpwp-intent="scale"]' );
+			const operate = control.querySelector( '[data-mcpwp-intent="operate"]' );
+
+			await act( async () => {
+				scale.dispatchEvent(
+					new MouseEvent( 'click', { bubbles: true, cancelable: true } )
+				);
+			} );
+
+			expect( control.dataset.selectedIntent ).toBe( 'scale' );
+			expect( scale.getAttribute( 'aria-current' ) ).toBe( 'location' );
+			expect( operate.hasAttribute( 'aria-current' ) ).toBe( false );
+			expect( window.location.hash ).toBe( '#scale' );
+			expect( control.textContent ).toContain( 'Scale safely' );
+			expect( control.textContent ).toContain( 'See agency' );
+			expect( intentEvents ).toEqual( [ { intent: 'scale' } ] );
+		} finally {
+			if ( reactRoot ) {
+				await act( async () => reactRoot.unmount() );
+			}
+
+			if ( previousActEnvironment === undefined ) {
+				delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+			} else {
+				globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
+			}
+		}
+	} );
+
+	test( 'restores an exact control-plane fallback after a render request fails', () => {
+		document.body.innerHTML = `
+			<section id="control" data-mcpwp-control-plane>
+				<a href="#operate" data-mcpwp-intent="operate" data-mcpwp-summary="Operate safely" data-mcpwp-action-label="Start" data-mcpwp-action-href="/start" data-mcpwp-accent="violet" data-mcpwp-event="homepage_intent_selected"><strong>Operate</strong></a>
+				<aside data-mcpwp-control-summary><p><strong>Fallback summary</strong></p></aside>
+			</section>
+		`;
+		const control = document.getElementById( 'control' );
+		const originalHTML = control.innerHTML;
+		const recorder = createRootRecorder( ( node ) => {
+			node.innerHTML = '<p>Partial React output</p>';
+			throw new Error( 'render request failed' );
+		} );
+
+		expect( mountControlPlaneNode( control, recorder.createRoot ) ).toBe( false );
+		expect( control.innerHTML ).toBe( originalHTML );
+		expect( control.dataset.motionFailed ).toBe( 'true' );
+		expect( recorder.unmountedNodes ).toEqual( [ control ] );
+	} );
+
 	test( 'uses safe defaults for invalid numeric attributes', () => {
 		document.body.innerHTML = `
 			<div
@@ -128,6 +231,10 @@ describe( 'editorial Motion islands', () => {
 		document.body.innerHTML = `
 			<section id="fade" data-motion="fade-in"><a href="/story">Story</a></section>
 			<section id="stream" data-motion-stream="/stream">Stream fallback</section>
+			<section id="control" data-mcpwp-control-plane>
+				<a href="#operate" data-mcpwp-intent="operate">Operate</a>
+				<aside data-mcpwp-control-summary>Control fallback</aside>
+			</section>
 		`;
 		const originalMarkup = document.body.innerHTML;
 		const recorder = createRootRecorder();

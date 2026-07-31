@@ -96,6 +96,8 @@ function mumega_motion_render_elementor_location( $location ) {
 function mumega_motion_is_editorial_view() {
 	return is_page_template( 'page-templates/editorial-page.php' ) ||
 		is_page_template( 'page-templates/editorial-home.php' ) ||
+		is_page_template( 'page-templates/product-home.php' ) ||
+		is_page_template( 'page-templates/control-home.php' ) ||
 		is_singular( 'post' ) ||
 		is_home() ||
 		is_archive() ||
@@ -169,6 +171,345 @@ function mumega_motion_enqueue_editorial_styles() {
 	wp_enqueue_style( 'mumega-motion-print', $uri . 'print.css', array( 'mumega-motion-editorial' ), $version, 'print' );
 }
 add_action( 'wp_enqueue_scripts', 'mumega_motion_enqueue_editorial_styles' );
+
+/**
+ * Enqueues the visual system owned by the product-home page template.
+ *
+ * @return void
+ */
+function mumega_motion_enqueue_product_home_styles() {
+	if ( ! is_page_template( 'page-templates/product-home.php' ) ) {
+		return;
+	}
+
+	$version = wp_get_theme()->get( 'Version' );
+	$uri     = get_template_directory_uri() . '/assets/css/';
+
+	wp_enqueue_style(
+		'mumega-motion-product-home',
+		$uri . 'product-home.css',
+		array( 'mumega-motion-editorial' ),
+		$version
+	);
+}
+add_action( 'wp_enqueue_scripts', 'mumega_motion_enqueue_product_home_styles' );
+
+/**
+ * Enqueues the visual system owned by the MCPWP control-plane homepage.
+ *
+ * @return void
+ */
+function mumega_motion_enqueue_control_home_styles() {
+	if ( ! is_page_template( 'page-templates/control-home.php' ) ) {
+		return;
+	}
+
+	$version = wp_get_theme()->get( 'Version' );
+	$uri     = get_template_directory_uri() . '/assets/css/';
+
+	wp_enqueue_style(
+		'mumega-motion-control-home',
+		$uri . 'control-home.css',
+		array( 'mumega-motion-editorial' ),
+		$version
+	);
+}
+add_action( 'wp_enqueue_scripts', 'mumega_motion_enqueue_control_home_styles' );
+
+/**
+ * Renders the source-controlled control homepage without wpautop mutations.
+ *
+ * Every other `the_content` filter remains active. The standard automatic
+ * paragraph callback is restored immediately at its original same-priority
+ * position so no later render inherits this template-specific exception.
+ *
+ * @return void
+ */
+function mumega_motion_the_control_home_content() {
+	global $wp_filter;
+
+	$wpautop_priority = has_filter( 'the_content', 'wpautop' );
+	$priority_callbacks = null;
+
+	if (
+		false !== $wpautop_priority &&
+		isset( $wp_filter['the_content'] ) &&
+		is_object( $wp_filter['the_content'] ) &&
+		isset( $wp_filter['the_content']->callbacks[ (int) $wpautop_priority ] ) &&
+		is_array( $wp_filter['the_content']->callbacks[ (int) $wpautop_priority ] )
+	) {
+		$priority_callbacks = $wp_filter['the_content']->callbacks[ (int) $wpautop_priority ];
+	}
+
+	if ( false !== $wpautop_priority ) {
+		remove_filter( 'the_content', 'wpautop', $wpautop_priority );
+	}
+
+	try {
+		the_content();
+	} finally {
+		if ( false !== $wpautop_priority ) {
+			add_filter( 'the_content', 'wpautop', $wpautop_priority );
+
+			if (
+				is_array( $priority_callbacks ) &&
+				isset( $wp_filter['the_content'] ) &&
+				is_object( $wp_filter['the_content'] ) &&
+				isset( $wp_filter['the_content']->callbacks[ (int) $wpautop_priority ] ) &&
+				is_array( $wp_filter['the_content']->callbacks[ (int) $wpautop_priority ] )
+			) {
+				$current_callbacks = $wp_filter['the_content']->callbacks[ (int) $wpautop_priority ];
+				$ordered_callbacks = array();
+				$used_callback_ids = array();
+
+				foreach ( $priority_callbacks as $original_registration ) {
+					if ( ! is_array( $original_registration ) || ! array_key_exists( 'function', $original_registration ) ) {
+						continue;
+					}
+
+					foreach ( $current_callbacks as $callback_id => $current_registration ) {
+						if (
+							isset( $used_callback_ids[ $callback_id ] ) ||
+							! is_array( $current_registration ) ||
+							! array_key_exists( 'function', $current_registration ) ||
+							$current_registration['function'] !== $original_registration['function']
+						) {
+							continue;
+						}
+
+						$ordered_callbacks[ $callback_id ] = $original_registration;
+						$used_callback_ids[ $callback_id ] = true;
+						break;
+					}
+				}
+
+				foreach ( $current_callbacks as $callback_id => $current_registration ) {
+					if ( ! isset( $used_callback_ids[ $callback_id ] ) ) {
+						$ordered_callbacks[ $callback_id ] = $current_registration;
+					}
+				}
+
+				$wp_filter['the_content']->callbacks[ (int) $wpautop_priority ] = $ordered_callbacks;
+			}
+		}
+	}
+}
+
+/**
+ * Renders the native WordPress search form inside product-owned page content.
+ *
+ * @return string Native search form markup.
+ */
+function mumega_motion_product_search_shortcode() {
+	ob_start();
+	get_search_form();
+
+	return (string) ob_get_clean();
+}
+add_shortcode( 'mumega_product_search', 'mumega_motion_product_search_shortcode' );
+
+/**
+ * Renders ASTER through WordPress's responsive attachment image boundary.
+ *
+ * @param array $atts Shortcode attributes.
+ * @return string Responsive image markup, or an empty string without an ID.
+ */
+function mumega_motion_product_aster_image_shortcode( $atts ) {
+	$atts = shortcode_atts(
+		array(
+			'id' => 0,
+		),
+		$atts,
+		'mumega_product_aster_image'
+	);
+
+	$attachment_id = (int) $atts['id'];
+
+	if ( $attachment_id <= 0 ) {
+		return '';
+	}
+
+	return wp_get_attachment_image(
+		$attachment_id,
+		'large',
+		false,
+		array(
+			'class'   => 'mcpwp-product-home__portrait',
+			'alt'     => __( 'ASTER, MCPWP’s AI Research Editor', 'mumega-motion' ),
+			'loading' => 'eager',
+			'sizes'   => '(max-width: 47.9375rem) calc(100vw - 2.5rem), 20rem',
+		)
+	);
+}
+add_shortcode( 'mumega_product_aster_image', 'mumega_motion_product_aster_image_shortcode' );
+
+/**
+ * Returns the explicitly owned homepage template paths.
+ *
+ * @return array<int,string> Owned page template paths.
+ */
+function mumega_motion_owned_home_templates() {
+	return array(
+		'page-templates/product-home.php',
+		'page-templates/control-home.php',
+	);
+}
+
+/**
+ * Reports whether the current or supplied page uses an owned home template.
+ *
+ * @param int $post_id Optional page ID. Defaults to the current request.
+ * @return bool Whether an owned home template is assigned.
+ */
+function mumega_motion_is_owned_home_template( $post_id = 0 ) {
+	if ( (int) $post_id > 0 ) {
+		return in_array( get_page_template_slug( (int) $post_id ), mumega_motion_owned_home_templates(), true );
+	}
+
+	foreach ( mumega_motion_owned_home_templates() as $template ) {
+		if ( is_page_template( $template ) ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Reports whether an owned homepage has been promoted through Reading Settings.
+ *
+ * @param int $post_id Optional page ID. Defaults to the queried object.
+ * @return bool Whether the page is the configured static front page.
+ */
+function mumega_motion_is_promoted_product_home( $post_id = 0 ) {
+	if ( 'page' !== get_option( 'show_on_front' ) ) {
+		return false;
+	}
+
+	$front_page_id = (int) get_option( 'page_on_front' );
+	$post_id       = (int) $post_id > 0 ? (int) $post_id : get_queried_object_id();
+
+	return $front_page_id > 0 && $front_page_id === $post_id;
+}
+
+/**
+ * Prevents owned homepage previews from being indexed before promotion.
+ *
+ * @param array $robots Robots directives generated by WordPress.
+ * @return array Filtered robots directives.
+ */
+function mumega_motion_filter_product_home_robots( $robots ) {
+	if ( ! mumega_motion_is_owned_home_template() || mumega_motion_is_promoted_product_home() ) {
+		return $robots;
+	}
+
+	$robots['noindex']  = true;
+	$robots['nofollow'] = true;
+
+	return $robots;
+}
+add_filter( 'wp_robots', 'mumega_motion_filter_product_home_robots' );
+
+/**
+ * Returns published owned-home page IDs that are still previews.
+ *
+ * @return array Preview page IDs.
+ */
+function mumega_motion_product_home_preview_ids() {
+	$preview_ids = get_posts(
+		array(
+			'post_type'              => 'page',
+			'post_status'            => 'publish',
+			'fields'                 => 'ids',
+			'numberposts'            => -1,
+			'meta_key'               => '_wp_page_template', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- The template assignment is the exclusion contract.
+			'meta_value'             => mumega_motion_owned_home_templates(), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- The owned template assignments are the exclusion contract.
+			'meta_compare'           => 'IN',
+			'no_found_rows'          => true,
+			'update_post_meta_cache' => false,
+			'update_post_term_cache' => false,
+		)
+	);
+
+	$preview_ids = array_values( array_unique( array_map( 'intval', $preview_ids ) ) );
+
+	if ( 'page' === get_option( 'show_on_front' ) ) {
+		$front_page_id = (int) get_option( 'page_on_front' );
+		$preview_ids   = array_values(
+			array_filter(
+				$preview_ids,
+				static function ( $post_id ) use ( $front_page_id ) {
+					return $front_page_id <= 0 || $post_id !== $front_page_id;
+				}
+			)
+		);
+	}
+
+	return $preview_ids;
+}
+
+/**
+ * Keeps preview owned-home pages out of WordPress core sitemaps.
+ *
+ * @param array  $args      Query arguments for the sitemap provider.
+ * @param string $post_type Post type handled by the sitemap provider.
+ * @return array Filtered sitemap query arguments.
+ */
+function mumega_motion_exclude_product_home_sitemap_pages( $args, $post_type ) {
+	if ( 'page' !== $post_type ) {
+		return $args;
+	}
+
+	$preview_ids = mumega_motion_product_home_preview_ids();
+
+	if ( empty( $preview_ids ) ) {
+		return $args;
+	}
+
+	$excluded_ids         = isset( $args['post__not_in'] ) && is_array( $args['post__not_in'] ) ? $args['post__not_in'] : array();
+	$args['post__not_in'] = array_values( array_unique( array_merge( $excluded_ids, array_map( 'intval', $preview_ids ) ) ) );
+
+	return $args;
+}
+add_filter( 'wp_sitemaps_posts_query_args', 'mumega_motion_exclude_product_home_sitemap_pages', 10, 2 );
+
+/**
+ * Adds unpromoted owned-home pages to Yoast's sitemap exclusion IDs.
+ *
+ * @param array $excluded_ids Existing excluded post IDs.
+ * @return array Filtered excluded post IDs.
+ */
+function mumega_motion_exclude_product_home_from_yoast_sitemaps( $excluded_ids ) {
+	return array_values(
+		array_unique(
+			array_merge( (array) $excluded_ids, mumega_motion_product_home_preview_ids() )
+		)
+	);
+}
+add_filter( 'wpseo_exclude_from_sitemap_by_post_ids', 'mumega_motion_exclude_product_home_from_yoast_sitemaps' );
+
+/**
+ * Removes an unpromoted owned-home page entry from Rank Math sitemaps.
+ *
+ * @param array|false $url            Sitemap URL entry.
+ * @param string      $type           Sitemap object type.
+ * @param object      $sitemap_object Sitemap object.
+ * @return array|false Filtered sitemap URL entry.
+ */
+function mumega_motion_filter_rank_math_sitemap_entry( $url, $type, $sitemap_object ) {
+	if ( 'post' !== $type || ! is_object( $sitemap_object ) || empty( $sitemap_object->ID ) ) {
+		return $url;
+	}
+
+	$post_id = (int) $sitemap_object->ID;
+
+	if ( ! mumega_motion_is_owned_home_template( $post_id ) || mumega_motion_is_promoted_product_home( $post_id ) ) {
+		return $url;
+	}
+
+	return false;
+}
+add_filter( 'rank_math/sitemap/entry', 'mumega_motion_filter_rank_math_sitemap_entry', 10, 3 );
 
 /**
  * Identifies an asset registered by Elementor or Elementor Pro.

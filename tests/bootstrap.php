@@ -20,6 +20,7 @@ if ( ! defined( 'DAY_IN_SECONDS' ) ) {
 
 $GLOBALS['mumega_motion_test_filters']          = array();
 $GLOBALS['mumega_motion_test_actions']          = array();
+$GLOBALS['mumega_motion_test_shortcodes']       = array();
 $GLOBALS['mumega_motion_test_translations']     = array();
 $GLOBALS['mumega_motion_test_pattern_categories'] = array();
 $GLOBALS['mumega_motion_test_patterns']         = array();
@@ -64,6 +65,7 @@ $GLOBALS['mumega_motion_test_dequeued_styles']  = array();
 $GLOBALS['mumega_motion_test_dequeued_scripts'] = array();
 $GLOBALS['mumega_motion_test_conditionals']     = array();
 $GLOBALS['mumega_motion_test_page_template']    = '';
+$GLOBALS['mumega_motion_test_page_templates']   = array();
 $GLOBALS['mumega_motion_test_queried_object_id'] = 0;
 $GLOBALS['mumega_motion_test_queried_object']   = null;
 $GLOBALS['mumega_motion_test_search_query']     = '';
@@ -85,6 +87,8 @@ $GLOBALS['mumega_motion_test_reset_postdata_exception']  = null;
 $GLOBALS['mumega_motion_test_elementor_edit_mode'] = '';
 $GLOBALS['mumega_motion_test_elementor_location_output'] = array();
 $GLOBALS['mumega_motion_test_postdata_events']  = array();
+$GLOBALS['mumega_motion_test_attachment_image_requests'] = array();
+$GLOBALS['mumega_motion_test_search_form_calls'] = 0;
 
 /**
  * Minimal post value used by editorial helper tests.
@@ -641,11 +645,74 @@ function wp_footer() {
  */
 function add_filter( $hook_name, $callback, $priority = 10, $accepted_args = 1 ) {
 	$GLOBALS['mumega_motion_test_filters'][ $hook_name ][ (int) $priority ][] = array(
+		'function'      => $callback,
 		'callback'      => $callback,
 		'accepted_args' => (int) $accepted_args,
 	);
 
 	return true;
+}
+
+/**
+ * Reports whether a callback is registered for a filter.
+ *
+ * @param string         $hook_name Filter name.
+ * @param callable|false $callback  Optional callback to locate.
+ * @return int|bool Callback priority, whether the hook has callbacks, or false.
+ */
+function has_filter( $hook_name, $callback = false ) {
+	if ( empty( $GLOBALS['mumega_motion_test_filters'][ $hook_name ] ) ) {
+		return false;
+	}
+
+	if ( false === $callback ) {
+		return true;
+	}
+
+	foreach ( $GLOBALS['mumega_motion_test_filters'][ $hook_name ] as $priority => $registrations ) {
+		foreach ( $registrations as $registration ) {
+			if ( $registration['callback'] === $callback ) {
+				return (int) $priority;
+			}
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Removes one callback registered for a filter.
+ *
+ * @param string   $hook_name Filter name.
+ * @param callable $callback  Callback to remove.
+ * @param int      $priority  Callback priority.
+ * @return bool Whether a callback was removed.
+ */
+function remove_filter( $hook_name, $callback, $priority = 10 ) {
+	if ( empty( $GLOBALS['mumega_motion_test_filters'][ $hook_name ][ (int) $priority ] ) ) {
+		return false;
+	}
+
+	$removed = false;
+	$GLOBALS['mumega_motion_test_filters'][ $hook_name ][ (int) $priority ] = array_values(
+		array_filter(
+			$GLOBALS['mumega_motion_test_filters'][ $hook_name ][ (int) $priority ],
+			static function ( $registration ) use ( $callback, &$removed ) {
+				if ( $registration['callback'] === $callback ) {
+					$removed = true;
+					return false;
+				}
+
+				return true;
+			}
+		)
+	);
+
+	if ( empty( $GLOBALS['mumega_motion_test_filters'][ $hook_name ][ (int) $priority ] ) ) {
+		unset( $GLOBALS['mumega_motion_test_filters'][ $hook_name ][ (int) $priority ] );
+	}
+
+	return $removed;
 }
 
 /**
@@ -677,6 +744,16 @@ function apply_filters( $hook_name, $value, ...$args ) {
 	}
 
 	return $value;
+}
+
+/**
+ * Marks content transformed by WordPress's automatic paragraph filter.
+ *
+ * @param string $content Post content.
+ * @return string Transformed content fixture.
+ */
+function wpautop( $content ) {
+	return '<p class="test-wpautop">' . $content . '</p>';
 }
 
 /**
@@ -822,8 +899,63 @@ function wp_nav_menu( $args = array() ) {
  *
  * @return void
  */
-function get_search_form() {
-	echo '<form role="search" class="search-form"><label>Search<input type="search"></label></form>';
+function get_search_form( $args = null ) {
+	$GLOBALS['mumega_motion_test_search_form_calls']++;
+	$markup = '<form role="search" class="search-form"><label>Search<input type="search" class="search-field"></label><button type="submit" class="search-submit">Search</button></form>';
+
+	if ( false === $args ) {
+		return $markup;
+	}
+
+	echo $markup; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Native search-form fixture.
+}
+
+/**
+ * Registers a shortcode callback for assertions.
+ *
+ * @param string   $tag      Shortcode tag.
+ * @param callable $callback Shortcode callback.
+ * @return void
+ */
+function add_shortcode( $tag, $callback ) {
+	$GLOBALS['mumega_motion_test_shortcodes'][ $tag ] = $callback;
+}
+
+/**
+ * Merges shortcode attributes with defaults.
+ *
+ * @param array  $pairs Defaults.
+ * @param array  $atts  Supplied attributes.
+ * @param string $tag   Shortcode tag.
+ * @return array
+ */
+function shortcode_atts( $pairs, $atts, $tag = '' ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
+	return array_merge( $pairs, (array) $atts );
+}
+
+/**
+ * Returns deterministic responsive attachment markup.
+ *
+ * @param int          $attachment_id Attachment ID.
+ * @param string|array $size          Requested image size.
+ * @param bool         $icon          Whether an icon was requested.
+ * @param array        $attr          Image attributes.
+ * @return string
+ */
+function wp_get_attachment_image( $attachment_id, $size = 'thumbnail', $icon = false, $attr = array() ) {
+	$GLOBALS['mumega_motion_test_attachment_image_requests'][] = array(
+		'attachment_id' => (int) $attachment_id,
+		'size'          => $size,
+		'icon'          => $icon,
+		'attr'          => $attr,
+	);
+
+	return sprintf(
+		'<img src="https://example.test/uploads/aster-768x1280.jpg" srcset="https://example.test/uploads/aster-300x500.jpg 300w, https://example.test/uploads/aster-768x1280.jpg 768w" sizes="%1$s" class="%2$s" alt="%3$s" />',
+		esc_attr( isset( $attr['sizes'] ) ? $attr['sizes'] : '' ),
+		esc_attr( isset( $attr['class'] ) ? $attr['class'] : '' ),
+		esc_attr( isset( $attr['alt'] ) ? $attr['alt'] : '' )
+	);
 }
 
 /**
@@ -1075,7 +1207,7 @@ function get_the_modified_date( $format = '', $post = null ) {
  * @return void
  */
 function the_content() {
-	echo $GLOBALS['mumega_motion_test_current_post']->post_content; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- WordPress content contract.
+	echo apply_filters( 'the_content', $GLOBALS['mumega_motion_test_current_post']->post_content ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- WordPress content contract.
 }
 
 /**
@@ -1361,6 +1493,20 @@ function is_404() {
  */
 function is_page_template( $template = '' ) {
 	return $template === $GLOBALS['mumega_motion_test_page_template'];
+}
+
+/**
+ * Returns a configured page template assignment.
+ *
+ * @param int $post_id Post ID.
+ * @return string
+ */
+function get_page_template_slug( $post_id = null ) {
+	$post_id = null === $post_id ? get_queried_object_id() : (int) $post_id;
+
+	return isset( $GLOBALS['mumega_motion_test_page_templates'][ $post_id ] )
+		? $GLOBALS['mumega_motion_test_page_templates'][ $post_id ]
+		: '';
 }
 
 /**
