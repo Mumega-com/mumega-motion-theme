@@ -210,4 +210,3 @@ The implementation is acceptable only when all of the following are true:
 - Creating fake activity, social proof, benchmarks, partner logos, or compatibility badges.
 - Rebuilding the whole editorial archive or every MCPWP page in this release.
 - Depending on Elementor for the new homepage.
-

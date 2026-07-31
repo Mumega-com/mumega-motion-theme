@@ -1,9 +1,9 @@
 # MCPWP conversion homepage preview
 
-**Date:** 2026-07-29  
-**Status:** Approved direction; pending owner review of this written contract  
-**Repository:** `Mumega-com/mumega-motion-theme`  
-**Target:** A separate, unlinked WordPress preview page  
+**Date:** 2026-07-29
+**Status:** Approved direction; pending owner review of this written contract
+**Repository:** `Mumega-com/mumega-motion-theme`
+**Target:** A separate, unlinked WordPress preview page
 **Production homepage:** Unchanged until explicit owner approval
 
 ## Objective

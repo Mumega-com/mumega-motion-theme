@@ -389,4 +389,3 @@ Invoke `superpowers:verification-before-completion`, `superpowers:requesting-cod
 ### Step 5: Final report
 
 Report the live URL, previous page rollback ID, commit SHA, package checksum, tests, browser evidence, known follow-ups, and PR URL. Do not call the homepage complete if any launch gate remains unverified.
-
