@@ -97,6 +97,7 @@ function mumega_motion_is_editorial_view() {
 	return is_page_template( 'page-templates/editorial-page.php' ) ||
 		is_page_template( 'page-templates/editorial-home.php' ) ||
 		is_page_template( 'page-templates/product-home.php' ) ||
+		is_page_template( 'page-templates/control-home.php' ) ||
 		is_singular( 'post' ) ||
 		is_home() ||
 		is_archive() ||
@@ -192,6 +193,28 @@ function mumega_motion_enqueue_product_home_styles() {
 	);
 }
 add_action( 'wp_enqueue_scripts', 'mumega_motion_enqueue_product_home_styles' );
+
+/**
+ * Enqueues the visual system owned by the MCPWP control-plane homepage.
+ *
+ * @return void
+ */
+function mumega_motion_enqueue_control_home_styles() {
+	if ( ! is_page_template( 'page-templates/control-home.php' ) ) {
+		return;
+	}
+
+	$version = wp_get_theme()->get( 'Version' );
+	$uri     = get_template_directory_uri() . '/assets/css/';
+
+	wp_enqueue_style(
+		'mumega-motion-control-home',
+		$uri . 'control-home.css',
+		array( 'mumega-motion-editorial' ),
+		$version
+	);
+}
+add_action( 'wp_enqueue_scripts', 'mumega_motion_enqueue_control_home_styles' );
 
 /**
  * Renders the native WordPress search form inside product-owned page content.

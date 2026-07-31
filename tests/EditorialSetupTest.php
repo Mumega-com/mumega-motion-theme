@@ -163,6 +163,9 @@ final class EditorialSetupTest extends TestCase {
 		$GLOBALS['mumega_motion_test_page_template'] = 'page-templates/product-home.php';
 		$this->assertTrue( mumega_motion_is_editorial_view() );
 
+		$GLOBALS['mumega_motion_test_page_template'] = 'page-templates/control-home.php';
+		$this->assertTrue( mumega_motion_is_editorial_view() );
+
 		foreach ( array( 'is_singular', 'is_home', 'is_archive', 'is_search', 'is_404' ) as $conditional ) {
 			$GLOBALS['mumega_motion_test_page_template'] = '';
 			$GLOBALS['mumega_motion_test_conditionals']  = array( $conditional => true );
@@ -203,6 +206,39 @@ final class EditorialSetupTest extends TestCase {
 			array(
 				'mumega-motion-product-home' => array(
 					'src'   => 'https://example.test/wp-content/themes/mumega-motion/assets/css/product-home.css',
+					'deps'  => array( 'mumega-motion-editorial' ),
+					'ver'   => '0.1.0',
+					'media' => 'all',
+				),
+			),
+			$GLOBALS['mumega_motion_test_enqueued_styles']
+		);
+	}
+
+	/**
+	 * Catches control-home styles leaking onto ordinary or product-owned pages.
+	 */
+	public function test_control_home_styles_are_scoped_to_the_control_home_template(): void {
+		$this->assertTrue( function_exists( 'mumega_motion_enqueue_control_home_styles' ) );
+
+		if ( ! function_exists( 'mumega_motion_enqueue_control_home_styles' ) ) {
+			return;
+		}
+
+		mumega_motion_enqueue_control_home_styles();
+		$this->assertSame( array(), $GLOBALS['mumega_motion_test_enqueued_styles'] );
+
+		$GLOBALS['mumega_motion_test_page_template'] = 'page-templates/product-home.php';
+		mumega_motion_enqueue_control_home_styles();
+		$this->assertSame( array(), $GLOBALS['mumega_motion_test_enqueued_styles'] );
+
+		$GLOBALS['mumega_motion_test_page_template'] = 'page-templates/control-home.php';
+		mumega_motion_enqueue_control_home_styles();
+
+		$this->assertSame(
+			array(
+				'mumega-motion-control-home' => array(
+					'src'   => 'https://example.test/wp-content/themes/mumega-motion/assets/css/control-home.css',
 					'deps'  => array( 'mumega-motion-editorial' ),
 					'ver'   => '0.1.0',
 					'media' => 'all',
