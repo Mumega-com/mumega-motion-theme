@@ -126,6 +126,18 @@ final class ControlHomeVisualSystemTest extends TestCase {
 	}
 
 	/**
+	 * Catches generic link colors outranking the contrasting header and button colors.
+	 */
+	public function test_generic_link_colors_use_zero_specificity_inner_selectors(): void {
+		$css = $this->stylesheet();
+
+		$this->assertStringContainsString( '.mcpwp-control-home :where(a) {', $css );
+		$this->assertStringContainsString( '.mcpwp-control-home :where(a:hover) {', $css );
+		$this->assertStringNotContainsString( '.mcpwp-control-home a {', $css );
+		$this->assertStringNotContainsString( '.mcpwp-control-home a:hover {', $css );
+	}
+
+	/**
 	 * Reads the scoped stylesheet.
 	 */
 	private function stylesheet(): string {

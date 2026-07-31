@@ -92,13 +92,13 @@
 	line-height: 1.58;
 }
 
-.mcpwp-control-home a {
+.mcpwp-control-home :where(a) {
 	color: inherit;
 	text-decoration-thickness: 0.08em;
 	text-underline-offset: 0.2em;
 }
 
-.mcpwp-control-home a:hover {
+.mcpwp-control-home :where(a:hover) {
 	color: var(--mcpwp-violet);
 }
 
