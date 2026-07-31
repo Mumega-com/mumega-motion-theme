@@ -299,23 +299,26 @@ final class EditorialSetupTest extends TestCase {
 	}
 
 	/**
-	 * Keeps preview product-home pages out of search results until promotion.
+	 * Keeps owned homepage previews out of search results until promotion.
 	 */
-	public function test_product_home_robots_filter_is_scoped_to_the_product_home_template(): void {
+	public function test_home_preview_robots_filter_is_scoped_to_owned_home_templates(): void {
 		$robots = array( 'max-image-preview' => 'large' );
 
 		$this->assertSame( $robots, apply_filters( 'wp_robots', $robots ) );
 
-		$GLOBALS['mumega_motion_test_page_template'] = 'page-templates/product-home.php';
+		foreach ( array( 'page-templates/product-home.php', 'page-templates/control-home.php' ) as $template ) {
+			$GLOBALS['mumega_motion_test_page_template'] = $template;
 
-		$this->assertSame(
-			array(
-				'max-image-preview' => 'large',
-				'noindex'           => true,
-				'nofollow'          => true,
-			),
-			apply_filters( 'wp_robots', $robots )
-		);
+			$this->assertSame(
+				array(
+					'max-image-preview' => 'large',
+					'noindex'           => true,
+					'nofollow'          => true,
+				),
+				apply_filters( 'wp_robots', $robots ),
+				$template
+			);
+		}
 
 		$GLOBALS['mumega_motion_test_options']           = array(
 			'show_on_front' => 'page',
@@ -327,9 +330,9 @@ final class EditorialSetupTest extends TestCase {
 	}
 
 	/**
-	 * Excludes product-home previews from page sitemaps without altering other post types.
+	 * Excludes owned homepage previews from page sitemaps without altering other post types.
 	 */
-	public function test_product_home_pages_are_excluded_only_from_page_sitemaps(): void {
+	public function test_owned_home_pages_are_excluded_only_from_page_sitemaps(): void {
 		$article_args = array( 'post__not_in' => array( 8 ) );
 
 		$this->assertSame(
@@ -351,7 +354,8 @@ final class EditorialSetupTest extends TestCase {
 				'fields'                 => 'ids',
 				'numberposts'            => -1,
 				'meta_key'               => '_wp_page_template', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- The template assignment is the exclusion contract.
-				'meta_value'             => 'page-templates/product-home.php', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- The template assignment is the exclusion contract.
+				'meta_value'             => array( 'page-templates/product-home.php', 'page-templates/control-home.php' ), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- The owned template assignments are the exclusion contract.
+				'meta_compare'           => 'IN',
 				'no_found_rows'          => true,
 				'update_post_meta_cache' => false,
 				'update_post_term_cache' => false,
@@ -374,7 +378,7 @@ final class EditorialSetupTest extends TestCase {
 	/**
 	 * Applies the same preview-only exclusion to Yoast and Rank Math sitemaps.
 	 */
-	public function test_seo_plugin_sitemap_filters_exclude_only_unpromoted_product_home_pages(): void {
+	public function test_seo_plugin_sitemap_filters_exclude_only_unpromoted_owned_home_pages(): void {
 		$GLOBALS['mumega_motion_test_post_queries'][] = array( 29, 31 );
 
 		$this->assertSame(
@@ -389,6 +393,12 @@ final class EditorialSetupTest extends TestCase {
 		$rank_math_entry = apply_filters( 'rank_math/sitemap/entry', $url, 'post', $post ); // phpcs:ignore WordPress.NamingConventions.ValidHookName.UseUnderscores -- Rank Math's documented hook uses slashes.
 		$this->assertFalse( $rank_math_entry );
 
+		$GLOBALS['mumega_motion_test_page_templates'][31] = 'page-templates/control-home.php';
+		$post = new WP_Post( array( 'ID' => 31 ) );
+		$this->assertFalse(
+			apply_filters( 'rank_math/sitemap/entry', $url, 'post', $post ) // phpcs:ignore WordPress.NamingConventions.ValidHookName.UseUnderscores -- Rank Math's documented hook uses slashes.
+		);
+
 		$GLOBALS['mumega_motion_test_options'] = array(
 			'show_on_front' => 'page',
 			'page_on_front' => 29,
@@ -399,6 +409,7 @@ final class EditorialSetupTest extends TestCase {
 			array( 7, 31 ),
 			apply_filters( 'wpseo_exclude_from_sitemap_by_post_ids', array( 7 ) )
 		);
+		$post = new WP_Post( array( 'ID' => 29 ) );
 		$rank_math_entry = apply_filters( 'rank_math/sitemap/entry', $url, 'post', $post ); // phpcs:ignore WordPress.NamingConventions.ValidHookName.UseUnderscores -- Rank Math's documented hook uses slashes.
 		$this->assertSame( $url, $rank_math_entry );
 	}
