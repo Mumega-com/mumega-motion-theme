@@ -7,6 +7,10 @@
 
 use PHPUnit\Framework\TestCase;
 
+if ( file_exists( dirname( __DIR__ ) . '/inc/editorial-setup.php' ) ) {
+	require_once dirname( __DIR__ ) . '/inc/editorial-setup.php';
+}
+
 /**
  * Exercises the control-plane homepage template boundary.
  */
@@ -32,6 +36,54 @@ final class ControlHomeTemplateTest extends TestCase {
 		$this->assertStringContainsString( "post_class( 'mcpwp-control-home-entry' )", $source );
 		$this->assertStringContainsString( 'while ( have_posts() )', $source );
 		$this->assertStringContainsString( 'the_post();', $source );
-		$this->assertStringContainsString( 'the_content();', $source );
+		$this->assertStringContainsString( 'mumega_motion_the_control_home_content();', $source );
+		$this->assertStringNotContainsString( '<?php the_content(); ?>', $source );
+	}
+
+	/**
+	 * Preserves source-controlled layout HTML while retaining every other content filter.
+	 */
+	public function test_control_home_content_suspends_only_wpautop_and_restores_it(): void {
+		$original_filters = isset( $GLOBALS['mumega_motion_test_filters']['the_content'] )
+			? $GLOBALS['mumega_motion_test_filters']['the_content']
+			: null;
+		$original_post    = $GLOBALS['mumega_motion_test_current_post'];
+
+		try {
+			$GLOBALS['mumega_motion_test_filters']['the_content'] = array();
+			$GLOBALS['mumega_motion_test_current_post']           = new WP_Post(
+				array(
+					'ID'           => 25,
+					'post_content' => '<div data-layout="control-home">Source HTML</div>',
+				)
+			);
+
+			add_filter( 'the_content', 'wpautop', 10 );
+			add_filter(
+				'the_content',
+				static function ( $content ) {
+					return $content . '<!-- retained-filter -->';
+				},
+				20
+			);
+
+			ob_start();
+			mumega_motion_the_control_home_content();
+			$output = ob_get_clean();
+
+			$this->assertSame(
+				'<div data-layout="control-home">Source HTML</div><!-- retained-filter -->',
+				$output
+			);
+			$this->assertSame( 10, has_filter( 'the_content', 'wpautop' ) );
+		} finally {
+			$GLOBALS['mumega_motion_test_current_post'] = $original_post;
+
+			if ( null === $original_filters ) {
+				unset( $GLOBALS['mumega_motion_test_filters']['the_content'] );
+			} else {
+				$GLOBALS['mumega_motion_test_filters']['the_content'] = $original_filters;
+			}
+		}
 	}
 }

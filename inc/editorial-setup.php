@@ -217,6 +217,31 @@ function mumega_motion_enqueue_control_home_styles() {
 add_action( 'wp_enqueue_scripts', 'mumega_motion_enqueue_control_home_styles' );
 
 /**
+ * Renders the source-controlled control homepage without wpautop mutations.
+ *
+ * Every other `the_content` filter remains active. The standard automatic
+ * paragraph callback is restored immediately so no later content render in
+ * the request inherits this template-specific exception.
+ *
+ * @return void
+ */
+function mumega_motion_the_control_home_content() {
+	$wpautop_priority = has_filter( 'the_content', 'wpautop' );
+
+	if ( false !== $wpautop_priority ) {
+		remove_filter( 'the_content', 'wpautop', $wpautop_priority );
+	}
+
+	try {
+		the_content();
+	} finally {
+		if ( false !== $wpautop_priority ) {
+			add_filter( 'the_content', 'wpautop', $wpautop_priority );
+		}
+	}
+}
+
+/**
  * Renders the native WordPress search form inside product-owned page content.
  *
  * @return string Native search form markup.

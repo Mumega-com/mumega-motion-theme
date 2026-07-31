@@ -653,6 +653,68 @@ function add_filter( $hook_name, $callback, $priority = 10, $accepted_args = 1 )
 }
 
 /**
+ * Reports whether a callback is registered for a filter.
+ *
+ * @param string         $hook_name Filter name.
+ * @param callable|false $callback  Optional callback to locate.
+ * @return int|bool Callback priority, whether the hook has callbacks, or false.
+ */
+function has_filter( $hook_name, $callback = false ) {
+	if ( empty( $GLOBALS['mumega_motion_test_filters'][ $hook_name ] ) ) {
+		return false;
+	}
+
+	if ( false === $callback ) {
+		return true;
+	}
+
+	foreach ( $GLOBALS['mumega_motion_test_filters'][ $hook_name ] as $priority => $registrations ) {
+		foreach ( $registrations as $registration ) {
+			if ( $registration['callback'] === $callback ) {
+				return (int) $priority;
+			}
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Removes one callback registered for a filter.
+ *
+ * @param string   $hook_name Filter name.
+ * @param callable $callback  Callback to remove.
+ * @param int      $priority  Callback priority.
+ * @return bool Whether a callback was removed.
+ */
+function remove_filter( $hook_name, $callback, $priority = 10 ) {
+	if ( empty( $GLOBALS['mumega_motion_test_filters'][ $hook_name ][ (int) $priority ] ) ) {
+		return false;
+	}
+
+	$removed = false;
+	$GLOBALS['mumega_motion_test_filters'][ $hook_name ][ (int) $priority ] = array_values(
+		array_filter(
+			$GLOBALS['mumega_motion_test_filters'][ $hook_name ][ (int) $priority ],
+			static function ( $registration ) use ( $callback, &$removed ) {
+				if ( $registration['callback'] === $callback ) {
+					$removed = true;
+					return false;
+				}
+
+				return true;
+			}
+		)
+	);
+
+	if ( empty( $GLOBALS['mumega_motion_test_filters'][ $hook_name ][ (int) $priority ] ) ) {
+		unset( $GLOBALS['mumega_motion_test_filters'][ $hook_name ][ (int) $priority ] );
+	}
+
+	return $removed;
+}
+
+/**
  * Applies callbacks registered for a filter.
  *
  * @param string $hook_name Filter name.
@@ -681,6 +743,16 @@ function apply_filters( $hook_name, $value, ...$args ) {
 	}
 
 	return $value;
+}
+
+/**
+ * Marks content transformed by WordPress's automatic paragraph filter.
+ *
+ * @param string $content Post content.
+ * @return string Transformed content fixture.
+ */
+function wpautop( $content ) {
+	return '<p class="test-wpautop">' . $content . '</p>';
 }
 
 /**
@@ -1134,7 +1206,7 @@ function get_the_modified_date( $format = '', $post = null ) {
  * @return void
  */
 function the_content() {
-	echo $GLOBALS['mumega_motion_test_current_post']->post_content; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- WordPress content contract.
+	echo apply_filters( 'the_content', $GLOBALS['mumega_motion_test_current_post']->post_content ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- WordPress content contract.
 }
 
 /**

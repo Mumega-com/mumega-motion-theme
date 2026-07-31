@@ -14,7 +14,7 @@ mumega_motion_get_header();
 		the_post();
 		?>
 		<article <?php post_class( 'mcpwp-control-home-entry' ); ?>>
-			<?php the_content(); ?>
+			<?php mumega_motion_the_control_home_content(); ?>
 		</article>
 	<?php endwhile; ?>
 </main>
