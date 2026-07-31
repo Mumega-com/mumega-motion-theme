@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { LazyMotion, domAnimation, m, LayoutGroup } from 'motion/react';
 import FadeIn, { FADE_IN_DEFAULTS } from '../components/FadeIn';
 import StreamingText from '../components/StreamingText';
+import ControlPlane, {
+	readControlPlaneConfig,
+} from '../components/ControlPlane';
 
 /**
  * Parses a finite motion value without accepting partial numeric strings.
@@ -187,7 +190,83 @@ export function mountMotionIslands(
 		}
 	} );
 
+	root.querySelectorAll( '[data-mcpwp-control-plane]' ).forEach( ( element ) => {
+		if ( mountControlPlaneNode( element, createRootImpl ) ) {
+			mounted += 1;
+		}
+	} );
+
 	return mounted;
+}
+
+/**
+ * Enhances one explicit MCPWP control plane while preserving its fallback.
+ *
+ * @param {Element}  element        Explicit control-plane mount.
+ * @param {Function} createRootImpl React root factory.
+ * @return {boolean} Whether rendering was requested successfully.
+ */
+export function mountControlPlaneNode( element, createRootImpl = createRoot ) {
+	const config = readControlPlaneConfig( element );
+
+	if ( ! config ) {
+		return false;
+	}
+
+	const originalHTML = element.innerHTML;
+	let reactRoot;
+	const recover = createIslandRecovery(
+		element,
+		originalHTML,
+		() => reactRoot
+	);
+	const view = element.ownerDocument?.defaultView;
+	const selectIntent = ( route ) => {
+		element.dataset.selectedIntent = route.id;
+
+		if ( view?.history && typeof view.history.replaceState === 'function' ) {
+			const nextUrl = `${ view.location.pathname }${
+				view.location.search
+			}#${ encodeURIComponent( route.id ) }`;
+
+			view.history.replaceState( view.history.state, '', nextUrl );
+		}
+
+		if ( view?.CustomEvent ) {
+			element.dispatchEvent(
+				new view.CustomEvent( 'mcpwp:intent-selected', {
+					bubbles: true,
+					detail: { intent: route.id },
+				} )
+			);
+		}
+	};
+
+	if ( config.initialIntent ) {
+		element.dataset.selectedIntent = config.initialIntent;
+	} else {
+		delete element.dataset.selectedIntent;
+	}
+
+	try {
+		reactRoot = createRootImpl( element );
+		reactRoot.render(
+			<MotionIslandErrorBoundary onError={ recover }>
+				<ControlPlane
+					defaultSummary={ config.defaultSummary }
+					initialIntent={ config.initialIntent }
+					onIntent={ selectIntent }
+					routes={ config.routes }
+					staticHTML={ config.staticHTML }
+				/>
+			</MotionIslandErrorBoundary>
+		);
+		delete element.dataset.motionFailed;
+		return true;
+	} catch {
+		recover();
+		return false;
+	}
 }
 
 /**

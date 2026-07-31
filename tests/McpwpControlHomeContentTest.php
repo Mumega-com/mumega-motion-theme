@@ -43,6 +43,7 @@ final class McpwpControlHomeContentTest extends TestCase {
 		$this->assertSame( 3, substr_count( $content, 'data-mcpwp-summary=' ) );
 		$this->assertSame( 3, substr_count( $content, 'data-mcpwp-action-label=' ) );
 		$this->assertSame( 3, substr_count( $content, 'data-mcpwp-action-href=' ) );
+		$this->assertSame( 3, substr_count( $content, 'data-mcpwp-event="homepage_intent_selected"' ) );
 		$this->assertStringContainsString( 'data-mcpwp-control-summary', $content );
 		$this->assertStringContainsString( 'aria-live="polite"', $content );
 	}

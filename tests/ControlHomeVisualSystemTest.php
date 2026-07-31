@@ -103,6 +103,18 @@ final class ControlHomeVisualSystemTest extends TestCase {
 	}
 
 	/**
+	 * Catches React enhancement wrappers becoming layout boxes that break the server-designed graph.
+	 */
+	public function test_progressive_enhancement_wrappers_preserve_server_layout(): void {
+		$css = $this->stylesheet();
+
+		$this->assertMatchesRegularExpression(
+			'/\.mcpwp-control-plane__enhancement,\s*\.mcpwp-control-plane__static\s*\{[^}]*display:\s*contents;/s',
+			$css
+		);
+	}
+
+	/**
 	 * Catches a palette change that makes the core reading surfaces fail WCAG AA.
 	 */
 	public function test_primary_palette_pairs_meet_wcag_aa(): void {
